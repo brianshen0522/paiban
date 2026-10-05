@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-Hant-TW">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>播放測試</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 16px; max-width: 900px; }
+  video { width: 100%; max-width: 640px; background: #000; display: block; margin: 8px 0; }
+  table { border-collapse: collapse; margin: 8px 0 24px; }
+  td, th { border: 1px solid #999; padding: 4px 8px; text-align: left; }
+  .ok { color: #070; } .bad { color: #b00; }
+  pre { background: #eee; padding: 8px; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<h1>拍板 階段 0：瀏覽器播放測試</h1>
+<p>按「開始」後會依序測兩個檔案：載入、播放、拖到 10:00、再拖回 0:30。全部自動。跑完把最下面灰色框裡的文字貼回給 coding agent。也請順便用耳朵確認 5.1 那個檔案有沒有聲音。</p>
+<button type="button" id="go">開始</button>
+<div id="out"></div>
+<pre id="summary"></pre>
+<script>
+const FILES = ['yts-like.stereo.mp4', 'yts-like.5.1.mp4'];
+const wait = (el, ev, ms = 20000) => new Promise((res, rej) => {
+  const t = setTimeout(() => rej(new Error(`timeout waiting for ${ev}`)), ms);
+  el.addEventListener(ev, () => { clearTimeout(t); res(); }, { once: true });
+  el.addEventListener('error', () => { clearTimeout(t); rej(new Error(`media error ${el.error?.code}`)); }, { once: true });
+});
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function test(name) {
+  const box = document.createElement('div');
+  box.innerHTML = `<h2>${name}</h2>`;
+  const v = document.createElement('video');
+  v.controls = true; v.preload = 'metadata'; v.playsInline = true;
+  box.appendChild(v);
+  const table = document.createElement('table');
+  box.appendChild(table);
+  document.getElementById('out').appendChild(box);
+  const rows = [];
+  const row = (step, ok, detail) => {
+    rows.push({ step, ok, detail });
+    const tr = table.insertRow();
+    tr.insertCell().textContent = step;
+    const c = tr.insertCell(); c.textContent = ok ? '通過' : '失敗'; c.className = ok ? 'ok' : 'bad';
+    tr.insertCell().textContent = detail;
+  };
+  const t0 = performance.now();
+  try {
+    row('canPlayType', v.canPlayType('video/mp4; codecs="avc1.640028, mp4a.40.2"') !== '', v.canPlayType('video/mp4; codecs="avc1.640028, mp4a.40.2"') || '(empty)');
+    v.src = `/${name}`;
+    await wait(v, 'loadedmetadata');
+    row('載入 metadata（moov 在檔尾）', true, `${Math.round(performance.now() - t0)} ms，片長 ${v.duration.toFixed(1)} s，${v.videoWidth}×${v.videoHeight}`);
+    v.muted = false;
+    try { await v.play(); } catch (e) { v.muted = true; await v.play(); row('自動播放有聲音', false, '瀏覽器擋了有聲音的自動播放，改成靜音播放（不影響結論）'); }
+    const a = v.currentTime; await sleep(2500); const b = v.currentTime;
+    row('播放', b - a > 1.5, `2.5 秒內前進 ${(b - a).toFixed(2)} s`);
+    const t1 = performance.now();
+    v.currentTime = 600; await wait(v, 'seeked');
+    const c1 = v.currentTime; await sleep(2000); const c2 = v.currentTime;
+    row('拖到 10:00', Math.abs(c1 - 600) < 2 && c2 > c1, `拖動花 ${Math.round(performance.now() - t1)} ms，之後 2 秒前進 ${(c2 - c1).toFixed(2)} s`);
+    v.currentTime = 30; await wait(v, 'seeked');
+    const d1 = v.currentTime; await sleep(1500); const d2 = v.currentTime;
+    row('拖回 0:30', Math.abs(d1 - 30) < 2 && d2 > d1, `之後 1.5 秒前進 ${(d2 - d1).toFixed(2)} s`);
+    const aud = v.webkitAudioDecodedByteCount ?? v.mozHasAudio ?? (v.audioTracks ? v.audioTracks.length : 'n/a');
+    row('聲音（瀏覽器回報）', aud !== 0 && aud !== false, String(aud));
+  } catch (e) {
+    row('錯誤', false, e.message);
+  }
+  v.pause();
+  return { name, rows };
+}
+document.getElementById('go').onclick = async () => {
+  document.getElementById('go').disabled = true;
+  const results = [];
+  for (const f of FILES) results.push(await test(f));
+  const lines = [navigator.userAgent];
+  for (const r of results) for (const x of r.rows) lines.push(`${r.name} | ${x.step} | ${x.ok ? 'OK' : 'FAIL'} | ${x.detail}`);
+  document.getElementById('summary').textContent = lines.join('\n');
+  window.__done = lines;
+};
+</script>
+</body>
+</html>

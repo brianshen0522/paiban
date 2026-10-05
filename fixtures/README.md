@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | `clip.mp4` | H.264 8-bit、480×270、23.976 fps、AAC 單聲道。1.4 MB | 「能直接播」的版本。下載、分析、同步、匯出的主要素材 |
 | `clip.hevc10.mp4` | 同樣的畫面，HEVC 10-bit、AAC 5.1。2.3 MB。每一格的時間戳和 `clip.mp4` 相同 | 「不能直接播」的版本：聲音檔要轉檔、要做預覽檔 |
-| `clip.webm` | 同樣的內容，VP9 + Opus。2.4 MB | **Playwright 內建的 Chromium 不能解碼 H.264。** 需要真的播放影片的瀏覽器測試用這個。它也算「能直接播」的版本（規則在 `docs/08-media-pipeline.md`） |
+| `clip.webm` | 同樣的內容，VP9 + Opus。2.4 MB | 需要真的播放影片的瀏覽器測試用這個，這樣不依賴測試用的 Chromium 能不能解 H.264（交接時的版本不能，Playwright 1.63 可以，見 `docs/15-testing.md`）。它也算「能直接播」的版本（規則在 `docs/08-media-pipeline.md`） |
 
 ## 分析結果
 
@@ -56,7 +56,21 @@
 | `late.en.vtt` | WebVTT |
 | `archive.zip` | 字幕網站常見的壓縮檔：一個 Big5 的繁體字幕、一個英文字幕、一個說明文字檔、一個 `__MACOSX` 的雜檔 |
 
-還沒有、需要在階段 0 自己準備的：`.rar` 和 `.7z` 的壓縮檔（準備這份素材的環境裡沒有能產生它們的工具）、惡意的壓縮檔（路徑含 `..`、含符號連結、解開後超過上限）。
+`archives/`（階段 0 用 `scripts/phase0/make-archives.sh` 產生，在一個暫時的 Debian 容器裡用 RARLAB 的 `rar` 7 和 `7zip`；這兩個工具都不在產品的映像檔裡）：
+
+| 檔案 | 內容 | 該有的結果 |
+| --- | --- | --- |
+| `archive.rar` | 和 `archive.zip` 同樣的四個項目，RAR5 | 和 `archive.zip` 相同。`rar` 7 已經不能寫 RAR4，所以沒有 RAR4 的樣本 |
+| `archive.7z` | 同上，7z | 同上 |
+| `hostile.traversal.zip` | 一個正常字幕加一個 `../../escaped.srt` | 整包拒絕（`ARCHIVE_INVALID`） |
+| `hostile.absolute.zip` | 一個正常字幕加一個 `/tmp/absolute.srt` | 整包拒絕 |
+| `hostile.symlink.zip` | 一個正常字幕加一個指向 `/etc/passwd` 的符號連結 | 整包拒絕 |
+| `hostile.bomb.zip` | 一個正常字幕加一個解開後 60 MB 的項目（壓縮後 62 KB） | 整包拒絕 |
+| `hostile.many.zip` | 201 個字幕檔 | 整包拒絕（上限 200） |
+| `nosubtitle.zip` | 只有一個文字檔 | `NO_SUBTITLE` |
+| `broken.zip` | 檔頭像 zip，內容不是 | `ARCHIVE_INVALID` |
+
+映像檔裡的 bsdtar 3.7.4 能解前兩個，內容和 `archive.zip` 完全相同。它自己只會拒絕含 `..` 的項目（其他照解）、去掉開頭的 `/`；符號連結照樣解出來、數量和大小不限制。所以這些檢查要由程式自己做（`docs/agent-notes.md`）。
 
 ## ffsubsync 的結果
 
