@@ -1,7 +1,10 @@
 import { mkdir, readdir, rename, stat, symlink, writeFile } from 'node:fs/promises';
+import { cpus } from 'node:os';
 import { extname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Logger } from 'pino';
+import { z } from 'zod';
+import { pickWindows } from '../asr/text.js';
 import type { Config } from '../config.js';
 import { many, one, type Pool, tx } from '../db/pool.js';
 import { readSettings } from '../settings/settings.js';
@@ -42,6 +45,7 @@ export const MEDIA_ROW = `select mf.id, mf.torrent_id, t.info_hash, mf.rel_path,
   from media_files mf join torrents t on t.id = mf.torrent_id join movies m on m.id = t.movie_id`;
 
 const NPZ_TO_JSON = fileURLToPath(new URL('../../media-scripts/npz_to_speech_json.py', import.meta.url));
+const ASR_SCRIPT = fileURLToPath(new URL('../../media-scripts/asr.py', import.meta.url));
 
 export const source = (c: Config, r: Pick<MediaRow, 'info_hash' | 'rel_path'>) =>
   join(c.dataDir, 'torrents', r.info_hash, r.rel_path);
@@ -257,10 +261,13 @@ export async function analysisJob(
     for (const f of files) await rename(join(work, f), join(out, f));
     let bytes = 0;
     for (const f of [...files, 'probe.json']) bytes += (await stat(join(out, f)).catch(() => ({ size: 0 }))).size;
+    // Recognition follows when it is switched on and there is something to hear (docs/08, "語音辨識").
+    const asr = (await readSettings(pool)).align.asr && !!row.audio_codec;
     const fin = await pool.query(
-      `update media_files mf set analysis_state = 'ready', analysis_bytes = $2, error = mf.error - 'analysis', updated_at = now() from torrents t
+      `update media_files mf set analysis_state = 'ready', analysis_bytes = $2, error = mf.error - 'analysis',
+              asr_state = case when $3 then 'pending' else mf.asr_state end, updated_at = now() from torrents t
         where mf.id = $1 and mf.analysis_state = 'running' and t.id = mf.torrent_id and t.want <> 'remove'`,
-      [row.id, bytes],
+      [row.id, bytes, asr],
     );
     if (!fin.rowCount) {
       await removeOwnMediaOutput(config.dataDir, row.id, files);
@@ -281,6 +288,85 @@ export async function analysisJob(
     }
     const code = failedPart ?? 'SPEECH_FAILED';
     return failAttempt(d, row, taskId, 'analysis', code);
+  } finally {
+    await removeWorkDir(config.dataDir, work);
+  }
+}
+
+const AsrOutput = z.object({
+  language: z.string().max(16),
+  model: z.string(),
+  windows: z.array(z.tuple([z.number(), z.number()])),
+  segments: z.array(z.object({ start: z.number(), end: z.number(), text: z.string() })),
+});
+
+/**
+ * Speech recognition (docs/08, "語音辨識"): Whisper on a few evenly spread windows of the film,
+ * never the whole film. The result, asr.json, is what auto-align pairs subtitle lines with. A
+ * failure only means auto-align works without it; it is not retried by itself.
+ */
+export async function asrJob(d: JobDeps, row: MediaRow): Promise<'done' | 'failed' | 'skipped'> {
+  const { pool, config, log } = d;
+  if (!(await readSettings(pool)).align.asr) {
+    await pool.query(`update media_files set asr_state = 'none' where id = $1 and asr_state = 'pending'`, [row.id]);
+    await notify(pool, row.torrent_id);
+    return 'skipped';
+  }
+  const claimed = await pool.query(
+    `update media_files mf set asr_state = 'running', updated_at = now() from torrents t
+      where mf.id = $1 and mf.asr_state = 'pending' and mf.analysis_state = 'ready' and t.id = mf.torrent_id and t.want <> 'remove'`,
+    [row.id],
+  );
+  if (!claimed.rowCount) return 'skipped';
+  await notify(pool, row.torrent_id);
+  const work = workDir(config, `asr-${row.id}`);
+  try {
+    const python = process.env.ASR_PYTHON;
+    if (!python) throw new Error('ASR_PYTHON is not set: speech recognition is not installed here');
+    await mkdir(work, { recursive: true });
+    const windows = pickWindows(row.duration_s ?? row.runtime_min * 60);
+    const args = [ASR_SCRIPT, source(config, row), JSON.stringify(windows), '--model', process.env.ASR_MODEL ?? 'base'];
+    args.push('--threads', String(cpus().length));
+    if (process.env.ASR_MODELS) args.push('--models-dir', process.env.ASR_MODELS);
+    const p = run(python, args, { nice: true });
+    const r = await watched(
+      () => p.done,
+      () => stillRunning(pool, row.id, 'asr_state'),
+      () => p.child.kill('SIGKILL'),
+    );
+    if (r.code !== 0) throw new Error(`asr.py exited with ${r.code}: ${r.stderr.slice(-300)}`);
+    const transcript = AsrOutput.parse(JSON.parse(r.stdout));
+    const body = JSON.stringify(transcript);
+    await writeFile(join(work, 'asr.json'), body);
+    if (!(await stillRunning(pool, row.id, 'asr_state'))) throw new Cancelled();
+    await mkdir(mediaDir(config, row.id), { recursive: true });
+    await rename(join(work, 'asr.json'), join(mediaDir(config, row.id), 'asr.json'));
+    const fin = await pool.query(
+      `update media_files mf set asr_state = 'ready', asr_language = $2, analysis_bytes = mf.analysis_bytes + $3,
+              error = mf.error - 'asr', updated_at = now() from torrents t
+        where mf.id = $1 and mf.asr_state = 'running' and t.id = mf.torrent_id and t.want <> 'remove'`,
+      [row.id, transcript.language, Buffer.byteLength(body)],
+    );
+    if (!fin.rowCount) {
+      await removeOwnMediaOutput(config.dataDir, row.id, ['asr.json']);
+      return 'skipped';
+    }
+    log.info(
+      { mediaId: row.id, language: transcript.language, lines: transcript.segments.length },
+      'speech recognised',
+    );
+    await notify(pool, row.torrent_id, true);
+    return 'done';
+  } catch (err) {
+    if (err instanceof Cancelled) return 'skipped';
+    log.warn({ err, mediaId: row.id }, 'speech recognition failed');
+    await pool.query(
+      `update media_files set asr_state = 'failed', error = coalesce(error, '{}'::jsonb) || '{"asr": "ASR_FAILED"}'::jsonb, updated_at = now()
+        where id = $1 and asr_state = 'running'`,
+      [row.id],
+    );
+    await notify(pool, row.torrent_id);
+    return 'failed';
   } finally {
     await removeWorkDir(config.dataDir, work);
   }
@@ -624,7 +710,11 @@ export async function rescanJob(d: JobDeps, taskId: string): Promise<void> {
     const size = async (f: string) =>
       (await stat(join(config.dataDir, 'media', m.id, f)).catch(() => ({ size: 0 }))).size;
     const analysis =
-      (await size('probe.json')) + (await size('peaks.bin')) + (await size('ref.npz')) + (await size('speech.json'));
+      (await size('probe.json')) +
+      (await size('peaks.bin')) +
+      (await size('ref.npz')) +
+      (await size('speech.json')) +
+      (await size('asr.json'));
     const audio = m.audio_state === 'ready' ? await size('audio.m4a') : m.audio_bytes;
     const proxy = m.proxy_state === 'ready' ? await size('proxy.mp4') : m.proxy_bytes;
     if (analysis !== m.analysis_bytes || audio !== m.audio_bytes || proxy !== m.proxy_bytes) {

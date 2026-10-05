@@ -241,7 +241,8 @@ export type MediaErrorCode =
   | 'PEAKS_FAILED'
   | 'SPEECH_FAILED'
   | 'TRANSCODE_FAILED'
-  | 'PREVIEW_NO_SPACE';
+  | 'PREVIEW_NO_SPACE'
+  | 'ASR_FAILED';
 
 export type MediaStatus = {
   id: Id;
@@ -257,7 +258,12 @@ export type MediaStatus = {
    * entries, so a later preview failure does not hide why there is no waveform. An entry is cleared
    * when that asset is requested again.
    */
-  errors: Partial<Record<'analysis' | 'audio' | 'proxy', MediaErrorCode>>;
+  errors: Partial<Record<'analysis' | 'audio' | 'proxy' | 'asr', MediaErrorCode>>;
+  /**
+   * Speech recognition on a few windows of the film, for auto-align (docs/08, "語音辨識").
+   * `language` is what was heard (ISO 639-1, as Whisper reports it). 'none' = switched off.
+   */
+  asr: { state: AssetState; language: string | null };
   /** Preview audio and video on disk plus what is still reserved for them: what removing the film frees besides the film. */
   previewBytes: Bytes;
   /** What POST /api/media/:id/proxy would reserve right now; 0 when no preview asset is missing. */
@@ -644,12 +650,27 @@ export type Settings = {
     zimuku: { enabled: boolean; searchUrl: string };
   };
   subtitles: { defaultLangs: Lang[] };
+  /**
+   * Auto-align with recognised speech (docs/08, "語音辨識" and "語言模型"). `asr` switches
+   * recognition for newly analysed films. `llm` pairs recognised speech with a subtitle in
+   * another language; its key is the `llmKey` secret.
+   */
+  align: {
+    asr: boolean;
+    llm: {
+      provider: 'none' | 'anthropic' | 'openai';
+      /** Empty = the provider's default (Claude Opus 5.5 for Anthropic). Required for 'openai'. */
+      model: string;
+      /** Only for 'openai' (any OpenAI-compatible server: Qwen on DashScope, Ollama, vLLM); may be on the local network. */
+      baseUrl: string;
+    };
+  };
 };
 
 /** Read-only facts shown next to the settings. */
 export type SettingsInfo = {
   /** Which secrets are set. Their values are write-only. */
-  secrets: { tmdbKey: boolean; subdlKey: boolean; assrtToken: boolean };
+  secrets: { tmdbKey: boolean; subdlKey: boolean; assrtToken: boolean; llmKey: boolean };
   /** From the environment; the published Docker ports have to match, so they are not editable here. */
   torrentPort: number;
   torrentDhtPort: number;
@@ -660,7 +681,7 @@ export type SettingsInfo = {
 /** The filesystem that holds /data: its size, what is free now, what the app always leaves free, and the highest limit that can be set. */
 export type DiskInfo = { totalBytes: Bytes; availableBytes: Bytes; reserveBytes: Bytes; maxLimitBytes: Bytes };
 
-export type SecretName = 'tmdbKey' | 'subdlKey' | 'assrtToken';
+export type SecretName = 'tmdbKey' | 'subdlKey' | 'assrtToken' | 'llmKey';
 
 type DeepPartial<T> = {
   [K in keyof T]?: T[K] extends (infer U)[] ? U[] : T[K] extends object ? DeepPartial<T[K]> : T[K];

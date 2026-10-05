@@ -19,7 +19,12 @@ export async function settingsInfo(deps: Deps): Promise<SettingsInfo> {
   );
   const lastAt = hb?.info.lastIncomingAt ?? null;
   return {
-    secrets: { tmdbKey: names.has('tmdbKey'), subdlKey: names.has('subdlKey'), assrtToken: names.has('assrtToken') },
+    secrets: {
+      tmdbKey: names.has('tmdbKey'),
+      subdlKey: names.has('subdlKey'),
+      assrtToken: names.has('assrtToken'),
+      llmKey: names.has('llmKey'),
+    },
     torrentPort: deps.config.torrentPort,
     torrentDhtPort: deps.config.torrentDhtPort,
     incoming: { seen: !!lastAt && Date.now() - Date.parse(lastAt) < 86_400_000, lastAt },

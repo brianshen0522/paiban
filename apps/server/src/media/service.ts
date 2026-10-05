@@ -2,7 +2,16 @@ import { many, one } from '../db/pool.js';
 import { cleanScratchOnStart } from '../storage/remove.js';
 import { versionLabel } from '../torrents/view.js';
 import { exportJob, finishCancelled } from './export-job.js';
-import { analysisJob, type JobDeps, MEDIA_ROW, type MediaRow, previewJob, probeJob, rescanJob } from './jobs.js';
+import {
+  analysisJob,
+  asrJob,
+  type JobDeps,
+  MEDIA_ROW,
+  type MediaRow,
+  previewJob,
+  probeJob,
+  rescanJob,
+} from './jobs.js';
 
 /**
  * The media service's scheduling (docs/02-architecture.md "服務之間怎麼溝通", docs/08 "對帳").
@@ -10,7 +19,7 @@ import { analysisJob, type JobDeps, MEDIA_ROW, type MediaRow, previewJob, probeJ
  * a job claims its row with a conditional update, so running it twice does it once. Each kind of
  * work runs one at a time, so a long transcode never blocks analysis, an export or a recalculation.
  */
-type Queue = 'analyze' | 'preview' | 'rescan' | 'export';
+type Queue = 'analyze' | 'asr' | 'preview' | 'rescan' | 'export';
 
 export class MediaService {
   private readonly d: JobDeps;
@@ -32,8 +41,9 @@ export class MediaService {
       `update media_files set probe_state = case when probe_state = 'running' then 'pending' else probe_state end,
               analysis_state = case when analysis_state = 'running' then 'pending' else analysis_state end,
               audio_state = case when audio_state = 'running' then 'pending' else audio_state end,
-              proxy_state = case when proxy_state = 'running' then 'pending' else proxy_state end
-        where 'running' in (probe_state, analysis_state, audio_state, proxy_state)`,
+              proxy_state = case when proxy_state = 'running' then 'pending' else proxy_state end,
+              asr_state = case when asr_state = 'running' then 'pending' else asr_state end
+        where 'running' in (probe_state, analysis_state, audio_state, proxy_state, asr_state)`,
     );
     // A cancellation the restart interrupted is finished now: nobody runs that export any more.
     const cancelled = await many<{ id: string }>(pool, `select id from exports where cancel_requested`);
@@ -95,7 +105,7 @@ export class MediaService {
           and not exists (select 1 from exports e where e.id::text = tasks.input->>'exportId' and e.state in ('queued', 'running'))`,
     );
     if (need.length) await pool.query(`select pg_notify('paiban_events', '{"type":"task"}')`);
-    for (const q of ['analyze', 'preview', 'rescan', 'export'] as const) this.kick(q);
+    for (const q of ['analyze', 'asr', 'preview', 'rescan', 'export'] as const) this.kick(q);
   }
 
   kick(q: Queue): void {
@@ -123,7 +133,9 @@ export class MediaService {
             ? await this.nextExport()
             : q === 'analyze'
               ? await this.nextAnalysis()
-              : await this.nextPreview();
+              : q === 'asr'
+                ? await this.nextAsr()
+                : await this.nextPreview();
       if (!did) return;
     }
   }
@@ -157,6 +169,20 @@ export class MediaService {
     const result = await analysisJob(this.d, row, await this.task('analyze', row.id));
     if (result === 'retry') this.cooling.set(row.id, Date.now() + 60_000);
     if (result === 'skipped') this.cooling.set(row.id, Date.now() + 5_000);
+    if (result === 'done') this.kick('asr');
+    return true;
+  }
+
+  /** Speech recognition, after the analysis (docs/08, "語音辨識"). Its own queue: it takes minutes. */
+  private async nextAsr(): Promise<boolean> {
+    const rows = await many<MediaRow>(
+      this.d.pool,
+      `${MEDIA_ROW} where t.want <> 'remove' and mf.analysis_state = 'ready' and mf.asr_state = 'pending' order by mf.created_at`,
+    );
+    const row = rows.find((r) => !this.cool(`asr:${r.id}`));
+    if (!row) return false;
+    const result = await asrJob(this.d, row);
+    if (result === 'skipped') this.cooling.set(`asr:${row.id}`, Date.now() + 5_000);
     return true;
   }
 

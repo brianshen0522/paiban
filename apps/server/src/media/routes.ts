@@ -84,7 +84,10 @@ export function mediaRoutes(app: FastifyInstance, deps: Deps): void {
     });
   }
 
-  /** Asks for the analysis (docs/04-api.md): `none` or `failed` becomes `pending`; a failed probe is redone too. */
+  /**
+   * Asks for the analysis (docs/04-api.md): `none` or `failed` becomes `pending`; a failed probe is
+   * redone too, and so is missing speech recognition once the analysis is there.
+   */
   app.post('/api/media/:id/analyze', async (req) => {
     const { id } = parse(Params, req.params);
     const row = await holderMedia(deps, requireUser(req), id);
@@ -95,7 +98,15 @@ export function mediaRoutes(app: FastifyInstance, deps: Deps): void {
         where id = $1 and analysis_state in ('none', 'failed')`,
       [id],
     );
-    if (changed.rowCount) {
+    // A film analysed already may still lack recognition: failed, or switched off back then.
+    const asr = (await readSettings(pool)).align.asr
+      ? await pool.query(
+          `update media_files set asr_state = 'pending', error = error - 'asr', updated_at = now()
+            where id = $1 and analysis_state = 'ready' and asr_state in ('none', 'failed') and audio_codec is not null`,
+          [id],
+        )
+      : { rowCount: 0 };
+    if (changed.rowCount || asr.rowCount) {
       await pool.query(`select pg_notify('paiban_media', '{}')`);
       await publishTorrent(pool, deps.events, row.id);
     }

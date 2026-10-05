@@ -69,7 +69,7 @@ create table settings (
 );
 
 create table secrets (
-  name       text primary key check (name in ('tmdbKey', 'subdlKey', 'assrtToken')),
+  name       text primary key check (name in ('tmdbKey', 'subdlKey', 'assrtToken', 'llmKey')),
   nonce      bytea not null,
   ciphertext bytea not null,                           -- AES-256-GCM with the key from SECRET_KEY; never returned by the API
   updated_by uuid references users (id) on delete set null,
@@ -230,7 +230,11 @@ create table media_files (
   proxy_progress real not null default 0,
   proxy_bytes    bigint not null default 0,
   reserve_bytes  bigint not null default 0 check (reserve_bytes >= 0),  -- still reserved for preview assets not finished yet
-  error          jsonb,                                -- {analysis?, audio?, proxy?: MediaErrorCode}: one entry per asset, cleared when that asset is requested again
+  error          jsonb,                                -- {analysis?, audio?, proxy?, asr?: MediaErrorCode}: one entry per asset, cleared when that asset is requested again
+  -- Speech recognition on a few windows of the film, after the analysis (docs/08, "語音辨識"):
+  -- asr.json in the media folder, counted in analysis_bytes. 'none' = switched off or no audio.
+  asr_state      text not null default 'none' check (asr_state in ('none', 'pending', 'running', 'ready', 'failed')),
+  asr_language   text,                                 -- what recognition decided was spoken
   created_at     timestamptz not null default now(),
   updated_at     timestamptz not null default now()
 );

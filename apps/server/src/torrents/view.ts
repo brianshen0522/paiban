@@ -53,6 +53,8 @@ export type TorrentRow = {
   rel_path: string | null;
   probe_state: AssetState | null;
   has_audio: boolean | null;
+  asr_state: AssetState | null;
+  asr_language: string | null;
 };
 
 const TORRENT_SELECT = `
@@ -68,7 +70,8 @@ select t.id, t.info_hash, t.quality, t.source_type, t.video_codec, t.bit_depth, 
        end as queue_position,
        mf.id as media_id, mf.duration_s, mf.fps_num, mf.fps_den, mf.direct_play, mf.analysis_state, mf.audio_state,
        mf.audio_bytes, mf.proxy_state, mf.proxy_res, mf.proxy_progress, mf.proxy_bytes, mf.reserve_bytes, mf.error as media_error,
-       mf.container, mf.rel_path, mf.probe_state, (mf.probe_state <> 'ready' or mf.audio_codec is not null) as has_audio
+       mf.container, mf.rel_path, mf.probe_state, (mf.probe_state <> 'ready' or mf.audio_codec is not null) as has_audio,
+       mf.asr_state, mf.asr_language
   from torrents t
   join movies m on m.id = t.movie_id
   left join users ru on ru.id = t.requested_by
@@ -122,6 +125,7 @@ export function mediaStatus(r: TorrentRow, proxyResolution: '480p' | '720p' = '4
     previewBytes: (r.audio_bytes ?? 0) + (r.proxy_bytes ?? 0) + (r.reserve_bytes ?? 0),
     previewNeedBytes: need,
     sources,
+    asr: { state: r.asr_state ?? 'none', language: r.asr_language },
   };
 }
 
