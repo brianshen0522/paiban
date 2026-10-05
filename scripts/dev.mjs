@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 // `pnpm dev`: everything for local development, no network and no keys needed (docs/15-testing.md).
 //   - PostgreSQL in Docker (deploy/docker-compose.dev.yml, port 55433)
-//   - the local seeder serving the three fixture clips as Charade's versions
+//   - the local seeder serving the three fixture clips as Charade's versions (plus SEED_EXTRA_FILM)
 //   - the fake YTS on 127.0.0.1:8090 (the 14 public-domain films)
 //   - the fake subtitle sources on 127.0.0.1:8091 (recorded answers for Inception, tt1375666)
-//   - api and torrent from source (tsx), with the development-only switches
+//   - api, torrent and media from source (tsx), with the development-only switches
 //   - Vite on http://localhost:5173
 // Sign in as `admin` / `paiban-dev-not-real` (development values). Files go to .dev-data/.
 import { spawn, spawnSync } from 'node:child_process';
-import { mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -75,8 +75,11 @@ function run(name, cmd, args, cwd) {
 }
 
 const tsx = join(root, 'node_modules', '.bin', 'tsx');
+// The fake YTS reads the seeder's versions once, so wait for this run's file: hashing a long
+// SEED_EXTRA_FILM takes a while, and an old file would list hashes nobody seeds.
+rmSync(localVersions, { force: true });
 run('seed', 'node', ['src/seed-cli.ts'], 'tools/fakes');
-await new Promise((r) => setTimeout(r, 1500)); // the seeder writes local-versions.json first
+while (!existsSync(localVersions)) await new Promise((r) => setTimeout(r, 500));
 run('yts', 'node', ['src/yts-cli.ts'], 'tools/fakes');
 run('sources', 'node', ['src/subtitles-cli.ts'], 'tools/fakes');
 run('api', tsx, ['watch', 'src/api.ts'], 'apps/server');
