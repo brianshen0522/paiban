@@ -144,7 +144,7 @@ function Loaded({ ws, tab }: { ws: Workspace; tab: Tab }) {
           </button>
         ))}
       </div>
-      <div id="ws-panel" role="tabpanel" aria-labelledby={`tab-${tab}`} className="stack">
+      <div id="ws-panel" role="tabpanel" aria-labelledby={`tab-${tab}`} className="ws-panel">
         {tab === 'subtitles' && <SubtitlesTab ws={ws} />}
         {tab === 'sync' && <SyncTab ws={ws} />}
         {tab === 'export' && <ExportTab ws={ws} />}

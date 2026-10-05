@@ -1,5 +1,23 @@
 /* Workspace and sync workbench (docs/11-pages.md, "工作區"; docs/09-sync-workbench.md). Tokens from app.css. */
 
+/* A link styled as the row's main action, and links that read as links. */
+a.btn.strong {
+  border-color: var(--accent-ink);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+a.link {
+  color: var(--accent-ink);
+  text-underline-offset: 3px;
+}
+#view .lib-main h2 a.link {
+  color: var(--ink);
+  text-decoration: none;
+}
+#view .lib-main h2 a.link:hover {
+  text-decoration: underline;
+}
+
 /* Toggle buttons (docs/17-ui.md, "切換鈕"). */
 button[aria-pressed="true"] {
   background: var(--ink);
@@ -9,6 +27,20 @@ button[aria-pressed="true"] {
 #view .bench .cue-row .x[aria-pressed="true"] {
   background: none;
   color: var(--ink);
+}
+
+#view .ws-panel,
+#view .ws-form {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+#view .ws-form {
+  gap: 12px;
+}
+#view .ws-form .field input {
+  max-width: 560px;
+  width: 100%;
 }
 
 #view fieldset.fchips,
@@ -626,6 +658,7 @@ button[aria-pressed="true"] {
 #view .bench .tool .grow {
   flex: 1 1 100%;
   min-width: 0;
+  white-space: nowrap;
 }
 #view .bench .tool .grow select {
   flex: 1 1 auto;

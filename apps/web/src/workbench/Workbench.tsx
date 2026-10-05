@@ -127,13 +127,18 @@ function Bench({ ws, detail }: { ws: Workspace; detail: SubtitleDetail }) {
   const savedRef = useRef<{ doc: SyncDoc; rev: number }>({ doc: detail.doc, rev: sub.rev });
   const reasonRef = useRef<'auto-align' | 'reset' | null>(null);
   const confirmedDocRef = useRef<SyncDoc | null>(sub.status === 'confirmed' ? detail.doc : null);
-  const [status, setStatus] = useState(sub.status);
+  // What the server last said; shown as a draft at once while the timing differs from what was confirmed.
+  const [serverStatus, setStatus] = useState(sub.status);
   const [saveState, setSaveState] = useState<SaveState>('saved');
   const [conflict, setConflict] = useState<Conflict | null>(null);
   const conflictRef = useRef(false);
   const [removed, setRemoved] = useState(false);
   const removedRef = useRef(false);
   const doc = docRef.current;
+  const status =
+    serverStatus === 'confirmed' && (!confirmedDocRef.current || !timingDiffers(confirmedDocRef.current, doc))
+      ? 'confirmed'
+      : 'draft';
 
   const [msg, setMsg] = useState<Msg>({ text: t.bench.msg.ready });
   const say = useCallback(
@@ -237,10 +242,6 @@ function Bench({ ws, detail }: { ws: Workspace; detail: SubtitleDetail }) {
     if (opts.record !== false) historyRef.current = record(historyRef.current, docRef.current);
     docRef.current = next;
     if (opts.reason) reasonRef.current = opts.reason;
-    if (confirmedDocRef.current && timingDiffers(confirmedDocRef.current, next)) {
-      setStatus('draft');
-      confirmedDocRef.current = null;
-    }
     scheduleSave();
     rerender();
   });

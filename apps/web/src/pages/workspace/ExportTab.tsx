@@ -103,7 +103,7 @@ export function ExportTab({ ws }: { ws: Workspace }) {
     <>
       <section className="card">
         <h2>{t.exportTab.tracks}</h2>
-        <form className="stack" onSubmit={start} noValidate>
+        <form className="ws-form" onSubmit={start} noValidate>
           {confirmed.length ? (
             <div className="tw">
               <table>

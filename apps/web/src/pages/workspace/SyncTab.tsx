@@ -1,4 +1,5 @@
 import type { Workspace } from '@paiban/shared';
+import { useEffect } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { Chip, Empty } from '../../components/Bits';
 import { t } from '../../copy/zh-TW';
@@ -12,6 +13,12 @@ export function SyncTab({ ws }: { ws: Workspace }) {
   const navigate = useNavigate();
   const x = ws.item.torrent;
   const subs = ws.subtitles;
+
+  // Pin the choice in the address, so confirming (which changes "the first unconfirmed") keeps it open.
+  const auto = !subtitleId ? (subs.find((s) => s.status !== 'confirmed') ?? subs[0] ?? null) : null;
+  useEffect(() => {
+    if (auto) navigate(`/library/${x.id}/sync/${auto.id}`, { replace: true });
+  }, [auto, navigate, x.id]);
 
   if (!subs.length)
     return (
