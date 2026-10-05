@@ -16,6 +16,14 @@
 
 ---
 
+## 2026-10-06 假的字幕來源也替本機做種的那部片回答
+
+- 原本：docs/15-testing.md 寫假的字幕來源只有 *Inception*（`tt1375666`）有結果。但假 YTS 上由本機做種的是 *Charade*（`tt9000002`），所以「離線的完整流程」走到找字幕時每個來源都是 0 筆，`pnpm dev` 也一樣，只能自己上傳。
+- 改成：`startFakeSources({ answerAsInception: [...] })` 把列出的 IMDb 編號當成 *Inception* 回答（TMDB、SubDL、YIFY 依 IMDb 查；JustSubtitles 依 TMDB 查到的 27205）。`pnpm dev` 的假來源和端對端測試都替 `tt9000002` 回答。錄下來的回應不變。
+- 原因：階段 9 的完整流程測試要能從真的搜尋結果加入字幕。
+- 改了哪些檔案：docs/15-testing.md、tools/fakes/src/subtitles.ts、tools/fakes/src/subtitles-cli.ts、scripts/dev.mjs
+- Brian 是否已確認：不需要
+
 ## 2026-10-06 自動對齊加上語音辨識和語言模型
 
 - 原本：自動對齊只看人聲偵測（ffsubsync 兩種、對齊核心），在配樂多的真實影片上會選錯（階段 0 的 Tears of Steel 五種情境全錯）。

@@ -3,7 +3,8 @@
 //   - PostgreSQL in Docker (deploy/docker-compose.dev.yml, port 55433)
 //   - the local seeder serving the three fixture clips as Charade's versions
 //   - the fake YTS on 127.0.0.1:8090 (the 14 public-domain films)
-//   - the fake subtitle sources on 127.0.0.1:8091 (recorded answers for Inception, tt1375666)
+//   - the fake subtitle sources on 127.0.0.1:8091 (recorded answers for Inception, tt1375666, also
+//     given for Charade, tt9000002)
 //   - api and torrent from source (tsx), with the development-only switches
 //   - Vite on http://localhost:5173
 // Sign in as `admin` / `paiban-dev-not-real` (development values). Files go to .dev-data/.
