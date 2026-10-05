@@ -297,7 +297,6 @@ function Bench({ ws, detail }: { ws: Workspace; detail: SubtitleDetail }) {
         return;
       }
       if (e.rev <= savedRef.current.rev || inFlight.current || dirty()) return;
-      if (e.by && e.by.id === me?.user.id) return;
       void reload(e.by?.displayName ?? t.bench.msg.someone);
     };
     const onReconnect = () => {
@@ -309,7 +308,7 @@ function Bench({ ws, detail }: { ws: Workspace; detail: SubtitleDetail }) {
       window.removeEventListener(SUBTITLE_EVENT, onEvent);
       window.removeEventListener(RECONNECTED, onReconnect);
     };
-  }, [sub.id, me?.user.id, reload, say, dirty]);
+  }, [sub.id, reload, say, dirty]);
 
   const takeTheirs = useLatest(() => {
     if (!conflict) return;
