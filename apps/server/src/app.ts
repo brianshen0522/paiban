@@ -14,6 +14,7 @@ import { libraryRoutes } from './library/routes.js';
 import { mediaRoutes } from './media/routes.js';
 import { notificationRoutes } from './notifications/routes.js';
 import { settingsRoutes } from './settings/routes.js';
+import { secretRoutes } from './settings/secrets.js';
 import { storageRoutes } from './storage/routes.js';
 import { torrentRoutes } from './torrents/routes.js';
 import { ytsRoutes } from './yts/routes.js';
@@ -113,6 +114,7 @@ export function buildApp(deps: Deps): FastifyInstance {
   libraryRoutes(app, deps);
   notificationRoutes(app, deps);
   settingsRoutes(app, deps);
+  secretRoutes(app, deps);
   eventRoutes(app, deps);
   return app;
 }

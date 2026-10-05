@@ -3,16 +3,18 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Stand-ins for development and tests (docs/15-testing.md): a fake YTS and a local seeder. Never in the production image.",
+  "description": "Stand-ins for development and tests (docs/15-testing.md): a fake YTS, fake subtitle sources and a local seeder. Never in the production image.",
   "exports": {
     "./yts": "./src/yts.ts",
-    "./seed": "./src/seed.ts"
+    "./seed": "./src/seed.ts",
+    "./subtitles": "./src/subtitles.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "yts": "node src/yts-cli.ts",
-    "seed": "node src/seed-cli.ts"
+    "seed": "node src/seed-cli.ts",
+    "subtitles": "node src/subtitles-cli.ts"
   },
   "dependencies": {
     "webtorrent": "3.0.21"

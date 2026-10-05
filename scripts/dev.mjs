@@ -3,6 +3,7 @@
 //   - PostgreSQL in Docker (deploy/docker-compose.dev.yml, port 55433)
 //   - the local seeder serving the three fixture clips as Charade's versions
 //   - the fake YTS on 127.0.0.1:8090 (the 14 public-domain films)
+//   - the fake subtitle sources on 127.0.0.1:8091 (recorded answers for Inception, tt1375666)
 //   - api and torrent from source (tsx), with the development-only switches
 //   - Vite on http://localhost:5173
 // Sign in as `admin` / `paiban-dev-not-real` (development values). Files go to .dev-data/.
@@ -22,6 +23,7 @@ const up = spawnSync('docker', ['compose', '-f', 'deploy/docker-compose.dev.yml'
 });
 if (up.status !== 0) process.exit(up.status ?? 1);
 
+const sources = 'http://127.0.0.1:8091';
 const env = {
   ...process.env,
   NODE_ENV: 'development',
@@ -33,6 +35,18 @@ const env = {
   BOOTSTRAP_ADMIN_PASSWORD: 'paiban-dev-not-real',
   STORAGE_LIMIT_GB: '20',
   ALLOW_LOCAL_SOURCES: '1',
+  SOURCE_OVERRIDES: JSON.stringify({
+    'www.justsubtitles.com': `${sources}/justsubtitles`,
+    'api.justsubtitles.com': `${sources}/justsubtitles`,
+    'search.justsubtitles.com': `${sources}/justsubtitles-search`,
+    'dl.subdl.com': `${sources}/subdl-dl`,
+    'api.subdl.com': `${sources}/subdl`,
+    'api.themoviedb.org': `${sources}/tmdb`,
+    'yts-subs.com': `${sources}/yify`,
+    'subtitles.yts-subs.com': `${sources}/yify-dl`,
+    'api.assrt.net': `${sources}/assrt`,
+    'file.assrt.net': `${sources}/assrt-file`,
+  }),
   TORRENT_TEST_PEERS: '127.0.0.1:51801',
   TORRENT_PORT: '51811',
   TORRENT_DHT_PORT: '51812',
@@ -64,6 +78,7 @@ const tsx = join(root, 'node_modules', '.bin', 'tsx');
 run('seed', 'node', ['src/seed-cli.ts'], 'tools/fakes');
 await new Promise((r) => setTimeout(r, 1500)); // the seeder writes local-versions.json first
 run('yts', 'node', ['src/yts-cli.ts'], 'tools/fakes');
+run('sources', 'node', ['src/subtitles-cli.ts'], 'tools/fakes');
 run('api', tsx, ['watch', 'src/api.ts'], 'apps/server');
 run('torrent', tsx, ['src/torrent.ts'], 'apps/server');
 run('media', tsx, ['src/media.ts'], 'apps/server');

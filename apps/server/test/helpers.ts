@@ -73,7 +73,7 @@ export async function testApp(pool: Pool, over: Partial<Config> = {}): Promise<T
     log: pino({ level: 'silent' }),
     events: new EventHub(),
     disk: async () => ({ ...disk }),
-    outbound: { allowLocal: over.allowLocalSources ?? true, overrides: {} },
+    outbound: { allowLocal: over.allowLocalSources ?? true, overrides: over.sourceOverrides ?? {} },
   };
   const app = buildApp(deps);
   await app.ready();
