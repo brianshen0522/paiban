@@ -99,6 +99,11 @@ pnpm lint                                            # Biome:lint + 格式檢查
 pnpm test                                            # 各套件的 Vitest
 pnpm build                                           # 建置 shared、server、web
 
+pnpm db:test                                         # 測試用的 PostgreSQL(port 55432);pnpm test 之前先起來
+pnpm dev                                             # 本機開發:資料庫、假的 YTS、本機做種、api、torrent、網頁
+                                                     # 打開 http://localhost:5173,用 admin / paiban-dev-not-real 登入,
+                                                     # 在「來源設定」把 YTS 網址設成 http://127.0.0.1:8090
+
 mkdir -p deploy/data                                 # 第一次:先建資料夾,否則 Docker 會用 root 建立
 docker compose -f deploy/docker-compose.yml build    # 建置映像檔(paiban-server、paiban-proxy)
 docker compose -f deploy/docker-compose.yml up -d    # 起五個容器;網址是 deploy/.env 的 PUBLIC_URL

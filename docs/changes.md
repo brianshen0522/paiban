@@ -16,6 +16,38 @@
 
 ---
 
+## 2026-10-06 階段的順序：先做登入、搜尋與下載
+
+- 原本：`docs/14-plan.md` 依序做階段 1（帳號與外框）→ 2（搜尋與電影頁）→ 3（下載與容量上限）。
+- 改成：Brian 在 2026-10-06 說先做 YTS 搜尋和種子下載，並且要有登入。所以這一輪做了階段 1 的登入、外框和共用程式碼，階段 2 的全部，階段 3 的大部分。還沒做的列在 `docs/reports/phase-1-3.md`（邀請、註冊、重設密碼、個人設定、使用者管理、操作紀錄頁、強制刪除、`media` 程式等）。
+- 原因：Brian 的指示（AGENTS.md 依據的優先順序第 1 項）。
+- 改了哪些檔案：沒有改計畫本身；這一則是紀錄
+- Brian 是否已確認：是（他提出的）
+
+## 2026-10-06 外觀可以選淺色、深色、跟隨系統
+
+- 原本：`docs/17-ui.md` 只跟隨系統，`data-theme` 只給測試用。
+- 改成：帳號選單和登入頁有三選一，選擇存在裝置的 localStorage；`public/theme-init.js` 在第一次繪製前套用。
+- 原因：Brian 的 UI 原則（2026-10-06）：一定要 RWD，一定要能選 Light、Dark、System。
+- 改了哪些檔案：docs/17-ui.md、docs/11-pages.md
+- Brian 是否已確認：是（他提出的）
+
+## 2026-10-06 資料庫：純 SQL 遷移，不用 Drizzle
+
+- 原本：`docs/02-architecture.md` 選 Drizzle ORM，`docs/14-plan.md` 階段 1 要用 Drizzle 定義 schema 並產生遷移，再寫測試確認和 `db/schema.sql` 等價。
+- 改成：遷移是純 SQL 檔，第一個（`apps/server/migrations/0001_init.sql`）就是交接的 `db/schema.sql`。查詢用 `pg` 加手寫 SQL，包在每個領域自己的函式裡。等價測試照做（`apps/server/test/schema-equivalence.test.ts`：兩邊各建一個資料庫，比對欄位、約束、索引、函式和 view）。
+- 原因：schema 已經有一份寫好、測過的 SQL；再用 Drizzle 重寫一份，要維持兩份一致，而用量計算、admission、排隊這些本來就要直接寫 SQL。02 的技術選型不在 00 的決定裡。
+- 改了哪些檔案：docs/02-architecture.md
+- Brian 是否已確認：否（交接層級的技術選擇，報告裡說明）
+
+## 2026-10-06 連入狀況只看 TCP 的連入
+
+- 原本：`docs/06-torrent-worker.md` 把 `tcpIncoming` 和 `utpIncoming` 都當成「埠是通的」。
+- 改成：只看 `tcpIncoming`。
+- 原因：階段 0 在沒有確認路由器轉發的情況下也看到了 `utpIncoming`（UDP 經由 NAT 回連），會讓管理員誤以為埠開好了。D32 是「交接」層級。
+- 改了哪些檔案：docs/06-torrent-worker.md
+- Brian 是否已確認：不需要
+
 ## 2026-10-06 合約和對齊核心搬進 packages/shared
 
 - 原本：`contracts/api.ts`、`reference/sync-core/core.ts` 和它的測試在交接包的位置。

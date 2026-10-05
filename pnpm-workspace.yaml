@@ -10,6 +10,8 @@ minimumReleaseAgeExclude:
 # Native add-ons WebTorrent needs (uTP, WebRTC, fast WebSocket helpers). Their install scripts pick
 # or fetch the prebuilt binary for the platform; docs/16-risks.md covers ARM.
 allowBuilds:
+  # tsx (development only) brings esbuild; its prebuilt binary comes as an optional package, the script is not needed.
+  esbuild: false
   bufferutil: true
   ip-set: true
   node-datachannel: true

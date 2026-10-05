@@ -96,7 +96,7 @@ new WebTorrent({
 | `infoHash` | 沒事（測試時在這之後才能 `addPeer`） |
 | `metadata` | 上一節 |
 | `download` | 只更新記憶體裡的「最後有進度的時間」，不要每次都寫資料庫 |
-| `wire` | `wire.type` 是 `tcpIncoming` 或 `utpIncoming` 時，記下「最近一次有人連進來」的時間（寫進心跳的 `info`） |
+| `wire` | `wire.type` 是 `tcpIncoming` 時，記下「最近一次有人連進來」的時間（寫進心跳的 `info`）。`utpIncoming` 不算：uTP 走 UDP，我們自己連出去之後 NAT 會讓對方暫時連得回來，證明不了埠有轉發（階段 0 實測） |
 | `noPeers` | 記 debug log。失敗與否由停滯檢查決定 |
 | `warning` | 記 warn log，不處理 |
 | `error` | 這個下載的致命錯誤。`ENOSPC` 標成 `DISK_FULL`，其他標成 `IO_ERROR`。走「失敗時的收尾」 |
@@ -192,7 +192,7 @@ new WebTorrent({
 
 ## 連入狀況
 
-這個程式沒有辦法從外面測自己（那需要第三方服務）。改用觀察：只要有任何 `tcpIncoming` 或 `utpIncoming` 的連線進來過，就表示埠是通的。把「最近一次連入的時間」寫在 `service_heartbeats.info`，管理頁顯示成：
+這個程式沒有辦法從外面測自己（那需要第三方服務）。改用觀察：只要有任何 `tcpIncoming` 的連線進來過，就表示埠是通的（`utpIncoming` 不算，理由見上）。把「最近一次連入的時間」寫在 `service_heartbeats.info`，管理頁顯示成：
 
 - 「最近 24 小時內有外部連入」：正常。
 - 「還沒觀察到外部連入」：可能埠沒開。說明要在 Docker 和路由器上開 `TORRENT_PORT`（TCP、UDP）和 `TORRENT_DHT_PORT`（UDP）。沒開仍然能下載，只是比較慢。

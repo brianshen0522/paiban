@@ -26,6 +26,17 @@ export function buildApp(deps: Deps): FastifyInstance {
     bodyLimit: 1024 * 1024,
   });
   app.register(cookie);
+  // A write without a body may still say application/json (docs/04-api.md: no Content-Type is
+  // required then); treat an empty body as no body instead of failing.
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body, done) => {
+    const text = String(body);
+    if (text.trim() === '') return done(null, undefined);
+    try {
+      done(null, JSON.parse(text));
+    } catch {
+      done(new ApiError('VALIDATION', 'body is not JSON', { fields: { _: 'NOT_JSON' } }), undefined);
+    }
+  });
   app.decorateRequest('user', null);
 
   const origin = new URL(deps.config.publicUrl).origin;

@@ -148,7 +148,7 @@ paiban/
 | 語言 | TypeScript | 7 | `reference/` 裡的 `.ts` 用 7.0.2 的 strict 模式檢查過。工具鏈不相容時退回 5.x |
 | 後端框架 | Fastify | 5 | `@fastify/cookie`、`@fastify/multipart`、`@fastify/static`、`@fastify/rate-limit` |
 | 資料庫 | PostgreSQL | 17 | 參考 schema 在 PGlite（PostgreSQL 18）上跑過。用 18 的官方映像檔要注意它的資料目錄位置和 17 不同 |
-| 資料庫存取 | Drizzle ORM + drizzle-kit | 0.45 / 0.31 | 需要 advisory lock 和彙總的地方直接寫 SQL |
+| 資料庫存取 | `pg` 加手寫 SQL；遷移是純 SQL 檔（`apps/server/migrations/`） | 8 | 原本規劃 Drizzle，實作時改掉，見 `docs/changes.md` 2026-10-06。`0001_init.sql` 就是交接的 `db/schema.sql`，另有測試確認兩者等價 |
 | PostgreSQL 驅動 | pg | 8 | `LISTEN` 要用一條專用的連線，不從連線池借 |
 | 工作佇列 | pg-boss | 12 | 用 PostgreSQL，不需要 Redis |
 | 驗證 | zod | 4 | schema 放在 `packages/shared`，前後端共用 |

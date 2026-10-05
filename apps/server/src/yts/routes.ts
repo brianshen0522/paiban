@@ -233,11 +233,12 @@ export async function fetchPoster(deps: Deps, ytsId: number): Promise<{ type: st
   }
   if (!allow(url.hostname)) return null;
   try {
+    // Redirects are followed only within the YTS host and its subdomains (yts.gg sends covers to
+    // img.yts.gg); `allow` is checked again after every hop.
     const res = await outboundFetch(deps.outbound, url.toString(), {
       allow,
       maxBytes: 2 * 1024 * 1024,
       timeoutMs: 10_000,
-      sameHostRedirectsOnly: true,
     });
     const type = (res.headers.get('content-type') ?? '').split(';')[0]?.trim() ?? '';
     if (res.status !== 200 || !IMAGE_TYPES.includes(type)) return null;

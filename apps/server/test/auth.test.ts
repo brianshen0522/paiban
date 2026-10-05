@@ -92,6 +92,15 @@ describe('sign-in', () => {
     expect((await call(t.app, 'GET', '/api/auth/me', { cookie })).statusCode).toBe(401);
   });
 
+  it('accepts a write that says JSON but sends no body', async () => {
+    const cookie = await login(t.app, 'mei');
+    const res = await call(t.app, 'POST', '/api/auth/logout', {
+      cookie,
+      headers: { 'content-type': 'application/json' },
+    });
+    expect(res.statusCode).toBe(204);
+  });
+
   it('ends the session of an account that gets disabled', async () => {
     await createUser(db.pool, 'soon', 'member');
     const cookie = await login(t.app, 'soon');
