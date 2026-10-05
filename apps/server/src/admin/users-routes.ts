@@ -189,7 +189,9 @@ select i.id, i.code, i.role, i.expires_at, i.used_at,
 
   app.get('/api/admin/invites', async (req) => {
     requireAdmin(req);
-    return (await many<InviteRow>(pool, `${INVITES} order by i.created_at desc`)).map((r) => toInvite(r, linkBase(config.publicUrl, req)));
+    return (await many<InviteRow>(pool, `${INVITES} order by i.created_at desc`)).map((r) =>
+      toInvite(r, linkBase(config.publicUrl, req)),
+    );
   });
 
   app.post('/api/admin/invites', async (req, reply) => {

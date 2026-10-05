@@ -20,7 +20,8 @@ const ROOT = '/home/brian/projects/paiban/.scratch/tears-of-steel';
 const [lang = 'en', mode = 'text', asrPath] = process.argv.slice(2);
 function parseSrt(s: string): Core.Cue[] {
   const tc = (x: string) => {
-    const m = x.match(/(\d+):(\d+):(\d+)[,.](\d+)/)!;
+    const m = x.match(/(\d+):(\d+):(\d+)[,.](\d+)/);
+    if (!m) throw new Error(`bad timecode ${x}`);
     return +m[1] * 3600 + +m[2] * 60 + +m[3] + +m[4] / 1000;
   };
   return s

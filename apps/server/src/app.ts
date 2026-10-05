@@ -68,7 +68,8 @@ export function buildApp(deps: Deps): FastifyInstance {
       if (req.headers['x-requested-with'] !== 'paiban') throw new ApiError('FORBIDDEN', 'missing X-Requested-With');
       // Same-origin: the configured address, or the very host the request was sent to. A cross-site
       // form or script always carries its own origin, which matches neither.
-      if (!sameOrigin(req.headers.origin, origin, req.headers.host)) throw new ApiError('FORBIDDEN', 'cross-origin request');
+      if (!sameOrigin(req.headers.origin, origin, req.headers.host))
+        throw new ApiError('FORBIDDEN', 'cross-origin request');
     }
     const token = req.cookies[SESSION_COOKIE];
     if (token) {
