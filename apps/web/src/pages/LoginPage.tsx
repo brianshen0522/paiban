@@ -1,7 +1,7 @@
 import { type Me, SITE_NAME } from '@paiban/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { type FormEvent, useRef, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { ThemePicker } from '../components/ThemePicker';
 import { t } from '../copy/zh-TW';
 import { ApiFailure, post } from '../lib/api';
@@ -95,6 +95,9 @@ export function LoginPage() {
         <button type="submit" className="primary" disabled={busy}>
           {busy ? t.auth.submitting : t.auth.submit}
         </button>
+        <p className="alt">
+          <Link to="/invite">{t.auth.inviteHint}</Link>
+        </p>
         <p className="alt">{t.auth.forgotHint}</p>
         <div className="auth-foot">
           <ThemePicker />

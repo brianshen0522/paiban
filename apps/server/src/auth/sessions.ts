@@ -32,6 +32,7 @@ export async function createSession(
      values ($1, $2, $3, $4, now() + make_interval(days => $5))`,
     [userId, tokenHash(token), userAgent.slice(0, 500), ip, SESSION_DAYS],
   );
+  await q.query('update users set last_seen_at = now() where id = $1', [userId]);
   return token;
 }
 

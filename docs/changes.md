@@ -27,9 +27,9 @@
 ## 2026-10-06 外觀可以選淺色、深色、跟隨系統
 
 - 原本：`docs/17-ui.md` 只跟隨系統，`data-theme` 只給測試用。
-- 改成：帳號選單和登入頁有三選一，選擇存在裝置的 localStorage；`public/theme-init.js` 在第一次繪製前套用。
+- 改成：帳號選單、個人設定和登入頁有三選一，選擇存在裝置的 localStorage；`public/theme-init.js` 在第一次繪製前套用。
 - 原因：Brian 的 UI 原則（2026-10-06）：一定要 RWD，一定要能選 Light、Dark、System。
-- 改了哪些檔案：docs/17-ui.md、docs/11-pages.md
+- 改了哪些檔案：docs/17-ui.md、docs/11-pages.md（外框、登入、個人設定）
 - Brian 是否已確認：是（他提出的）
 
 ## 2026-10-06 資料庫：純 SQL 遷移，不用 Drizzle

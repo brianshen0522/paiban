@@ -125,11 +125,14 @@ export function Shell({ me }: { me: Me }) {
     { to: '/downloads', label: t.shell.nav.downloads, count: active },
     { to: '/library', label: t.shell.nav.library },
     { to: '/storage', label: t.shell.nav.storage },
+    { to: '/profile', label: t.shell.nav.profile },
   ];
   const adminNav = [
+    { to: '/admin/users', label: t.shell.admin.users },
     { to: '/admin/storage', label: t.shell.admin.storage },
     { to: '/admin/sources', label: t.shell.admin.sources },
     { to: '/admin/downloads', label: t.shell.admin.downloads },
+    { to: '/admin/audit', label: t.shell.admin.audit },
   ];
 
   return (
@@ -228,6 +231,9 @@ export function Shell({ me }: { me: Me }) {
                 <div className="pad">
                   <ThemePicker />
                 </div>
+                <Link className="pop-item" to="/profile">
+                  <span>{t.shell.profile}</span>
+                </Link>
                 <button type="button" className="pop-item" onClick={logout}>
                   <span>{t.shell.logout}</span>
                 </button>

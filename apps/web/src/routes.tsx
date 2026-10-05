@@ -7,13 +7,18 @@ import { Shell } from './components/Shell';
 import { t } from './copy/zh-TW';
 import { ApiFailure } from './lib/api';
 import { useMe } from './lib/queries';
+import { AuditPage } from './pages/admin/AuditPage';
 import { DownloadSettingsPage } from './pages/admin/DownloadSettingsPage';
 import { SourcesPage } from './pages/admin/SourcesPage';
 import { StorageAdminPage } from './pages/admin/StorageAdminPage';
+import { UsersPage } from './pages/admin/UsersPage';
 import { DownloadsPage } from './pages/DownloadsPage';
 import { LibraryPage } from './pages/LibraryPage';
 import { LoginPage } from './pages/LoginPage';
 import { MoviePage } from './pages/MoviePage';
+import { ProfilePage } from './pages/ProfilePage';
+import { RegisterPage } from './pages/RegisterPage';
+import { ResetPage } from './pages/ResetPage';
 import { SearchPage } from './pages/SearchPage';
 import { ForbiddenPage, NotFoundPage } from './pages/StatusPages';
 import { StoragePage } from './pages/StoragePage';
@@ -63,6 +68,8 @@ function RequireAdmin() {
 
 export const routes: RouteObject[] = [
   { path: '/login', element: <LoginPage /> },
+  { path: '/invite/:code?', element: <RegisterPage /> },
+  { path: '/reset/:token', element: <ResetPage /> },
   {
     element: <RequireAuth />,
     children: [
@@ -72,11 +79,14 @@ export const routes: RouteObject[] = [
       { path: 'downloads', element: <DownloadsPage /> },
       { path: 'library', element: <LibraryPage /> },
       { path: 'storage', element: <StoragePage /> },
+      { path: 'profile', element: <ProfilePage /> },
       {
         path: 'admin',
         element: <RequireAdmin />,
         children: [
-          { index: true, element: <Navigate to="/admin/storage" replace /> },
+          { index: true, element: <Navigate to="/admin/users" replace /> },
+          { path: 'users', element: <UsersPage /> },
+          { path: 'audit', element: <AuditPage /> },
           { path: 'storage', element: <StorageAdminPage /> },
           { path: 'sources', element: <SourcesPage /> },
           { path: 'downloads', element: <DownloadSettingsPage /> },

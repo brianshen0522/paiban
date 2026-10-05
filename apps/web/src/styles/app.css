@@ -1449,3 +1449,31 @@ label.chk {
     font-size: 14px;
   }
 }
+
+/* account pages */
+#view .narrow {
+  max-width: 360px;
+}
+#view .sel {
+  user-select: all;
+  overflow-wrap: anywhere;
+}
+#view form.align-end {
+  align-items: flex-end;
+}
+#view form.align-end .field {
+  flex: 1 1 240px;
+  max-width: 360px;
+}
+#view .radios legend {
+  padding: 0;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+.pop a.pop-item {
+  color: var(--ink);
+  text-decoration: none;
+}
+.auth .alt a {
+  color: var(--accent-ink);
+}

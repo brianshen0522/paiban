@@ -232,6 +232,7 @@ describe('administering people', () => {
       activeDownloads: 0,
       soleHolderOf: 0,
     });
+    expect(users.find((u: { id: string }) => u.id === bossId).lastSeenAt).not.toBeNull();
   });
 
   it('cannot change or remove oneself', async () => {
