@@ -543,6 +543,16 @@ function Bench({ ws, detail }: { ws: Workspace; detail: SubtitleDetail }) {
           : t.bench.msg.autoDoneNoScore(parts);
       if (method) text += t.bench.msg.method(t.bench.methods[method] ?? method);
       if (r.agree === false) text += t.bench.msg.disagree;
+      // What speech recognition contributed; absent on older servers, null when the film has none.
+      const heard = r.heard;
+      if (heard) {
+        const lang = t.media.asrLangs[heard.language] ?? heard.language;
+        text +=
+          heard.pairs > 0
+            ? t.bench.msg.heard(lang, heard.pairs, heard.support, heard.via === 'llm')
+            : t.bench.msg.heardNothing(lang);
+        if (heard.llmError) text += t.bench.msg.llmFailed(t.bench.msg.llmErrors[heard.llmError] ?? heard.llmError);
+      }
       say(text);
     } catch (e) {
       const f = asFailure(e);
