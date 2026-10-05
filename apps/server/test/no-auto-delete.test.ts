@@ -64,15 +64,21 @@ describe('deleting files', () => {
       // whose row did not get in), and the administrator's force deletion.
       removeExportFiles: ['admin/storage-delete-routes.ts', 'exports/routes.ts'],
       removeOrphanFolder: ['admin/storage-delete-routes.ts'],
+      // A holder removing a candidate or a subtitle.
+      removeCandidateFiles: ['subtitles/routes.ts'],
+      removeSubtitleFiles: ['subtitles/routes.ts'],
       // The listed scratch clean-ups: start-up drafts, a job's own work folder, a job's own output
-      // when its final update found the row gone or cancelled.
+      // when its final update found the row gone or cancelled, a staged upload or download once the
+      // job that uses it ends.
       cleanScratchOnStart: ['media/service.ts'],
-      removeWorkDir: ['media/jobs.ts'],
+      removeWorkDir: ['media/jobs.ts', 'media/subtitle-jobs.ts', 'subtitles/routes.ts'],
       removeOwnMediaOutput: ['media/jobs.ts'],
       // An export's subtitle tracks once it has its outcome: the mux job, and the torrent loop for
       // the waiting exports of a film a person removed. The mux job's own .part or MKV.
       removeExportTracks: ['media/export-job.ts', 'torrent/worker.ts'],
       removeOwnExportOutput: ['media/export-job.ts'],
+      removeOwnSubtitleOutput: ['media/subtitle-jobs.ts', 'subtitles/routes.ts'],
+      removeStaging: ['media/subtitle-jobs.ts', 'subtitles/routes.ts', 'subtitles/worker.ts'],
     };
     const exported = [
       ...(await readFile(join(SRC, 'storage/remove.ts'), 'utf8')).matchAll(/export async function (\w+)/g),
@@ -89,7 +95,8 @@ describe('deleting files', () => {
         callers[fn].push(rel);
       }
     }
-    for (const [fn, files] of Object.entries(allowed)) expect(callers[fn] ?? [], fn).toEqual(files);
+    for (const [fn, files] of Object.entries(allowed))
+      expect((callers[fn] ?? []).sort(), fn).toEqual([...files].sort());
     const worker = await readFile(join(SRC, 'torrent/worker.ts'), 'utf8');
     expect(worker).toMatch(/where t\.want = 'remove'/);
   });

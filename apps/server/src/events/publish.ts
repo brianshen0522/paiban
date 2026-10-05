@@ -1,6 +1,6 @@
-import type { Notification } from '@paiban/shared';
+import type { Notification, UserRef } from '@paiban/shared';
 import type { Queryable } from '../db/pool.js';
-import { one } from '../db/pool.js';
+import { many, one } from '../db/pool.js';
 import { readUsage } from '../storage/usage.js';
 import { selectTorrents, toTorrent } from '../torrents/view.js';
 import type { EventHub } from './hub.js';
@@ -15,6 +15,29 @@ export async function publishTorrent(q: Queryable, hub: EventHub, torrentId: str
   const online = hub.connectedUsers();
   for (const h of row.holders)
     if (online.has(h.id)) hub.toUser(h.id, { type: 'torrent', torrent: toTorrent(row, h.id) });
+}
+
+async function onlineHolders(q: Queryable, hub: EventHub, torrentId: string): Promise<string[]> {
+  if (hub.size === 0) return [];
+  const online = hub.connectedUsers();
+  const rows = await many<{ user_id: string }>(q, 'select user_id from torrent_holders where torrent_id = $1', [
+    torrentId,
+  ]);
+  return rows.map((r) => r.user_id).filter((id) => online.has(id));
+}
+
+/** The film's candidate list changed: its holders refetch (docs/04-api.md, "即時更新"). */
+export async function publishCandidates(q: Queryable, hub: EventHub, torrentId: string): Promise<void> {
+  for (const id of await onlineHolders(q, hub, torrentId)) hub.toUser(id, { type: 'candidates', torrentId });
+}
+
+/** A subtitle was saved, confirmed, added or removed. `by` lets the person who did it ignore their own echo. */
+export async function publishSubtitle(
+  q: Queryable,
+  hub: EventHub,
+  e: { torrentId: string; subtitleId: string; rev: number; removed: boolean; by: UserRef | null },
+): Promise<void> {
+  for (const id of await onlineHolders(q, hub, e.torrentId)) hub.toUser(id, { type: 'subtitle', ...e });
 }
 
 export async function publishUsage(q: Queryable, hub: EventHub): Promise<void> {
