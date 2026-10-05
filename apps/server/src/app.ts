@@ -6,6 +6,7 @@ import { overviewRoutes } from './admin/overview-routes.js';
 import { storageDeleteRoutes } from './admin/storage-delete-routes.js';
 import { systemRoutes } from './admin/system-routes.js';
 import { adminUserRoutes } from './admin/users-routes.js';
+import { alignRoutes } from './asr/routes.js';
 import { accountRoutes } from './auth/account-routes.js';
 import { authRoutes } from './auth/routes.js';
 import { lookupSession, SESSION_COOKIE } from './auth/sessions.js';
@@ -136,6 +137,7 @@ export function buildApp(deps: Deps): FastifyInstance {
   notificationRoutes(app, deps);
   settingsRoutes(app, deps);
   secretRoutes(app, deps);
+  alignRoutes(app, deps);
   eventRoutes(app, deps);
   return app;
 }

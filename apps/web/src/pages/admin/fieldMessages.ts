@@ -2,6 +2,12 @@ import { t } from '../../copy/zh-TW';
 
 /** Field codes from SETTING_INVALID into the sentences of docs/13-settings.md. */
 export function fieldMessage(key: string, code: string, context: { maxActive?: number } = {}): string {
+  if (code === 'URL_FORMAT' && key === 'align.llm.baseUrl') return t.fields.modelUrlFormat;
+  if (code === 'REQUIRED') return t.fields.required;
+  if (code === 'NO_PLACEHOLDER') return t.fields.noPlaceholder;
+  if (key === 'providers.cacheHours') return t.fields.range1to168;
+  if (key === 'subtitles.defaultLangs') return t.fields.atLeastOneLang;
+  if (code === 'URL_FORMAT' && key === 'providers.zimuku.searchUrl') return t.fields.urlFormatPlain;
   if (code === 'URL_FORMAT')
     return t.fields.urlFormat(key === 'providers.yify.baseUrl' ? 'https://yts-subs.com' : 'https://yts.example');
   if (code === 'INTERNAL') return t.fields.internal;

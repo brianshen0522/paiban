@@ -392,6 +392,9 @@ export type AlignResult = {
   } | null;
 };
 
+/** A tiny fixed pairing question sent to the configured model (docs/13-settings.md, "測試連線"). */
+export type AlignModelCheck = { ok: boolean; code: 'OK' | 'WRONG_ANSWER' | LlmErrorCode; ms: number };
+
 export type LlmErrorCode =
   | 'NOT_CONFIGURED'
   | 'AUTH'
@@ -837,6 +840,8 @@ export interface Endpoints {
   'DELETE /api/admin/secrets/:name': { ok: null };
   /** Always 200: a source that cannot be reached is a result, not an error of this endpoint. */
   'POST /api/admin/sources/:id/test': { ok: SourceCheck };
+  /** Always 200, like the source tests: a model that does not answer is a result. */
+  'POST /api/admin/align/test': { ok: AlignModelCheck };
   'GET /api/admin/system': { ok: { services: ServiceStatus[]; tasks: Task[]; disk: DiskInfo } };
   /** Answers with the task that was retried, unchanged. The new task shows up in GET /api/admin/system after the `admin` event. */
   'POST /api/admin/tasks/:id/retry': { ok: Task };
