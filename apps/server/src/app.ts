@@ -1,5 +1,7 @@
 import cookie from '@fastify/cookie';
 import Fastify, { type FastifyInstance } from 'fastify';
+import { adminUserRoutes } from './admin/users-routes.js';
+import { accountRoutes } from './auth/account-routes.js';
 import { authRoutes } from './auth/routes.js';
 import { lookupSession, SESSION_COOKIE } from './auth/sessions.js';
 import { eventRoutes } from './events/routes.js';
@@ -38,6 +40,12 @@ export function buildApp(deps: Deps): FastifyInstance {
     }
   });
   app.decorateRequest('user', null);
+  // Every route as registered, so a test can walk all of them (docs/15-testing.md, "權限").
+  const table: { method: string; url: string }[] = [];
+  app.decorate('routeTable', table);
+  app.addHook('onRoute', (r) => {
+    for (const m of [r.method].flat()) if (m !== 'HEAD') table.push({ method: m, url: r.url });
+  });
 
   const origin = new URL(deps.config.publicUrl).origin;
   app.addHook('onRequest', async (req) => {
@@ -89,6 +97,8 @@ export function buildApp(deps: Deps): FastifyInstance {
   });
 
   authRoutes(app, deps);
+  accountRoutes(app, deps);
+  adminUserRoutes(app, deps);
   ytsRoutes(app, deps);
   torrentRoutes(app, deps);
   storageRoutes(app, deps);

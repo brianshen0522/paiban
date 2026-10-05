@@ -28,4 +28,7 @@ declare module 'fastify' {
   interface FastifyRequest {
     user: AuthedUser | null;
   }
+  interface FastifyInstance {
+    routeTable: { method: string; url: string }[];
+  }
 }

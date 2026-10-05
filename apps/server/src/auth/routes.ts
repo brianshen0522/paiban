@@ -57,7 +57,8 @@ export function authRoutes(app: FastifyInstance, deps: Deps): void {
       role: row.role,
       prefs: row.prefs,
     };
-    await audit(pool, user, 'auth.login', describeAgent(ua) as Record<string, string>, ip);
+    const device = describeAgent(ua);
+    await audit(pool, user, 'auth.login', { os: device.os ?? '', browser: device.browser ?? '' }, ip);
     return buildMe(pool, user);
   });
 
