@@ -149,7 +149,13 @@ export function storageDeleteRoutes(app: FastifyInstance, deps: Deps): void {
         }
         // Being written: ask the media service to stop; it removes its own half-written file and the row.
         if (e.state === 'running') await c.query('update exports set cancel_requested = true where id = $1', [id]);
-        else await c.query('delete from exports where id = $1', [id]);
+        else {
+          await c.query('delete from exports where id = $1', [id]);
+          await c.query(
+            `update tasks set state = 'cancelled', finished_at = now() where kind = 'export' and input->>'exportId' = $1 and state in ('queued', 'running')`,
+            [id],
+          );
+        }
         await audit(
           c,
           admin,
@@ -164,6 +170,8 @@ export function storageDeleteRoutes(app: FastifyInstance, deps: Deps): void {
         };
       });
       if (!out.running) await removeExportFiles(config.dataDir, id, log);
+      else await pool.query(`select pg_notify('paiban_media', '{}')`);
+      deps.events.toAll({ type: 'export.removed', id });
       freedBytes = out.freed;
       notes = out.notes;
     } else {

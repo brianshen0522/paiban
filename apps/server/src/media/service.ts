@@ -1,15 +1,16 @@
 import { many, one } from '../db/pool.js';
 import { cleanScratchOnStart } from '../storage/remove.js';
 import { versionLabel } from '../torrents/view.js';
+import { exportJob, finishCancelled } from './export-job.js';
 import { analysisJob, type JobDeps, MEDIA_ROW, type MediaRow, previewJob, probeJob, rescanJob } from './jobs.js';
 
 /**
  * The media service's scheduling (docs/02-architecture.md "服務之間怎麼溝通", docs/08 "對帳").
  * The tables are the truth: a row in a waiting state is work to do. There is no separate queue;
  * a job claims its row with a conditional update, so running it twice does it once. Each kind of
- * work runs one at a time, so a long transcode never blocks analysis or a recalculation.
+ * work runs one at a time, so a long transcode never blocks analysis, an export or a recalculation.
  */
-type Queue = 'analyze' | 'preview' | 'rescan';
+type Queue = 'analyze' | 'preview' | 'rescan' | 'export';
 
 export class MediaService {
   private readonly d: JobDeps;
@@ -34,7 +35,10 @@ export class MediaService {
               proxy_state = case when proxy_state = 'running' then 'pending' else proxy_state end
         where 'running' in (probe_state, analysis_state, audio_state, proxy_state)`,
     );
-    await pool.query(`update exports set state = 'queued' where state = 'running'`);
+    // A cancellation the restart interrupted is finished now: nobody runs that export any more.
+    const cancelled = await many<{ id: string }>(pool, `select id from exports where cancel_requested`);
+    for (const e of cancelled) await finishCancelled(this.d, e.id);
+    await pool.query(`update exports set state = 'queued', progress = 0 where state = 'running'`);
     await pool.query(`update subtitle_candidates set align_state = 'queued' where align_state = 'running'`);
     await pool.query(
       `update tasks set state = 'queued' where state = 'running' and kind in ('analyze', 'preview', 'export', 'rank', 'rescan')`,
@@ -84,8 +88,14 @@ export class MediaService {
           and not exists (select 1 from media_files mf join torrents t on t.id = mf.torrent_id
                            where mf.id::text = tasks.input->>'mediaId' and t.want <> 'remove')`,
     );
+    // Export tasks whose export is gone or finished without them (deleted while waiting).
+    await pool.query(
+      `update tasks set state = 'cancelled', finished_at = now()
+        where state in ('queued', 'running') and kind = 'export'
+          and not exists (select 1 from exports e where e.id::text = tasks.input->>'exportId' and e.state in ('queued', 'running'))`,
+    );
     if (need.length) await pool.query(`select pg_notify('paiban_events', '{"type":"task"}')`);
-    for (const q of ['analyze', 'preview', 'rescan'] as const) this.kick(q);
+    for (const q of ['analyze', 'preview', 'rescan', 'export'] as const) this.kick(q);
   }
 
   kick(q: Queue): void {
@@ -109,9 +119,11 @@ export class MediaService {
       const did =
         q === 'rescan'
           ? await this.nextRescan()
-          : q === 'analyze'
-            ? await this.nextAnalysis()
-            : await this.nextPreview();
+          : q === 'export'
+            ? await this.nextExport()
+            : q === 'analyze'
+              ? await this.nextAnalysis()
+              : await this.nextPreview();
       if (!did) return;
     }
   }
@@ -156,6 +168,21 @@ export class MediaService {
     const row = rows.find((r) => !this.cool(r.id));
     if (!row) return false;
     const result = await previewJob(this.d, row, await this.task('preview', row.id));
+    if (result === 'retry') this.cooling.set(row.id, Date.now() + 60_000);
+    if (result === 'skipped') this.cooling.set(row.id, Date.now() + 5_000);
+    return true;
+  }
+
+  /** One export at a time, independent of the preview queue (docs/08-media-pipeline.md, "封裝"). */
+  private async nextExport(): Promise<boolean> {
+    const rows = await many<{ id: string }>(
+      this.d.pool,
+      `select e.id from exports e join torrents t on t.id = e.torrent_id
+        where e.state = 'queued' and not e.cancel_requested and t.want <> 'remove' order by e.created_at`,
+    );
+    const row = rows.find((r) => !this.cool(r.id));
+    if (!row) return false;
+    const result = await exportJob(this.d, row.id);
     if (result === 'retry') this.cooling.set(row.id, Date.now() + 60_000);
     if (result === 'skipped') this.cooling.set(row.id, Date.now() + 5_000);
     return true;

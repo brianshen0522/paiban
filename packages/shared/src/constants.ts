@@ -33,3 +33,11 @@ export const PREVIEW_BYTES_PER_SECOND = {
 } as const;
 /** Used when YTS reports a runtime of 0. */
 export const FALLBACK_RUNTIME_MIN = 120;
+
+/**
+ * What admission asks for when an export starts (docs/10-storage.md, "接受與拒絕"): the film file
+ * × 1.01 + 1 MB, for the Matroska overhead and the subtitle tracks. `Workspace.exportNeedBytes`.
+ */
+export function exportNeedBytes(mediaBytes: number): number {
+  return Math.ceil(mediaBytes * 1.01) + 1024 * 1024;
+}

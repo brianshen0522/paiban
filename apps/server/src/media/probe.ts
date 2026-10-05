@@ -98,6 +98,18 @@ export const mimeOf = (container: string | null, fileName: string): string => {
   return 'application/octet-stream';
 };
 
+export type StreamCounts = { video: number; audio: number; subtitle: number };
+
+/** Real video streams (cover art excluded, as `-map 0:V` does), audio and subtitle streams. */
+export function streamCounts(json: unknown): StreamCounts {
+  const p = Probe.parse(json);
+  return {
+    video: p.streams.filter((s) => s.codec_type === 'video' && !s.disposition?.attached_pic).length,
+    audio: p.streams.filter((s) => s.codec_type === 'audio').length,
+    subtitle: p.streams.filter((s) => s.codec_type === 'subtitle').length,
+  };
+}
+
 /** Reservation for each preview asset still to be made (docs/10-storage.md, "預覽預留"). */
 export function assetReserve(durationS: number | null, runtimeMin: number, asset: 'audio' | '480p' | '720p'): number {
   const seconds = durationS && durationS > 0 ? durationS : (runtimeMin > 0 ? runtimeMin : FALLBACK_RUNTIME_MIN) * 60;

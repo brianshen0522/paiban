@@ -60,13 +60,19 @@ describe('deleting files', () => {
       removeDownloadFiles: ['torrent/worker.ts'],
       removePoster: ['torrent/worker.ts'],
       removePreviewFiles: ['admin/storage-delete-routes.ts'],
-      removeExportFiles: ['admin/storage-delete-routes.ts'],
+      // An export deleted by its creator or an administrator (or the api's own tracks of a request
+      // whose row did not get in), and the administrator's force deletion.
+      removeExportFiles: ['admin/storage-delete-routes.ts', 'exports/routes.ts'],
       removeOrphanFolder: ['admin/storage-delete-routes.ts'],
       // The listed scratch clean-ups: start-up drafts, a job's own work folder, a job's own output
       // when its final update found the row gone or cancelled.
       cleanScratchOnStart: ['media/service.ts'],
       removeWorkDir: ['media/jobs.ts'],
       removeOwnMediaOutput: ['media/jobs.ts'],
+      // An export's subtitle tracks once it has its outcome: the mux job, and the torrent loop for
+      // the waiting exports of a film a person removed. The mux job's own .part or MKV.
+      removeExportTracks: ['media/export-job.ts', 'torrent/worker.ts'],
+      removeOwnExportOutput: ['media/export-job.ts'],
     };
     const exported = [
       ...(await readFile(join(SRC, 'storage/remove.ts'), 'utf8')).matchAll(/export async function (\w+)/g),

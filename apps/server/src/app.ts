@@ -8,6 +8,7 @@ import { accountRoutes } from './auth/account-routes.js';
 import { authRoutes } from './auth/routes.js';
 import { lookupSession, SESSION_COOKIE } from './auth/sessions.js';
 import { eventRoutes } from './events/routes.js';
+import { exportRoutes } from './exports/routes.js';
 import type { Deps } from './http/context.js';
 import { ApiError } from './http/errors.js';
 import { libraryRoutes } from './library/routes.js';
@@ -111,6 +112,7 @@ export function buildApp(deps: Deps): FastifyInstance {
   torrentRoutes(app, deps);
   storageRoutes(app, deps);
   libraryRoutes(app, deps);
+  exportRoutes(app, deps);
   notificationRoutes(app, deps);
   settingsRoutes(app, deps);
   eventRoutes(app, deps);
