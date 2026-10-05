@@ -16,6 +16,25 @@
 
 ---
 
+## 2026-10-06 匯出：驗證的細節、移除電影時的 tracks/、取消到一半被重啟
+
+- 原本：
+  - docs/04-api.md 只寫了 `NO_CONFIRMED_SUBTITLE`、`INVALID_FILENAME` 兩種錯誤，沒說「預設軌不是恰好一條」、「同一條選兩次」、「選了別部片的字幕」、「下載還沒完成」怎麼回，也沒說檔名錯誤要怎麼區分兩句說明。
+  - docs/03-data-model.md 寫「排隊中的匯出的 `tracks/` 由 `torrent` 刪；進行中的由封裝工作自己收」。
+  - 「做完之後檢查一次」沒說檢查的是 `.part` 還是改名之後的檔案。
+  - 沒寫 `media` 在取消到一半被重啟時怎麼辦。
+- 改成：
+  - 預設軌不是恰好一條、同一條選兩次：`VALIDATION`（`details.fields.tracks` 是 `ONE_DEFAULT`、`DUPLICATE`）。別部片的字幕：`NO_CONFIRMED_SUBTITLE`。下載沒完成：`MEDIA_NOT_READY`。檔名：`INVALID_FILENAME`，`details.fields.fileName` 是 `EXTENSION`、`CHARACTERS`、`TOO_LONG`，對應頁面上的兩句說明；另外拒絕控制字元、開頭是點、頭尾空白（檔名會進 HTTP 標頭和別人的磁碟）。
+  - `torrent` 移除電影時，替**所有**它標成失敗的匯出刪 `tracks/`（排隊中和進行中都刪）；進行中的封裝工作之後再刪一次也不算錯。這樣 `media` 剛好沒在跑時也不會留下沒有人收的資料夾。
+  - 檢查的是 `.part`，通過才改名，維持「看得到正式檔名的檔案一定是完整的」。
+  - `media` 啟動時，`cancel_requested` 已經是 true 的匯出直接收掉（刪 `tracks/`、刪那一列、`tasks` 標 `cancelled`）；對帳第 4 項也收掉對象已經不在 `queued`/`running` 的 `export` 工作。
+  - 已經要求取消、正在等 `media` 停下來的匯出，清單不列出，再刪一次回 `NOT_FOUND`。
+  - 管理員強制刪除排隊中的匯出時，它的 `tasks` 也標成 `cancelled`，並發 `export.removed`。
+  - 匯出需要的空間只寫在 `packages/shared` 的 `exportNeedBytes()`，`Workspace.exportNeedBytes` 和 admission 用同一個。
+- 原因：實作階段 7 時發現的缺漏；行為依 docs/08 的共通規矩推出來，沒有改變任何既定的決定。
+- 改了哪些檔案：docs/03-data-model.md、docs/04-api.md、docs/08-media-pipeline.md、docs/10-storage.md、docs/11-pages.md、AGENTS.md（指令）
+- Brian 是否已確認：否（交接層級）
+
 ## 2026-10-06 media 服務：不用 pg-boss，錯誤每種資產一格，測試在映像檔裡跑
 
 - 原本：`docs/02-architecture.md` 用 pg-boss 當工作佇列；`media_files.error` 和 `MediaStatus.error` 只有一格。

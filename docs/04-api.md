@@ -122,10 +122,10 @@
 
 | 端點 | 權限 | 行為 |
 | --- | --- | --- |
-| `POST /api/torrents/:id/exports` | 持有人 | 至少一條字幕，而且每一條都要是已確認的（否則 `NO_CONFIRMED_SUBTITLE`）；恰好一條是預設軌；檔名要通過檢查（否則 `INVALID_FILENAME`）。要通過 admission（否則 `STORAGE_LIMIT`） |
-| `GET /api/exports` | 登入 | `scope=mine`（預設）回自己建立的；`scope=all` 回全站的，只有管理員能用。儲存空間頁用它列出「我建立的匯出檔」：電影被刪掉之後，匯出檔只剩這裡可以下載。某一部片的匯出檔在 `GET /api/library/:torrentId` 裡 |
-| `GET /api/exports/:id/file` | 那部片的持有人、建立者或管理員 | 下載 MKV。支援 Range，帶 `Content-Disposition: attachment` |
-| `DELETE /api/exports/:id` | 建立者或管理員 | 完成或失敗的：刪檔、刪列。還在排隊的：直接刪。進行中的：要求取消，`media` 停下來之後刪。回釋出的大小 |
+| `POST /api/torrents/:id/exports` | 持有人 | 至少一條字幕，而且每一條都要是**這部片的**已確認字幕（否則 `NO_CONFIRMED_SUBTITLE`）；恰好一條是預設軌、同一條不能選兩次（否則 `VALIDATION`，`details.fields.tracks` 是 `ONE_DEFAULT` 或 `DUPLICATE`）；檔名要通過檢查（否則 `INVALID_FILENAME`，`details.fields.fileName` 是 `EXTENSION`、`CHARACTERS` 或 `TOO_LONG`）；下載還沒完成回 `MEDIA_NOT_READY`。要通過 admission（否則 `STORAGE_LIMIT` 或 `DISK_FULL`）。成功回 `201` 和那個 `Export`。預設軌在檔案裡排第一條，其他照請求的順序 |
+| `GET /api/exports` | 登入 | `scope=mine`（預設）回自己建立的；`scope=all` 回全站的，只有管理員能用（成員回 `FORBIDDEN`）。新的在前。儲存空間頁用它列出「我建立的匯出檔」：電影被刪掉之後，匯出檔只剩這裡可以下載。某一部片的匯出檔在 `GET /api/library/:torrentId` 裡。已經要求取消、正在等 `media` 停下來的不列出 |
+| `GET /api/exports/:id/file` | 那部片的持有人、建立者或管理員 | 下載 MKV。支援 Range，帶 `Content-Disposition: attachment`（`filename` 是 ASCII 的替代名，`filename*=UTF-8''…` 是原本的檔名）。還沒完成的、或呼叫者看不到的，回 `NOT_FOUND` |
+| `DELETE /api/exports/:id` | 建立者或管理員 | 完成或失敗的：刪檔、刪列。還在排隊的：直接刪（連同 `tracks/`，它的 `tasks` 標成 `cancelled`）。進行中的：要求取消，`media` 停下來之後刪。回釋出的大小（完成的是檔案大小，排隊或進行中的是預留量，失敗的是 0）。那部片的其他持有人回 `FORBIDDEN`；看不到它的人回 `NOT_FOUND` |
 
 細節在 [08-media-pipeline.md](08-media-pipeline.md)。
 
