@@ -137,6 +137,28 @@ describe.skipIf(!TOOLS)('the media service', { timeout: 180_000 }, () => {
     expect(tasks).toEqual([{ state: 'done' }]);
   });
 
+  it.skipIf(!process.env.ASR_PYTHON)(
+    'recognises the speech of clip.mp4 after the analysis, well enough to pair it with the subtitle',
+    { timeout: 300_000 },
+    async () => {
+      const f = await film(fixture('clip.mp4'));
+      await service.reconcile();
+      await until(async () => ['ready', 'failed'].includes((await media(f.mid)).asr_state), 280_000);
+      const m = await media(f.mid);
+      expect(m).toMatchObject({ asr_state: 'ready', asr_language: 'en' });
+      const heard = JSON.parse(await readFile(join(t.deps.config.dataDir, 'media', f.mid, 'asr.json'), 'utf8'));
+      expect(heard.windows.length).toBeGreaterThanOrEqual(2);
+      const { parseSrt } = await import('../src/subtitles/text.js');
+      const { textPairs } = await import('../src/asr/text.js');
+      const truth = parseSrt(await readFile(fixture('truth.en.srt'), 'utf8')).map((c, i) => ({ ...c, id: i + 1 }));
+      const pairs = textPairs(truth, heard);
+      expect(pairs.length).toBeGreaterThanOrEqual(5);
+      for (const p of pairs) expect(Math.abs(truth[p.cue].start - p.y)).toBeLessThan(0.5);
+      const status = (await call(t.app, 'GET', `/api/media/${f.mid}`, { cookie: mei })).json();
+      expect(status.asr).toEqual({ state: 'ready', language: 'en' });
+    },
+  );
+
   it('streams the original with Range, to holders only', async () => {
     const f = await film(fixture('clip.mp4'), { analysis: 'none' });
     const res = await call(t.app, 'GET', `/api/media/${f.mid}/original`, {
