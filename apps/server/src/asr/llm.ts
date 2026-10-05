@@ -170,12 +170,13 @@ export function openAiCompatibleMatcher(
 
 /** Most subtitle lines shown with one window; a dense film at an unknown speed could offer more. */
 const MAX_LINES = 300;
-const CONCURRENCY = 3;
+/** Requests at once: a local model server is usually one GPU or CPU; a cloud API takes more. */
+export const CONCURRENCY = { local: 3, cloud: 6 } as const;
 
 /**
  * Pairs through a language model, one request per listening window: the recognised lines of
  * that window and every subtitle line that could be at that time (text.ts, sourceRange).
- * Requests run a few at a time. Answers are checked against what was asked: an id that was not
+ * Requests run a few at a time (`concurrency`). Answers are checked against what was asked: an id that was not
  * in the request is dropped. A window whose request fails is skipped; when all fail, the first
  * error is thrown so the caller can say why.
  */
@@ -185,6 +186,7 @@ export async function llmPairs(
   transcript: AsrTranscript,
   subtitleLanguage: string,
   signal?: AbortSignal,
+  concurrency: number = CONCURRENCY.local,
 ): Promise<{ pairs: Pair[]; failed: number; windows: number }> {
   const jobs: MatchRequest[] = [];
   for (const [start, length] of transcript.windows) {
@@ -230,7 +232,7 @@ export async function llmPairs(
       }
     }
   };
-  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, jobs.length) }, worker));
+  await Promise.all(Array.from({ length: Math.min(concurrency, jobs.length) }, worker));
   if (jobs.length && errors.length >= jobs.length) throw errors[0];
   if (jobs.length && !pairs.length && errors.length) throw errors[0];
   return { pairs, failed: errors.length, windows: jobs.length };

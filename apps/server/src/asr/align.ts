@@ -8,6 +8,7 @@ import { toTraditional } from '../subtitles/text.js';
 import type { Pair } from './fit.js';
 import {
   anthropicMatcher,
+  CONCURRENCY,
   DEFAULT_ANTHROPIC_MODEL,
   LlmError,
   type LlmErrorCode,
@@ -99,7 +100,14 @@ export async function llmHeard(
       : openAiCompatibleMatcher(llm.baseUrl, key, llm.model, LLM_BUDGET_MS);
   const started = Date.now();
   try {
-    const r = await llmPairs(matcher, cues, transcript, language, AbortSignal.timeout(LLM_BUDGET_MS));
+    const r = await llmPairs(
+      matcher,
+      cues,
+      transcript,
+      language,
+      AbortSignal.timeout(LLM_BUDGET_MS),
+      llm.provider === 'anthropic' ? CONCURRENCY.cloud : CONCURRENCY.local,
+    );
     deps.log.info(
       { mediaId, provider: llm.provider, pairs: r.pairs.length, failedWindows: r.failed, ms: Date.now() - started },
       'language model paired recognised speech',
