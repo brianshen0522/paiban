@@ -1,0 +1,9 @@
+{
+  "name": "paiban-phase0-checks",
+  "private": true,
+  "type": "module",
+  "description": "Manual phase 0 checks (docs/14-plan.md). Not part of the product and not copied into the image.",
+  "dependencies": {
+    "webtorrent": "3.0.21"
+  }
+}
