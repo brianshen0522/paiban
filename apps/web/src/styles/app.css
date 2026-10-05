@@ -1477,3 +1477,78 @@ label.chk {
 .auth .alt a {
   color: var(--accent-ink);
 }
+
+/* administrator overview */
+#view .tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
+  gap: 12px;
+}
+#view .tile {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: grid;
+  gap: 2px;
+  text-align: left;
+  color: var(--ink);
+  text-decoration: none;
+}
+#view a.tile:hover {
+  border-color: var(--line-strong);
+  background: var(--panel-2);
+}
+#view .tile small {
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+#view .tile b {
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 500;
+}
+#view .tile span {
+  color: var(--ink-2);
+  font-size: 12.5px;
+}
+#view .two {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: 16px;
+}
+#view .plist,
+#view .feed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+#view .plist li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+#view .plist li:first-child,
+#view .feed li:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+#view .plist li > span:nth-child(2) {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+#view .feed li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 2px 12px;
+  padding: 7px 0;
+  border-top: 1px solid var(--line);
+}
+#view .feed small {
+  color: var(--ink-3);
+}

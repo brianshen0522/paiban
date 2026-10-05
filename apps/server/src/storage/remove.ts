@@ -45,3 +45,33 @@ export async function removeDownloadFiles(
 export async function removePoster(dataDir: string, ytsId: number): Promise<void> {
   await unlink(under(dataDir, 'posters', `${ytsId}.jpg`)).catch(() => undefined);
 }
+
+/**
+ * An administrator deleted a film's preview assets (docs/10-storage.md, "刪除": 管理員刪除預覽檔).
+ * Only the preview video and audio go; the film and its analysis stay.
+ */
+export async function removePreviewFiles(dataDir: string, mediaId: string, log: Logger): Promise<void> {
+  for (const f of ['audio.m4a', 'proxy.mp4']) await rm(under(dataDir, 'media', mediaId, f), { force: true });
+  log.info({ mediaId }, 'preview files removed (requested by an administrator)');
+}
+
+/** An export file deleted by its creator or an administrator: the export's folder. */
+export async function removeExportFiles(dataDir: string, exportId: string, log: Logger): Promise<void> {
+  await rm(under(dataDir, 'exports', exportId), { recursive: true, force: true });
+  log.info({ exportId }, 'export removed (requested by a person)');
+}
+
+/**
+ * A folder the last recalculation found with no row (an orphan), deleted by an administrator.
+ * The caller checks again, just before, that it still has no row.
+ */
+export async function removeOrphanFolder(
+  dataDir: string,
+  root: 'torrents' | 'media' | 'subtitles' | 'candidates' | 'exports',
+  name: string,
+  log: Logger,
+): Promise<void> {
+  const path = root === 'candidates' ? under(dataDir, 'subtitles', 'candidates', name) : under(dataDir, root, name);
+  await rm(path, { recursive: true, force: true });
+  log.info({ root, name }, 'orphan folder removed (requested by an administrator)');
+}

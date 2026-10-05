@@ -33,7 +33,7 @@ export function notificationText(n: Notification): string {
     case 'subtitle.confirmed':
       return t.notifications['subtitle.confirmed'](d.actor ?? '', title, d.language ?? '');
     case 'item.deleted':
-      return t.notifications['item.deleted'](d.actor ?? '', d.itemKind ?? '', title);
+      return t.notifications['item.deleted'](d.actor ?? '', t.itemKinds[d.itemKind ?? ''] ?? d.itemKind ?? '', title);
     default:
       return title;
   }
@@ -128,6 +128,7 @@ export function Shell({ me }: { me: Me }) {
     { to: '/profile', label: t.shell.nav.profile },
   ];
   const adminNav = [
+    { to: '/admin', label: t.shell.admin.overview, end: true },
     { to: '/admin/users', label: t.shell.admin.users },
     { to: '/admin/storage', label: t.shell.admin.storage },
     { to: '/admin/sources', label: t.shell.admin.sources },
@@ -253,7 +254,7 @@ export function Shell({ me }: { me: Me }) {
           <>
             <h2>{t.shell.adminHeading}</h2>
             {adminNav.map((n) => (
-              <NavLink key={n.to} to={n.to}>
+              <NavLink key={n.to} to={n.to} end={'end' in n}>
                 <span>{n.label}</span>
               </NavLink>
             ))}

@@ -1,5 +1,7 @@
 import cookie from '@fastify/cookie';
 import Fastify, { type FastifyInstance } from 'fastify';
+import { overviewRoutes } from './admin/overview-routes.js';
+import { storageDeleteRoutes } from './admin/storage-delete-routes.js';
 import { adminUserRoutes } from './admin/users-routes.js';
 import { accountRoutes } from './auth/account-routes.js';
 import { authRoutes } from './auth/routes.js';
@@ -99,6 +101,8 @@ export function buildApp(deps: Deps): FastifyInstance {
   authRoutes(app, deps);
   accountRoutes(app, deps);
   adminUserRoutes(app, deps);
+  overviewRoutes(app, deps);
+  storageDeleteRoutes(app, deps);
   ytsRoutes(app, deps);
   torrentRoutes(app, deps);
   storageRoutes(app, deps);

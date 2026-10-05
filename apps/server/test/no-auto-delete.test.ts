@@ -53,14 +53,32 @@ describe('deleting files', () => {
     );
   });
 
-  it('is triggered only from the torrent loop, for rows a person marked want = remove', async () => {
-    const callers: string[] = [];
+  it('is called only where something a person asked for is carried out', async () => {
+    // Each deletion function and the only files allowed to call it: the torrent loop for rows a person
+    // marked want = remove, and the administrator's force-delete endpoint.
+    const allowed: Record<string, string[]> = {
+      removeDownloadFiles: ['torrent/worker.ts'],
+      removePoster: ['torrent/worker.ts'],
+      removePreviewFiles: ['admin/storage-delete-routes.ts'],
+      removeExportFiles: ['admin/storage-delete-routes.ts'],
+      removeOrphanFolder: ['admin/storage-delete-routes.ts'],
+    };
+    const exported = [
+      ...(await readFile(join(SRC, 'storage/remove.ts'), 'utf8')).matchAll(/export async function (\w+)/g),
+    ].map((m) => m[1]);
+    expect(exported.sort()).toEqual(Object.keys(allowed).sort());
+    const callers: Record<string, string[]> = {};
     for (const file of await sources(SRC)) {
       const rel = relative(SRC, file);
       if (rel === 'storage/remove.ts') continue;
-      if (/removeDownloadFiles|removePoster/.test(await readFile(file, 'utf8'))) callers.push(rel);
+      const text = await readFile(file, 'utf8');
+      for (const fn of Object.keys(allowed)) {
+        if (!new RegExp(`\\b${fn}\\(`).test(text)) continue;
+        callers[fn] ??= [];
+        callers[fn].push(rel);
+      }
     }
-    expect(callers).toEqual(['torrent/worker.ts']);
+    for (const [fn, files] of Object.entries(allowed)) expect(callers[fn] ?? [], fn).toEqual(files);
     const worker = await readFile(join(SRC, 'torrent/worker.ts'), 'utf8');
     expect(worker).toMatch(/where t\.want = 'remove'/);
   });

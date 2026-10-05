@@ -89,7 +89,7 @@ export function when(iso: string): string {
   return `${d.toLocaleDateString('zh-TW')} ${hm}`;
 }
 
-function actionText(e: AuditEntry): string {
+export function actionText(e: AuditEntry): string {
   if (e.action === 'admin.settings.change') {
     const keys = String(e.target.keys ?? '').split(',');
     const s = t.audit.settings;
@@ -103,9 +103,11 @@ function actionText(e: AuditEntry): string {
   return t.audit.actions[e.action] ?? e.action;
 }
 
-function targetText(e: AuditEntry): string {
+export function targetText(e: AuditEntry): string {
   const x = e.target;
   const join = (...p: unknown[]) => p.filter((v) => v !== undefined && v !== '').join(' · ');
+  if (e.action === 'admin.storage.delete')
+    return join(t.itemKinds[String(x.itemKind)] ?? x.itemKind, x.fileName ?? x.movieTitle);
   if (x.movieTitle !== undefined) return join(x.movieTitle, x.version ?? x.language ?? x.releaseName ?? x.fileName);
   if (e.action === 'auth.login' || e.action === 'auth.session.revoke')
     return x.os || x.browser ? join(x.os, x.browser) : t.profile.unknownDevice;

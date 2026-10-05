@@ -341,7 +341,7 @@ YTS 連不上而這部片有先前存下來的資料時（`MovieDetail.stale`）
 | --- | --- | --- | --- | --- |
 | `OVER_LIMIT` | 問題 | 用量超過容量上限，所有人都不能下載或匯出。 | 處理 → 儲存空間管理 | |
 | `NEARLY_FULL` | 注意 | 容量只剩 1.6 GB。 | 查看 → 儲存空間管理 | `freeBytes` |
-| `DISK_LOW` | 問題 | 磁碟本身的可用空間只剩 1.2 GB。（新） | 查看 → 儲存空間管理 | `availableBytes` |
+| `DISK_LOW` | 問題 | 磁碟本身的可用空間只剩 1.2 GB。（新）門檻：可用空間少於系統保留（`STORAGE_RESERVE_GB`）的兩倍 | 查看 → 儲存空間管理 | `availableBytes` |
 | `FAILED_DOWNLOAD`，每個失敗的下載一項 | 問題 | 下載失敗：Charade 1080p BluRay（美玲）。〈原因〉，殘留 300 MB。 | 查看 → 下載 | `movieTitle`、`version`、`requestedBy`、`errorCode`、`bytes` |
 | `YTS_NOT_CONFIGURED` | 問題 | 還沒有設定 YTS 的網址，搜尋頁目前無法使用。（新） | 前往設定 → 來源設定 | |
 | `YTS_DOWN` | 問題 | YTS 連不上，搜尋頁目前無法使用。 | 更新網址 → 來源設定 | |

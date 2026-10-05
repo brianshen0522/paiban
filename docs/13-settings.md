@@ -147,6 +147,7 @@ API 的形狀是 `packages/shared/src/contracts/api.ts` 的 `Settings`、`Settin
 | 預覽預留的位元率 | 見 [10-storage.md](10-storage.md) | |
 | 匯出預留 | 原檔 × 1.01 + 1 MB | [10-storage.md](10-storage.md) |
 | 用量指示的門檻 | 剩 2 GB 變黃、0.5 GB 變紅 | 原型 |
+| 總覽的「磁碟快滿了」（`DISK_LOW`） | 磁碟可用空間少於系統保留的兩倍 | 2026-10-06 定（docs/changes.md） |
 | Session 有效期 | 30 天 | [12-auth.md](12-auth.md) |
 | 邀請連結有效期的選項 | 1、3、7 天 | 原型 |
 | 重設連結有效期 | 30 分鐘 | 原型 |

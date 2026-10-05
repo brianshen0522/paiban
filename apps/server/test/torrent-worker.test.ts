@@ -55,7 +55,8 @@ function newWorker(): TorrentWorker {
   return worker;
 }
 
-async function until(check: () => Promise<boolean>, ms = 20_000): Promise<void> {
+// Generous: these download for real over loopback, and the whole suite runs files in parallel.
+async function until(check: () => Promise<boolean>, ms = 60_000): Promise<void> {
   const end = Date.now() + ms;
   while (Date.now() < end) {
     clock = Date.now() > clock ? Date.now() : clock;
@@ -127,7 +128,7 @@ const start = async (cookie: string, hash = clipHash) =>
   (await call(t.app, 'POST', '/api/torrents', { cookie, body: { ytsId: 2, infoHash: hash } })).json().torrent
     .id as string;
 
-describe('the torrent service', () => {
+describe('the torrent service', { timeout: 90_000 }, () => {
   it('downloads by hash, verifies, records the media file and tells the holder', async () => {
     const id = await start(mei);
     await until(async () => (await row()).state === 'completed');

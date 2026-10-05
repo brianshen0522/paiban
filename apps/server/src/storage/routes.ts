@@ -62,6 +62,37 @@ async function storageItems(deps: Deps, userId: string | null): Promise<StorageI
     if (r.media_id && r.preview_bytes > 0)
       items.push({ ...base, kind: 'preview', id: r.media_id, previewResolution: r.proxy_res, bytes: r.preview_bytes });
   }
+  // The administrator's list also has every export (the member's own come from GET /api/exports).
+  if (userId === null) {
+    const exps = await many<{
+      id: string;
+      torrent_id: string | null;
+      movie_title: string;
+      file_name: string;
+      bytes: number;
+      by_id: string | null;
+      by_name: string | null;
+      created_at: Date;
+    }>(
+      deps.pool,
+      `select e.id, e.torrent_id, e.movie_title, e.file_name, e.created_at,
+              case when e.state = 'done' then e.size_bytes else e.reserved_bytes end as bytes, u.id as by_id, u.display_name as by_name
+         from exports e left join users u on u.id = e.created_by where e.state <> 'failed' or e.size_bytes > 0`,
+    );
+    for (const e of exps)
+      items.push({
+        kind: 'export',
+        id: e.id,
+        torrentId: e.torrent_id,
+        movieTitle: e.movie_title,
+        version: null,
+        previewResolution: null,
+        fileName: e.file_name,
+        bytes: e.bytes,
+        holders: e.by_id ? [{ id: e.by_id, displayName: e.by_name ?? '' }] : [],
+        lastUsedAt: e.created_at.toISOString(),
+      });
+  }
   return items.sort((a, b) => b.bytes - a.bytes);
 }
 

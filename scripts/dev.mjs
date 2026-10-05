@@ -66,6 +66,7 @@ await new Promise((r) => setTimeout(r, 1500)); // the seeder writes local-versio
 run('yts', 'node', ['src/yts-cli.ts'], 'tools/fakes');
 run('api', tsx, ['watch', 'src/api.ts'], 'apps/server');
 run('torrent', tsx, ['src/torrent.ts'], 'apps/server');
+run('media', tsx, ['src/media.ts'], 'apps/server');
 run('web', 'pnpm', ['exec', 'vite', '--host', '127.0.0.1'], 'apps/web');
 
 console.log('\nOpen http://localhost:5173 and sign in as admin / paiban-dev-not-real.');

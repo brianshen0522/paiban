@@ -9,6 +9,7 @@ import { ApiFailure } from './lib/api';
 import { useMe } from './lib/queries';
 import { AuditPage } from './pages/admin/AuditPage';
 import { DownloadSettingsPage } from './pages/admin/DownloadSettingsPage';
+import { OverviewPage } from './pages/admin/OverviewPage';
 import { SourcesPage } from './pages/admin/SourcesPage';
 import { StorageAdminPage } from './pages/admin/StorageAdminPage';
 import { UsersPage } from './pages/admin/UsersPage';
@@ -84,7 +85,7 @@ export const routes: RouteObject[] = [
         path: 'admin',
         element: <RequireAdmin />,
         children: [
-          { index: true, element: <Navigate to="/admin/users" replace /> },
+          { index: true, element: <OverviewPage /> },
           { path: 'users', element: <UsersPage /> },
           { path: 'audit', element: <AuditPage /> },
           { path: 'storage', element: <StorageAdminPage /> },

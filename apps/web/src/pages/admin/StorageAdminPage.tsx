@@ -1,11 +1,11 @@
-import type { Usage } from '@paiban/shared';
+import type { StorageItem, Usage } from '@paiban/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { type FormEvent, useEffect, useState } from 'react';
-import { Banner, Field, PageHead, Skeleton } from '../../components/Bits';
+import { Banner, ConfirmInline, Field, PageHead, Skeleton } from '../../components/Bits';
 import { useToast } from '../../components/Toasts';
 import { UsageBar, UsageLegend } from '../../components/Usage';
 import { t } from '../../copy/zh-TW';
-import { ApiFailure, put } from '../../lib/api';
+import { ApiFailure, del, put } from '../../lib/api';
 import { bytes } from '../../lib/format';
 import { keys, useAdminStorage } from '../../lib/queries';
 import { UsageNotice } from '../StoragePage';
@@ -133,33 +133,118 @@ export function StorageAdminPage() {
           <p className="sub">{t.admin.storage.itemsEmpty}</p>
         ) : (
           <div className="tw">
-            <table>
+            <table className="rtable">
               <thead>
                 <tr>
                   <th>{t.storage.cols.kind}</th>
                   <th>{t.storage.cols.name}</th>
                   <th className="num">{t.storage.cols.size}</th>
                   <th>{t.storage.cols.holders}</th>
+                  <th className="act">{t.storage.cols.action}</th>
                 </tr>
               </thead>
               <tbody>
                 {items.map((i) => (
-                  <tr key={`${i.kind}:${i.id}`}>
-                    <td>{t.storage.kinds[i.kind]}</td>
-                    <td className="rel">
-                      {i.movieTitle} <span className="sub-i">{i.version}</span>
-                    </td>
-                    <td className="num">{bytes(i.bytes)}</td>
-                    <td>
-                      {i.holders.length ? i.holders.map((h) => h.displayName).join('、') : t.admin.storage.noHolders}
-                    </td>
-                  </tr>
+                  <AdminItemRow
+                    key={`${i.kind}:${i.id}`}
+                    item={i}
+                    hasPreview={
+                      i.kind === 'movie' && items.some((x) => x.kind === 'preview' && x.torrentId === i.torrentId)
+                    }
+                  />
                 ))}
               </tbody>
             </table>
           </div>
         )}
       </section>
+    </>
+  );
+}
+
+/** One item with the administrator's force delete (docs/10-storage.md, "確認的文字"). */
+function AdminItemRow({ item, hasPreview }: { item: StorageItem; hasPreview: boolean }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [confirm, setConfirm] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const names = item.holders.map((h) => h.displayName).join('、') || t.forceDelete.nobody;
+  const size = bytes(item.bytes);
+  const text =
+    item.kind === 'movie'
+      ? item.holders.length
+        ? t.forceDelete.movieHeld(item.holders.length, size, hasPreview)
+        : t.forceDelete.movieNobody(size, hasPreview)
+      : item.kind === 'reserved'
+        ? t.forceDelete.reserved(names)
+        : item.kind === 'partial'
+          ? t.forceDelete.partial(size)
+          : item.kind === 'preview'
+            ? t.forceDelete.preview
+            : t.forceDelete.export(names, size);
+
+  const remove = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await del<{ freedBytes: number }>(`/api/admin/storage/items/${item.kind}/${item.id}`);
+      toast(r.freedBytes > 0 ? t.forceDelete.done(bytes(r.freedBytes)) : t.forceDelete.doneNoSize);
+    } catch (err) {
+      setError(
+        err instanceof ApiFailure && (err.code === 'TORRENT_STATE' || err.code === 'NOT_FOUND')
+          ? t.forceDelete.changed
+          : t.common.unknownError,
+      );
+    } finally {
+      setBusy(false);
+      setConfirm(false);
+      void qc.invalidateQueries({ queryKey: keys.adminStorage });
+      void qc.invalidateQueries({ queryKey: keys.storage });
+    }
+  };
+
+  return (
+    <>
+      <tr>
+        <td className="lead">{t.storage.kinds[item.kind]}</td>
+        <td className="rel" data-label={t.storage.cols.name}>
+          {item.fileName ?? item.movieTitle}{' '}
+          <span className="sub-i">{item.kind === 'export' ? item.movieTitle : item.version}</span>
+        </td>
+        <td className="num" data-label={t.storage.cols.size}>
+          {size}
+        </td>
+        <td data-label={t.storage.cols.holders}>{item.holders.length ? names : t.admin.storage.noHolders}</td>
+        <td className="act">
+          <button type="button" aria-expanded={confirm} onClick={() => setConfirm(true)}>
+            {t.forceDelete.button}
+          </button>
+        </td>
+      </tr>
+      {(confirm || error) && (
+        <tr className="blocked">
+          <td colSpan={5}>
+            {confirm && (
+              <ConfirmInline
+                text={text}
+                confirmLabel={t.forceDelete.button}
+                busy={busy}
+                onConfirm={remove}
+                onCancel={() => setConfirm(false)}
+              />
+            )}
+            {error && (
+              <Banner tone="warn">
+                <span>{error}</span>
+                <button type="button" onClick={() => setError(null)}>
+                  {t.common.gotIt}
+                </button>
+              </Banner>
+            )}
+          </td>
+        </tr>
+      )}
     </>
   );
 }
