@@ -67,7 +67,13 @@ for (const [name, f] of Object.entries(scenarios).filter(([n]) => !process.env.O
     { method: 'core', segments: Core.autoAlign(sp, cues, { allowSplit: true, radius: 60 }).segments },
   ];
   if (fit) cands.push({ method: mode === 'llm' ? 'asr-llm' : 'asr', segments: fit.segments });
-  const r = pickWithPairs(sp, cues, cands, pairs, asr.segments.map((s) => s.start));
+  const r = pickWithPairs(
+    sp,
+    cues,
+    cands,
+    pairs,
+    asr.segments.map((s) => s.start),
+  );
   console.log(
     '   supports',
     cands.map((c) => `${c.method}=${pairSupport(cues, pairs, c.segments)} segs=${c.segments.length}`).join(' '),
