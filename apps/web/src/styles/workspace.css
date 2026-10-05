@@ -1,0 +1,806 @@
+/* Workspace and sync workbench (docs/11-pages.md, "工作區"; docs/09-sync-workbench.md). Tokens from app.css. */
+
+/* A link styled as the row's main action, and links that read as links. */
+a.btn.strong {
+  border-color: var(--accent-ink);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+a.link {
+  color: var(--accent-ink);
+  text-underline-offset: 3px;
+}
+#view .lib-main h2 a.link {
+  color: var(--ink);
+  text-decoration: none;
+}
+#view .lib-main h2 a.link:hover {
+  text-decoration: underline;
+}
+
+/* Toggle buttons (docs/17-ui.md, "切換鈕"). */
+button[aria-pressed="true"] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--panel);
+}
+#view .bench .cue-row .x[aria-pressed="true"] {
+  background: none;
+  color: var(--ink);
+}
+
+#view .ws-panel,
+#view .ws-form {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+#view .ws-form {
+  gap: 12px;
+}
+/* Narrow screens: short cells keep their words together; the table scrolls in its own box. */
+#view .ws-panel td:not(.rel),
+#view .ws-panel th {
+  white-space: nowrap;
+}
+#view .ws-form .field input {
+  max-width: 560px;
+  width: 100%;
+}
+
+#view fieldset.fchips,
+#view fieldset.switch {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+#view fieldset.fchips legend.sub {
+  float: left;
+  margin-right: 6px;
+  padding: 0;
+  line-height: 30px;
+}
+#view .fchips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+#view .fchips button {
+  border-radius: 999px;
+  padding: 3px 12px;
+}
+#view .whead {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  min-width: 0;
+}
+#view .whead h1 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+#view .whead p {
+  margin: 2px 0 0;
+}
+#view .tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+}
+#view .tabs button {
+  display: grid;
+  gap: 0;
+  justify-items: start;
+  text-align: left;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  border-radius: 0;
+  background: none;
+  padding: 6px 16px 8px 4px;
+  margin-right: 12px;
+  color: var(--ink-2);
+  font-size: 15px;
+}
+#view .tabs button small {
+  font-size: 12px;
+  color: var(--ink-3);
+  font-weight: 400;
+}
+#view .tabs button[aria-selected="true"] {
+  border-bottom-color: var(--accent-fill);
+  color: var(--ink);
+  font-weight: 600;
+}
+#view .provs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: center;
+}
+#view .provs button {
+  padding: 2px 10px;
+  font-size: 13px;
+}
+#view .howto {
+  margin: 0;
+  padding-left: 1.3em;
+  color: var(--ink-2);
+  display: grid;
+  gap: 2px;
+}
+#view .drop {
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  text-align: center;
+  border: 1.5px dashed var(--line-strong);
+  border-radius: 10px;
+  padding: 22px 14px;
+  cursor: pointer;
+  color: var(--ink-2);
+}
+#view .drop:hover,
+#view .drop.over {
+  border-color: var(--accent-fill);
+  background: var(--accent-wash);
+}
+#view .drop:has(input:focus-visible) {
+  outline: 2px solid var(--accent-fill);
+  outline-offset: 2px;
+}
+#view .syncpick .field {
+  flex: 1 1 260px;
+  max-width: 420px;
+}
+#view .syncpick select {
+  width: 100%;
+}
+#view .mediapanel {
+  display: grid;
+  gap: 8px;
+}
+#view .mediapanel:empty {
+  display: none;
+}
+#view .mediapanel p {
+  margin: 0;
+}
+#view .mp-progress,
+#view .exp-prog {
+  display: grid;
+  gap: 4px;
+  max-width: 360px;
+}
+#view .h3 {
+  margin: 8px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+#view td b.good,
+#view .bench .score strong.good {
+  color: var(--good);
+}
+#view td b.warn,
+#view .bench .score strong.warn {
+  color: var(--warn);
+}
+#view td b.bad,
+#view .bench .score strong.bad {
+  color: var(--bad);
+}
+
+/* ------------------------------------------------------------------ workbench */
+
+#view .bench {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+#view .bench .bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  align-items: center;
+  justify-content: space-between;
+}
+#view .bench .meta {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+#view .bench .bar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  align-items: center;
+}
+#view .bench .steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  color: var(--ink-3);
+  font-size: 13px;
+  counter-reset: s;
+}
+#view .bench .steps li {
+  counter-increment: s;
+}
+#view .bench .steps li::before {
+  content: counter(s) "  ";
+  font-family: var(--font-mono);
+  color: var(--accent-ink);
+  font-weight: 500;
+}
+#view .bench .work {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: stretch;
+}
+#view .bench .stage {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+#view .bench .screen {
+  position: relative;
+  background: var(--stage);
+  border-radius: 10px;
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  max-width: 100%;
+}
+#view .bench .screen video {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+  background: var(--stage);
+}
+#view .bench .audio-only {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  color: var(--stage-ink-2);
+  font-family: var(--font-poster);
+  font-size: clamp(18px, 4vw, 34px);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  text-align: center;
+  opacity: 0.5;
+}
+#view .bench .subs {
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  bottom: 8%;
+  text-align: center;
+  color: var(--stage-ink);
+  font-weight: 500;
+  font-size: clamp(15px, 2.5vw, 26px);
+  line-height: 1.35;
+  pointer-events: none;
+  white-space: pre-line;
+  text-shadow:
+    0 0 3px #000,
+    0 1px 2px #000,
+    1px 0 2px #000,
+    -1px 0 2px #000,
+    0 -1px 2px #000;
+}
+#view .bench .subs .sub2 {
+  display: block;
+  font-size: 0.7em;
+  font-weight: 400;
+  color: var(--stage-ink-2);
+}
+#view .bench .tag {
+  position: absolute;
+  top: 10px;
+  font-size: 11.5px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  color: var(--stage-ink-2);
+  background: rgba(255, 255, 255, 0.1);
+}
+#view .bench .tag.corner {
+  right: 12px;
+}
+#view .bench .tag.orig {
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--accent-fill);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+#view .bench .transport {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+#view .bench .transport .play {
+  min-width: 4.6em;
+}
+#view .bench .clock {
+  font-size: 15px;
+  margin-inline: 4px;
+}
+#view .bench .clock .dur {
+  color: var(--ink-3);
+}
+#view .bench .transport .push {
+  margin-left: auto;
+  display: flex;
+  gap: 8px 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+#view .bench .cues {
+  min-width: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  max-height: 560px;
+}
+#view .bench .cues-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px;
+  border-bottom: 1px solid var(--line);
+}
+#view .bench .cues-head input {
+  flex: 1 1 9em;
+  min-width: 0;
+}
+#view .bench .switch {
+  display: inline-flex;
+}
+#view .bench .switch button {
+  border-radius: 0;
+  margin-left: -1px;
+}
+#view .bench .switch button:first-of-type {
+  border-radius: var(--r) 0 0 var(--r);
+  margin-left: 0;
+}
+#view .bench .switch button:last-of-type {
+  border-radius: 0 var(--r) var(--r) 0;
+}
+#view .bench .cue-note {
+  margin: 0;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  border-bottom: 1px solid var(--line);
+}
+#view .bench .cues-scroll {
+  overflow-y: auto;
+  flex: 1 1 0;
+  min-height: 300px;
+  overscroll-behavior: contain;
+}
+#view .bench .cue-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: relative;
+  width: 100%;
+}
+#view .bench .cue-slot {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+}
+#view .bench .cue-row {
+  display: grid;
+  grid-template-columns: 2.4em 5.6em minmax(0, 1fr) 10px;
+  gap: 4px 8px;
+  align-items: baseline;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line);
+}
+#view .bench .cue-row:hover {
+  background: var(--panel-2);
+}
+#view .bench .cue-row.now {
+  background: var(--accent-wash);
+}
+#view .bench .cue-row.sel {
+  box-shadow: inset 0 0 0 2px var(--accent-fill);
+}
+#view .bench .cue-row .n {
+  color: var(--ink-3);
+  font-size: 12.5px;
+  text-align: right;
+}
+#view .bench .cue-row .t {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--ink-2);
+  font-size: 12.5px;
+  text-align: left;
+  text-decoration: underline dotted var(--line-strong);
+  text-underline-offset: 3px;
+}
+#view .bench .cue-row .t:hover {
+  color: var(--accent-ink);
+}
+#view .bench .cue-row .x {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+#view .bench .cue-row .x small {
+  display: block;
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+#view .bench .cue-row.del .x {
+  text-decoration: line-through;
+  color: var(--ink-3);
+}
+#view .bench .dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  align-self: center;
+  background: var(--ink-3);
+}
+#view .bench .dot.good {
+  background: var(--good);
+}
+#view .bench .dot.warn {
+  background: var(--warn);
+}
+#view .bench .dot.bad {
+  background: var(--bad);
+}
+#view .bench .row-extra {
+  grid-column: 2 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding-top: 4px;
+}
+#view .bench .row-extra textarea {
+  flex: 1 1 100%;
+  min-width: 0;
+  resize: vertical;
+}
+#view .bench .row-extra .grp {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+#view .bench .row-extra button {
+  padding: 3px 9px;
+  font-size: 13px;
+}
+#view .bench .cue-empty {
+  padding: 18px 12px;
+  margin: 0;
+  color: var(--ink-3);
+}
+#view .bench .timeline {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+#view .bench .timeline p {
+  margin: 0;
+}
+#view .bench .tl-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  align-items: center;
+  justify-content: space-between;
+}
+#view .bench .score {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  color: var(--ink-2);
+}
+#view .bench .score strong {
+  font-family: var(--font-mono);
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--ink);
+}
+#view .bench .score small {
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+#view .bench .tl-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+#view .bench .tl-tools button {
+  padding: 3px 10px;
+}
+#view .bench canvas {
+  display: block;
+  width: 100%;
+}
+#view .bench canvas.ov {
+  height: 38px;
+  cursor: pointer;
+  touch-action: none;
+}
+#view .bench canvas.tl {
+  height: 178px;
+  cursor: crosshair;
+  touch-action: pan-y;
+}
+#view .bench .legend {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+#view .bench .legend i {
+  display: inline-block;
+  width: 14px;
+  height: 8px;
+  border-radius: 2px;
+  margin-right: 5px;
+  vertical-align: 1px;
+}
+#view .bench .legend .k-wave {
+  background: var(--wave);
+}
+#view .bench .legend .k-speech {
+  background: var(--speech);
+}
+#view .bench .legend .k-a {
+  background: var(--seg-a);
+}
+#view .bench .legend .k-b {
+  background: var(--seg-b);
+}
+#view .bench .log {
+  margin: 0;
+  min-height: 2.2em;
+  padding: 6px 12px;
+  color: var(--ink-2);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  align-items: center;
+}
+#view .bench .log b {
+  color: var(--ink);
+  font-weight: 600;
+}
+#view .bench .log button {
+  padding: 2px 10px;
+}
+#view .bench .tools {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  gap: 10px;
+}
+#view .bench .tool {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: grid;
+  gap: 7px;
+  align-content: start;
+  min-width: 0;
+}
+#view .bench .tool h2 {
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-3);
+  letter-spacing: 0.04em;
+}
+#view .bench .tool .ctl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+#view .bench .tool p {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 12.5px;
+}
+#view .bench .tool .ctl button {
+  padding-inline: 9px;
+}
+#view .bench .tool input.offset {
+  width: 5.8em;
+  text-align: right;
+}
+#view .bench .tool .grow {
+  flex: 1 1 100%;
+  min-width: 0;
+  white-space: nowrap;
+}
+#view .bench .tool .grow select {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+}
+#view .bench .dots {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+}
+#view .bench .dots button {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 11.5px;
+  font-family: var(--font-mono);
+  color: var(--ink-2);
+}
+#view .bench .dots button.ok {
+  background: var(--good);
+  border-color: var(--good);
+  color: var(--panel);
+}
+#view .bench .dots button.bad {
+  background: var(--bad);
+  border-color: var(--bad);
+  color: var(--panel);
+}
+#view .bench .dots button.cur {
+  box-shadow: 0 0 0 2px var(--accent-fill);
+}
+#view .bench .chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+#view .bench .chip {
+  border-radius: 999px;
+  padding: 1px 9px;
+  font-size: 12.5px;
+  font-weight: 400;
+  letter-spacing: 0;
+  border: 1px solid var(--line-strong);
+  color: var(--ink-2);
+}
+#view .bench .chip.a {
+  border-color: var(--seg-a);
+}
+#view .bench .chip.b {
+  border-color: var(--seg-b);
+}
+#view .bench .chip.c {
+  border-color: var(--seg-c);
+}
+#view .bench .chip.cur {
+  background: var(--accent-wash);
+  color: var(--ink);
+}
+#view .bench .summary {
+  background: var(--panel);
+  border: 1px solid var(--good);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+#view .bench .summary h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+#view .bench .summary p {
+  margin: 0;
+  color: var(--ink-2);
+}
+#view .bench .keys {
+  color: var(--ink-2);
+}
+#view .bench .keys summary {
+  cursor: pointer;
+  width: fit-content;
+}
+#view .bench .keys dl {
+  margin: 8px 0 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+  gap: 4px 20px;
+}
+#view .bench .keys div {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+#view .bench .keys dt {
+  min-width: 6.2em;
+}
+#view .bench .keys dd {
+  margin: 0;
+  color: var(--ink-3);
+}
+#view .bench kbd {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  padding: 0 5px;
+}
+
+@media (max-width: 860px) {
+  #view .bench .work {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  #view .bench .cues {
+    max-height: 380px;
+  }
+  #view .bench .cues-scroll {
+    min-height: 240px;
+  }
+  #view .bench .transport .push {
+    margin-left: 0;
+  }
+}
+@media (max-width: 480px) {
+  #view .bench .cue-row {
+    grid-template-columns: 2em 5.2em minmax(0, 1fr) 10px;
+    padding-inline: 8px;
+  }
+  #view .bench canvas.tl {
+    height: 160px;
+  }
+  #view .whead .thumb {
+    display: none;
+  }
+}

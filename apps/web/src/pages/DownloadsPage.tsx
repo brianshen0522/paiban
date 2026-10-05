@@ -125,9 +125,21 @@ function meta(x: Torrent, me: Me): string {
       const reason = x.error ? t.downloads.errors[x.error.code] : t.common.unknownError;
       return x.diskBytes > 0 ? t.downloads.failedMeta(reason, bytes(x.diskBytes)) : t.downloads.failedNothing(reason);
     }
-    default:
-      return x.completedAt ? t.downloads.doneMeta(relative(x.completedAt)) : '';
+    default: {
+      const done = x.completedAt ? t.downloads.doneMeta(relative(x.completedAt)) : '';
+      return [done, previewMeta(x)].filter(Boolean).join(' · ');
+    }
   }
+}
+
+/** docs/11-pages.md, "下載": the preview's state on a finished row; nothing for a film that plays directly. */
+function previewMeta(x: Torrent): string {
+  const m = x.media;
+  if (!m || m.directPlay) return '';
+  if (m.proxy.state === 'ready') return t.downloads.previewReady;
+  if (m.proxy.state === 'pending' || m.proxy.state === 'running')
+    return t.downloads.previewRunning(percent(m.proxy.progress));
+  return t.downloads.previewMissing;
 }
 
 type Confirm = 'cancel' | 'remove' | null;
@@ -218,7 +230,7 @@ function Row({ x, me, showHolders }: { x: Torrent; me: Me; showHolders: boolean 
         </button>
       )}
       {(x.status === 'ready' || x.status === 'analyzing') && (
-        <Link className="btn" to="/library">
+        <Link className="btn" to={`/library/${x.id}/subtitles`}>
           {t.downloads.open}
         </Link>
       )}

@@ -1,8 +1,9 @@
-import type { Export, LibraryItem, Workspace } from '@paiban/shared';
+import type { LibraryItem, Workspace } from '@paiban/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { Queryable } from '../db/pool.js';
 import { many, one } from '../db/pool.js';
+import { exportsForTorrent } from '../exports/view.js';
 import type { Deps } from '../http/context.js';
 import { ApiError } from '../http/errors.js';
 import { parse, requireUser } from '../http/guards.js';
@@ -43,14 +44,6 @@ async function libraryItems(q: Queryable, rows: TorrentRow[], viewerId: string):
   });
 }
 
-/**
- * The film's exports for the workspace. The export feature fills this in (docs/14-plan.md, phase 7);
- * until then a film has none.
- */
-export async function workspaceExports(_q: Queryable, _torrentId: string, _viewerId: string): Promise<Export[]> {
-  return [];
-}
-
 export function libraryRoutes(app: FastifyInstance, deps: Deps): void {
   /** Finished films the caller holds, analysing ones included (docs/11-pages.md, "片庫"). */
   app.get('/api/library', async (req): Promise<LibraryItem[]> => {
@@ -84,7 +77,7 @@ export function libraryRoutes(app: FastifyInstance, deps: Deps): void {
     return {
       item: item as LibraryItem,
       subtitles: (await subtitleRows(deps.pool, torrentId)).map(toSubtitle),
-      exports: await workspaceExports(deps.pool, torrentId, user.id),
+      exports: await exportsForTorrent(deps, torrentId, user.id),
       usage: await readUsage(deps.pool),
       exportNeedBytes: Math.ceil((media?.size_bytes ?? 0) * 1.01) + 1024 * 1024,
     };
