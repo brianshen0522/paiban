@@ -12,7 +12,7 @@
 - 標「管理員」的端點，成員呼叫回 `403 FORBIDDEN`。
 - 標「持有人」的端點，呼叫者必須是那部片的持有人，否則回 `403 NOT_HOLDER`。**管理員也一樣**：他要處理別人的片，先把那個版本加入自己的片庫（`POST /api/torrents`）。字幕和影片的端點依它所屬的那部片檢查。管理員比成員多的只有三樣：`/api/admin/…`、全站的下載與匯出清單（`scope=all`）、任何人的匯出檔。
 - 正在被刪除的下載（`want = 'remove'`）對所有端點來說已經不存在：回 `404 NOT_FOUND`，清單裡也不列出。
-- 會改變資料的請求（`POST`、`PUT`、`PATCH`、`DELETE`）必須帶 `X-Requested-With: paiban` 標頭，並檢查 `Origin` 和 `PUBLIC_URL` 同源；少了就回 `403 FORBIDDEN`。這是防跨站請求用的。有內容的請求另外要帶 `Content-Type: application/json`（上傳是 `multipart/form-data`）；沒有內容的請求（例如暫停、刪除）不需要 `Content-Type`。
+- 會改變資料的請求（`POST`、`PUT`、`PATCH`、`DELETE`）必須帶 `X-Requested-With: paiban` 標頭，並檢查 `Origin` 和 `PUBLIC_URL` 同源（或等於請求的 `Host`）；少了就回 `403 FORBIDDEN`。這是防跨站請求用的。有內容的請求另外要帶 `Content-Type: application/json`（上傳是 `multipart/form-data`）；沒有內容的請求（例如暫停、刪除）不需要 `Content-Type`。
 - `GET` 不改變資料。有兩個例外，都只是紀錄，不是使用者的資料：`sessions.last_seen_at` 和 `torrents.last_used_at`。
 - 請求內容不符合 schema 回 `422 VALIDATION`，`details.fields` 指出哪個欄位、什麼原因（原因是代碼，不是句子）。
 - 錯誤回應的形狀固定是 `ApiError`。

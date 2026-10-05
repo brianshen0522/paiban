@@ -152,3 +152,13 @@ describe('first administrator (D18)', () => {
     }
   });
 });
+
+describe('same-origin writes from another address', () => {
+  it('accept a write whose Origin is the host it was sent to, refuse a foreign one', async () => {
+    const body = { username: 'mei', password: 'test-password-not-real' };
+    const lan = await call(t.app, 'POST', '/api/auth/login', { body, headers: { origin: 'http://192.168.1.20:8088', host: '192.168.1.20:8088' } });
+    expect(lan.statusCode).toBe(200);
+    const foreign = await call(t.app, 'POST', '/api/auth/login', { body, headers: { origin: 'https://evil.example', host: '192.168.1.20:8088' } });
+    expect(foreign.statusCode).toBe(403);
+  });
+});

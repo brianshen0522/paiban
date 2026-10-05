@@ -8,6 +8,7 @@ import { type Client, many, one, pgCode, tx, UNIQUE_VIOLATION } from '../db/pool
 import type { Deps } from '../http/context.js';
 import { ApiError } from '../http/errors.js';
 import { parse, requireAdmin } from '../http/guards.js';
+import { linkBase } from '../http/links.js';
 import { readSettings } from '../settings/settings.js';
 
 /** Administration of people (docs/04-api.md, "管理"; docs/11-pages.md, "使用者與邀請", "操作紀錄"). */
@@ -135,7 +136,7 @@ export function adminUserRoutes(app: FastifyInstance, deps: Deps): void {
       await audit(c, me, 'admin.user.reset_link', { name: u.display_name }, req.ip);
       return r?.expires_at ?? new Date();
     });
-    return { url: `${config.publicUrl}/reset/${token}`, expiresAt: out.toISOString() };
+    return { url: `${linkBase(config.publicUrl, req)}/reset/${token}`, expiresAt: out.toISOString() };
   });
 
   /** Removes the account, never its files: what only they held stays, without holders (docs/10-storage.md). */
@@ -175,10 +176,10 @@ select i.id, i.code, i.role, i.expires_at, i.used_at,
     used_id: string | null;
     used_name: string | null;
   };
-  const toInvite = (r: InviteRow): Invite => ({
+  const toInvite = (r: InviteRow, base: string): Invite => ({
     id: r.id,
     code: r.code,
-    url: `${config.publicUrl}/invite/${r.code}`,
+    url: `${base}/invite/${r.code}`,
     role: r.role,
     state: r.used_at ? 'used' : r.expires_at.getTime() <= Date.now() ? 'expired' : 'open',
     createdBy: r.by_id ? { id: r.by_id, displayName: r.by_name ?? '' } : null,
@@ -188,7 +189,7 @@ select i.id, i.code, i.role, i.expires_at, i.used_at,
 
   app.get('/api/admin/invites', async (req) => {
     requireAdmin(req);
-    return (await many<InviteRow>(pool, `${INVITES} order by i.created_at desc`)).map(toInvite);
+    return (await many<InviteRow>(pool, `${INVITES} order by i.created_at desc`)).map((r) => toInvite(r, linkBase(config.publicUrl, req)));
   });
 
   app.post('/api/admin/invites', async (req, reply) => {
@@ -209,7 +210,7 @@ select i.id, i.code, i.role, i.expires_at, i.used_at,
         deps.events.toAdmins({ type: 'admin', what: 'users' });
         const [inv] = await many<InviteRow>(pool, `${INVITES} where i.id = $1`, [r?.id]);
         if (!inv) throw new Error('invite vanished');
-        return reply.status(201).send(toInvite(inv));
+        return reply.status(201).send(toInvite(inv, linkBase(config.publicUrl, req)));
       } catch (err) {
         if (pgCode(err) !== UNIQUE_VIOLATION || attempt > 3) throw err;
       }

@@ -20,6 +20,16 @@ import { ytsRoutes } from './yts/routes.js';
 
 const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
+export function sameOrigin(header: string | undefined, publicOrigin: string, host: string | undefined): boolean {
+  if (!header) return false;
+  if (header === publicOrigin) return true;
+  try {
+    return !!host && new URL(header).host === host;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * The HTTP application. Separate from the entry point so tests can drive it with `inject`.
  * Caddy sits in front; the client address is taken from X-Forwarded-For only when the request
@@ -56,7 +66,9 @@ export function buildApp(deps: Deps): FastifyInstance {
     // Cross-site request protection (docs/12-auth.md, "防跨站請求").
     if (MUTATING.has(req.method) && req.url.startsWith('/api/')) {
       if (req.headers['x-requested-with'] !== 'paiban') throw new ApiError('FORBIDDEN', 'missing X-Requested-With');
-      if (req.headers.origin !== origin) throw new ApiError('FORBIDDEN', 'cross-origin request');
+      // Same-origin: the configured address, or the very host the request was sent to. A cross-site
+      // form or script always carries its own origin, which matches neither.
+      if (!sameOrigin(req.headers.origin, origin, req.headers.host)) throw new ApiError('FORBIDDEN', 'cross-origin request');
     }
     const token = req.cookies[SESSION_COOKIE];
     if (token) {

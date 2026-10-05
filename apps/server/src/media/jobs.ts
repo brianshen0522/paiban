@@ -85,7 +85,7 @@ export async function probeJob(d: JobDeps, row: MediaRow): Promise<void> {
       info = null;
     }
   }
-  if (!info || !info.videoCodec) {
+  if (!info?.videoCodec) {
     // Unreadable: the file is probably broken. Not retried automatically (docs/08, "特殊情況").
     await pool.query(
       `update media_files set probe_state = 'failed', error = coalesce(error, '{}'::jsonb) || '{"analysis": "PROBE_FAILED"}'::jsonb,
@@ -337,7 +337,7 @@ export async function previewJob(
     ]);
   for (const asset of ['audio', 'proxy'] as const) {
     const fresh = await one<MediaRow>(pool, `${MEDIA_ROW} where mf.id = $1`, [row.id]);
-    if (!fresh || fresh[`${asset}_state`] !== 'pending') continue;
+    if (fresh?.[`${asset}_state`] !== 'pending') continue;
     const result = await assetJob(d, fresh, asset, taskId);
     if (result !== 'done') return result;
   }

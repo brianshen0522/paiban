@@ -98,7 +98,7 @@
 ## 防跨站請求
 
 - Cookie 是 `SameSite=Lax`。
-- 會改變資料的請求必須帶 `X-Requested-With: paiban` 標頭（瀏覽器的跨站表單送不出自訂標頭），並且 `Origin` 要和 `PUBLIC_URL` 同源。
+- 會改變資料的請求必須帶 `X-Requested-With: paiban` 標頭（瀏覽器的跨站表單送不出自訂標頭），並且 `Origin` 要和 `PUBLIC_URL` 同源，或者就是這個請求送達的主機（`Host`）。
 - 有內容的請求要帶 `Content-Type: application/json`（上傳是 `multipart/form-data`）；沒有內容的請求不要求 `Content-Type`。
 - `GET` 不改變資料（`last_seen_at`、`last_used_at` 這兩個紀錄用的欄位除外）。
 - 不開 CORS。

@@ -16,6 +16,14 @@
 
 ---
 
+## 2026-10-06 防跨站檢查也接受「送到哪個主機就從哪個主機來」的請求
+
+- 原本：`docs/12-auth.md`、`docs/04-api.md` 要求寫入請求的 `Origin` 和 `PUBLIC_URL` 同源。
+- 改成：`Origin` 等於 `PUBLIC_URL`，或者 `Origin` 的主機就是這個請求的 `Host`，都接受。邀請和重設連結的開頭仍然用 `PUBLIC_URL`；但 `PUBLIC_URL` 還是 `localhost` 時，改用管理員當下打開網站的位址。
+- 原因：`PUBLIC_URL` 沒改到實際網址時，從別台電腦用 IP 打開網站連登入都會被拒（Brian 要在早上從別的裝置測試）。跨站請求帶的是攻擊者網站自己的 Origin，和 Host 不同，所以防護不變；`X-Requested-With` 的檢查也照舊。
+- 改了哪些檔案：docs/12-auth.md、docs/04-api.md
+- Brian 是否已確認：否
+
 ## 2026-10-06 media 服務：不用 pg-boss，錯誤每種資產一格，測試在映像檔裡跑
 
 - 原本：`docs/02-architecture.md` 用 pg-boss 當工作佇列；`media_files.error` 和 `MediaStatus.error` 只有一格。
