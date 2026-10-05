@@ -281,7 +281,7 @@ ffmpeg -v error -nostdin -y -progress pipe:1 -nostats -i "$SRC" -map 0:V:0 -map 
 ### 建立匯出時（`api`）
 
 1. 驗證：每條字幕都是已確認的；恰好一條是預設軌；檔名合法。
-2. 估計大小：`media_files.size_bytes × 1.01 + 1 MB`（就是 `Workspace.exportNeedBytes`）。在交易裡 `storage_admit`。
+2. 估計大小：`media_files.size_bytes × 1.01 + 1 MB`（就是 `Workspace.exportNeedBytes`；算式只寫在 `packages/shared` 的 `exportNeedBytes()`，1 MB 是 1,048,576 位元組，乘完的小數無條件進位）。在交易裡 `storage_admit`。
 3. 通過後，**當場**把每條字幕套用同步文件並寫成最終的 SRT：`applyDoc` → `toSrt`，存在 `/data/exports/<id>/tracks/<n>.srt`（UTF-8）。這樣之後字幕被修改或刪除都不影響這次匯出。
 4. 建立 `exports`（`queued`）和 `tasks` 的列，`NOTIFY paiban_media`。更新這部片的 `last_used_at`。
 
@@ -324,7 +324,9 @@ ffmpeg 只能寫三個字母的語言碼，所以繁簡靠 `title` 區分。這�
 
 **時間**：原檔的聲音常有一點負的起始時間（AAC 的編碼延遲）。封裝成 MKV 時 ffmpeg 會把**所有**軌一起往後挪同樣的量（測試片段是 46 毫秒），字幕也一起挪，所以影像、聲音、字幕之間的相對時間不變。不需要、也不應該自己去補這個量。
 
-**做完之後檢查一次**：用 ffprobe 看輸出檔，影像軌數、聲音軌數要和原檔相同，字幕軌數要等於要求的數量。不對就當成失敗（`VERIFY_FAILED`）。
+**做完之後檢查一次**：用 ffprobe 看輸出檔（還是 `.part` 的時候，檢查過才改名），影像軌數（不算封面圖，和 `0:V` 一樣）、聲音軌數要和原檔相同，字幕軌數要等於要求的數量。不對就當成失敗（`VERIFY_FAILED`）。
+
+**佇列**：封裝在 `media` 裡是獨立的一條佇列，同時只跑一個，和預覽資產、分析互不等待。進度從 `-progress` 的 `out_time_us` 除以片長算，每 2 秒最多寫一次 `exports.progress` 和 `tasks.progress`，並 `NOTIFY`（`export`）。完成和失敗的通知帶片名、版本、檔名（失敗另帶代碼），`link` 指向那部片工作區的匯出分頁。
 
 ### 結束的四種情況
 
@@ -386,7 +388,7 @@ ffmpeg 只能寫三個字母的語言碼，所以繁簡靠 `title` 區分。這�
 | 上次停在 | 改成 |
 | --- | --- |
 | `media_files` 的 `probe_state`、`analysis_state`、`audio_state`、`proxy_state` 是 `running` | `pending` |
-| `exports.state = 'running'` | `queued` |
+| `exports.state = 'running'` | `queued`。但 `cancel_requested` 已經是 true 的（取消到一半被重啟）直接收掉：刪 `tracks/`、刪那一列、它的 `tasks` 標成 `cancelled` |
 | `subtitle_candidates.align_state = 'running'` | `queued` |
 | `tasks.state = 'running'`，種類是 `analyze`、`preview`、`export`、`rank`、`rescan` | `queued` |
 | `tasks` 裡還沒結束的 `align` | `failed`：等它的那個請求早就不在了 |
@@ -407,7 +409,7 @@ ffmpeg 只能寫三個字母的語言碼，所以繁簡靠 `title` 區分。這�
 
 3. **處理卡住的候選。** `fetch_state = 'fetching'` 超過 10 分鐘的，改成 `failed`（`DOWNLOAD_FAILED`）；它如果在等排名，`align_state` 也改成 `failed`。
 
-4. **收掉沒有對象的工作。** `tasks` 還沒結束、但它的對象已經不存在的，標成 `cancelled`。
+4. **收掉沒有對象的工作。** `tasks` 還沒結束、但它的對象已經不存在的，標成 `cancelled`。`export` 的工作看的是那一筆匯出還在不在 `queued` 或 `running`。
 
 對帳本身不刪任何檔案，也不依時間刪任何東西；第 3 項改的是狀態，不是檔案。
 

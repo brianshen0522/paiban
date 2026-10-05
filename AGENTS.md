@@ -98,6 +98,7 @@ pnpm typecheck                                       # 型別檢查(TypeScript 7
 pnpm lint                                            # Biome:lint + 格式檢查;pnpm format 會直接修正
 pnpm test                                            # 各套件的 Vitest
 pnpm build                                           # 建置 shared、server、web
+pnpm db:test && pnpm test:image [test/<檔案>]          # 在映像檔裡跑伺服器測試:需要 ffmpeg、ffsubsync 的(media、exports-mux)在主機上會略過
 
 pnpm db:test                                         # 測試用的 PostgreSQL(port 55432);pnpm test 之前先起來
 pnpm dev                                             # 本機開發:資料庫、假的 YTS、本機做種、api、torrent、網頁

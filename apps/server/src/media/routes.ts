@@ -2,7 +2,7 @@ import { createReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { MediaStatus } from '@paiban/shared';
-import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { audit } from '../audit.js';
 import { one, tx } from '../db/pool.js';
@@ -10,6 +10,7 @@ import { publishTorrent, publishUsage } from '../events/publish.js';
 import type { AuthedUser, Deps } from '../http/context.js';
 import { ApiError } from '../http/errors.js';
 import { parse, requireUser } from '../http/guards.js';
+import { sendFile } from '../http/send-file.js';
 import { readSettings } from '../settings/settings.js';
 import { admit } from '../storage/usage.js';
 import { mediaStatus, selectTorrents, type TorrentRow, versionLabel } from '../torrents/view.js';
@@ -23,40 +24,6 @@ async function holderMedia(deps: Deps, user: AuthedUser, id: string): Promise<To
   if (!row) throw new ApiError('NOT_FOUND', 'no such media');
   if (!row.holders.some((h) => h.id === user.id)) throw new ApiError('NOT_HOLDER', 'not a holder of this film');
   return row;
-}
-
-/**
- * Streams a file with Range support (docs/04-api.md, "影片": Range, If-Range, HEAD, Accept-Ranges,
- * no caching). The path always comes from the database, never from the request.
- */
-async function sendFile(req: FastifyRequest, reply: FastifyReply, path: string, mime: string): Promise<FastifyReply> {
-  const s = await stat(path).catch(() => null);
-  if (!s?.isFile()) throw new ApiError('NOT_FOUND', 'file not there');
-  const size = s.size;
-  const etag = `"${s.mtimeMs.toString(36)}-${size.toString(36)}"`;
-  reply
-    .header('Accept-Ranges', 'bytes')
-    .header('Cache-Control', 'private, no-store')
-    .header('ETag', etag)
-    .header('Last-Modified', s.mtime.toUTCString())
-    .type(mime);
-  const range = req.headers.range;
-  const ifRange = req.headers['if-range'];
-  const rangeApplies = range && (!ifRange || ifRange === etag || ifRange === s.mtime.toUTCString());
-  const m = rangeApplies ? /^bytes=(\d*)-(\d*)$/.exec(range) : null;
-  if (!m) return reply.header('Content-Length', size).send(req.method === 'HEAD' ? '' : createReadStream(path));
-  let start = m[1] === '' ? size - Number(m[2]) : Number(m[1]);
-  let end = m[1] === '' || m[2] === '' ? size - 1 : Math.min(Number(m[2]), size - 1);
-  if (start < 0) start = 0;
-  if (Number.isNaN(start) || Number.isNaN(end) || start > end || start >= size) {
-    return reply.status(416).header('Content-Range', `bytes */${size}`).send();
-  }
-  end = Math.min(end, size - 1);
-  reply
-    .status(206)
-    .header('Content-Range', `bytes ${start}-${end}/${size}`)
-    .header('Content-Length', end - start + 1);
-  return reply.send(req.method === 'HEAD' ? '' : createReadStream(path, { start, end }));
 }
 
 export function mediaRoutes(app: FastifyInstance, deps: Deps): void {

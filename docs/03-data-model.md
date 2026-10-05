@@ -185,7 +185,7 @@ API 回給前端的 `TorrentStatus` 是算出來的，不是存起來的：
 - `tracks` 記錄當時封裝了哪些字幕（含它們的 `rev`），之後字幕再被修改也不影響已經匯出的檔案。
 - `reserved_bytes` 在 `queued` / `running` 時算進用量；`done` 之後改算 `size_bytes`。失敗時兩者都是 0，寫到一半的檔案由該工作自己刪掉，原因記在 `error_code`。
 - 使用者刪除一個還在排隊的匯出（`queued`）：`api` 直接刪掉 `tracks/` 和這一列，不用等 `media`。
-- 使用者刪除一個進行中的匯出（`running`）：`api` 把 `cancel_requested` 設成 true，`media` 看到後終止 ffmpeg、刪掉半成品、刪掉這一列。
+- 使用者刪除一個進行中的匯出（`running`）：`api` 把 `cancel_requested` 設成 true，`media` 看到後終止 ffmpeg、刪掉半成品、刪掉這一列。從設成 true 的那一刻起，清單和事件都當它已經不在（`GET /api/exports` 不列出，再刪一次回 `NOT_FOUND`）。`media` 剛好在這之間重啟的話，啟動時把這種列收掉（刪 `tracks/` 和這一列）。
 - 封裝到一半，來源的電影被刪除：這次匯出失敗（`SOURCE_MISSING`），預留釋出。
 
 ## 設定與金鑰
@@ -239,7 +239,7 @@ API 回給前端的 `TorrentStatus` 是算出來的，不是存起來的：
    - 這個下載底下其他還沒結束的 `tasks`（`queued`、`running`）標成 `cancelled`。
    - 刪除 `torrents` 那一列。外鍵會連帶刪掉持有人、影片、字幕、候選；`exports.torrent_id` 和 `tasks.torrent_id` 變成 null。
 
-   排隊中的匯出留在磁碟上的 `tracks/` 由 `torrent` 在這一步之後順手刪掉；進行中的由封裝工作自己收（見下面）。
+   這一步標成失敗的匯出，留在磁碟上的 `tracks/` 由 `torrent` 在這一步之後順手刪掉（排隊中的沒有別人會收；進行中的封裝工作也會自己收，兩邊都刪不算錯誤，而且 `media` 剛好不在執行時也不會留下來）。
 5. 如果那部電影已經沒有任何下載，刪掉 `movies` 那一列和海報快取。
 6. `NOTIFY`：`torrent.removed`、`usage`；每一列被改動的 `tasks` 各一則 `task`（正在等那個工作的請求會被叫醒，系統狀態頁會更新）；每個被標成失敗的匯出各一則 `export`；每則通知各一則 `notification`。
 

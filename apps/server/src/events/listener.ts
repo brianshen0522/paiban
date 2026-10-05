@@ -1,6 +1,7 @@
 import pg from 'pg';
 import type { Logger } from 'pino';
 import type { Pool } from '../db/pool.js';
+import { publishExport } from '../exports/view.js';
 import type { EventHub } from './hub.js';
 import { publishNotification, publishTorrent, publishUsage } from './publish.js';
 
@@ -23,6 +24,8 @@ export function listenForEvents(databaseUrl: string, pool: Pool, hub: EventHub, 
     try {
       if (msg.type === 'torrent' && msg.id) await publishTorrent(pool, hub, msg.id);
       else if (msg.type === 'torrent.removed' && msg.id) hub.toAll({ type: 'torrent.removed', id: msg.id });
+      else if (msg.type === 'export' && msg.id) await publishExport(pool, hub, msg.id);
+      else if (msg.type === 'export.removed' && msg.id) hub.toAll({ type: 'export.removed', id: msg.id });
       else if (msg.type === 'usage') await publishUsage(pool, hub);
       else if (msg.type === 'notification' && msg.id) await publishNotification(pool, hub, Number(msg.id));
       else if (msg.type === 'task') hub.toAdmins({ type: 'admin', what: 'tasks' });

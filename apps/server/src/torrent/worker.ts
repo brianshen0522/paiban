@@ -7,7 +7,7 @@ import { many, one, type Pool, tx } from '../db/pool.js';
 import { readSettings } from '../settings/settings.js';
 import type { DiskProbe } from '../storage/disk.js';
 import { folderBytes } from '../storage/measure.js';
-import { removeDownloadFiles, removePoster } from '../storage/remove.js';
+import { removeDownloadFiles, removeExportTracks, removePoster } from '../storage/remove.js';
 import { admit, predictDirectPlay } from '../storage/usage.js';
 import { versionLabel } from '../torrents/view.js';
 import type { Engine, EngineTorrent } from './engine.js';
@@ -489,17 +489,38 @@ export class TorrentWorker {
       this.log,
     );
     const out = await tx(this.pool, async (c) => {
-      const exportNotes = await c.query<{ id: number }>(
-        `with failed as (
-           update exports set state = 'failed', error_code = 'SOURCE_MISSING', reserved_bytes = 0
-            where torrent_id = $1 and state in ('queued', 'running') returning id, created_by, movie_title, file_name)
-         insert into notifications (user_id, kind, data, link)
-         select created_by, 'export.failed', jsonb_build_object('movieTitle', movie_title, 'fileName', file_name, 'errorCode', 'SOURCE_MISSING'), null
-           from failed where created_by is not null returning id`,
+      const failedExports = await many<{
+        id: string;
+        created_by: string | null;
+        movie_title: string;
+        file_name: string;
+      }>(
+        c,
+        `update exports set state = 'failed', error_code = 'SOURCE_MISSING', reserved_bytes = 0, progress = 0
+          where torrent_id = $1 and state in ('queued', 'running') returning id, created_by, movie_title, file_name`,
         [r.id],
       );
-      await c.query(
-        `update tasks set state = 'cancelled', finished_at = now() where torrent_id = $1 and state in ('queued', 'running')`,
+      const exportNotes: number[] = [];
+      for (const e of failedExports)
+        if (e.created_by) {
+          const n = await one<{ id: number }>(
+            c,
+            `insert into notifications (user_id, kind, data, link)
+             values ($1, 'export.failed', jsonb_build_object('movieTitle', $2::text, 'fileName', $3::text, 'errorCode', 'SOURCE_MISSING'), null) returning id`,
+            [e.created_by, e.movie_title, e.file_name],
+          );
+          if (n) exportNotes.push(n.id);
+        }
+      // Their tasks failed with them (docs/03-data-model.md, step 4); the film's other tasks are cancelled.
+      const failedTasks = await many<{ id: string }>(
+        c,
+        `update tasks set state = 'failed', error_code = 'SOURCE_MISSING', finished_at = now()
+          where kind = 'export' and input->>'exportId' = any($1::text[]) and state in ('queued', 'running') returning id`,
+        [failedExports.map((e) => e.id)],
+      );
+      const cancelledTasks = await many<{ id: string }>(
+        c,
+        `update tasks set state = 'cancelled', finished_at = now() where torrent_id = $1 and state in ('queued', 'running') returning id`,
         [r.id],
       );
       const gone = await one<{ movie_id: string }>(
@@ -516,14 +537,27 @@ export class TorrentWorker {
         );
         ytsId = m?.yts_id ?? null;
       }
-      return { notes: exportNotes.rows.map((x) => x.id), ytsId, deleted: !!gone };
+      return {
+        notes: exportNotes,
+        ytsId,
+        deleted: !!gone,
+        exports: failedExports.map((e) => e.id),
+        tasks: [...failedTasks, ...cancelledTasks].map((t) => t.id),
+      };
     });
     if (out.ytsId !== null) await removePoster(this.config.dataDir, out.ytsId);
+    // The subtitle tracks of the exports that just failed: a running mux job removes them too when it
+    // notices, but one still waiting has nobody else to do it.
+    for (const e of out.exports) await removeExportTracks(this.config.dataDir, e);
     if (out.deleted) {
       await this.pool.query(`select pg_notify('paiban_events', $1)`, [
         JSON.stringify({ type: 'torrent.removed', id: r.id }),
       ]);
       await this.pool.query(`select pg_notify('paiban_events', '{"type":"usage"}')`);
+      for (const e of out.exports)
+        await this.pool.query(`select pg_notify('paiban_events', $1)`, [JSON.stringify({ type: 'export', id: e })]);
+      for (const t of out.tasks)
+        await this.pool.query(`select pg_notify('paiban_events', $1)`, [JSON.stringify({ type: 'task', id: t })]);
       for (const n of out.notes)
         await this.pool.query(`select pg_notify('paiban_events', $1)`, [
           JSON.stringify({ type: 'notification', id: String(n) }),

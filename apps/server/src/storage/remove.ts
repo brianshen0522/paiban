@@ -1,4 +1,4 @@
-import { readdir, rm, unlink } from 'node:fs/promises';
+import { readdir, rm, rmdir, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Logger } from 'pino';
 import type { Engine } from '../torrent/engine.js';
@@ -55,7 +55,11 @@ export async function removePreviewFiles(dataDir: string, mediaId: string, log: 
   log.info({ mediaId }, 'preview files removed (requested by an administrator)');
 }
 
-/** An export file deleted by its creator or an administrator: the export's folder. */
+/**
+ * An export deleted by its creator or an administrator: the export's folder (the MKV, or the
+ * subtitle tracks of one still waiting). Also the `api`'s own just-written tracks when the
+ * request that wrote them did not get its row in.
+ */
 export async function removeExportFiles(dataDir: string, exportId: string, log: Logger): Promise<void> {
   await rm(under(dataDir, 'exports', exportId), { recursive: true, force: true });
   log.info({ exportId }, 'export removed (requested by a person)');
@@ -138,4 +142,29 @@ export async function removeOwnMediaOutput(dataDir: string, mediaId: string, fil
     if (!allowed.has(f)) throw new Error(`not a media output: ${f}`);
     await rm(under(dataDir, 'media', mediaId, f), { force: true });
   }
+}
+
+/** Removes an export's folder if nothing is left in it (an empty folder is nobody's file). */
+async function dropEmptyExportDir(dataDir: string, exportId: string): Promise<void> {
+  await rmdir(under(dataDir, 'exports', exportId)).catch(() => undefined);
+}
+
+/**
+ * The subtitle tracks an export wrote for ffmpeg (`/data/exports/<id>/tracks/`), once the export
+ * has its final outcome: done, failed twice, cancelled, or its film removed (docs/10-storage.md,
+ * "哪些清理不算自動刪除"). The folder goes too when that leaves it empty.
+ */
+export async function removeExportTracks(dataDir: string, exportId: string): Promise<void> {
+  await rm(under(dataDir, 'exports', exportId, 'tracks'), { recursive: true, force: true });
+  await dropEmptyExportDir(dataDir, exportId);
+}
+
+/**
+ * The mux job's own output: its `.part`, or the finished MKV when the final conditional update
+ * found the row cancelled or its film being removed (docs/08-media-pipeline.md, "工作的共通規矩").
+ */
+export async function removeOwnExportOutput(dataDir: string, exportId: string, fileName: string): Promise<void> {
+  if (!/\.mkv(\.part)?$/i.test(fileName)) throw new Error(`not an export output: ${fileName}`);
+  await rm(under(dataDir, 'exports', exportId, fileName), { force: true });
+  await dropEmptyExportDir(dataDir, exportId);
 }
