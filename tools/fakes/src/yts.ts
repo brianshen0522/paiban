@@ -2,6 +2,8 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { catalogue, type LocalVersion } from './films.ts';
 
+export type { LocalVersion };
+
 /**
  * A small YTS: list_movies.json and movie_details.json in the real shape (docs/05-yts.md),
  * over the fake catalogue. `mode` makes it misbehave the ways the tests need.
