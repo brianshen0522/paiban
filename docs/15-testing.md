@@ -35,7 +35,7 @@
 
 `torrent` 程式用測試專用的掛鉤（環境變數 `TORRENT_TEST_PEERS=seed:51801`）在加入種子後直接 `addPeer`。做法照 `reference/torrent/local-swarm-test.mjs`。種子的 info hash 取決於檔案內容和分塊大小，所以由做種的服務在啟動時算出來，寫到假 YTS 讀得到的地方。
 
-**假的字幕來源**：一個 HTTP 服務，依路徑回傳錄下來的回應和 `fixtures/archive.zip`（`tools/fakes/src/subtitles.ts`；開發時 `pnpm dev` 會一起起來，在 8091 埠）。只有 *Inception*（`tt1375666`、TMDB `27205`）有結果，和錄下來的回應一致；射手網的範例是手寫的，片名是「Sample Movie」（2010）。可以讓任何一個來源回 500、回挑戰頁、不回應、回額度錯誤（`30900`），也記下每個請求收到的時間，用來驗證排隊和「從來沒連過」。
+**假的字幕來源**：一個 HTTP 服務，依路徑回傳錄下來的回應和 `fixtures/archive.zip`（`tools/fakes/src/subtitles.ts`；開發時 `pnpm dev` 會一起起來，在 8091 埠）。只有 *Inception*（`tt1375666`、TMDB `27205`）有結果，和錄下來的回應一致；本機做種的那部片（假 YTS 的 *Charade*，`tt9000002`）也被當成 *Inception* 回答（`answerAsInception`），否則完整流程在找字幕這一步就找不到東西（片名和年份對不上不影響：來源依 IMDb／TMDB 編號查）。射手網的範例是手寫的，片名是「Sample Movie」（2010）。可以讓任何一個來源回 500、回挑戰頁、不回應、回額度錯誤（`30900`），也記下每個請求收到的時間，用來驗證排隊和「從來沒連過」。
 
 **怎麼把正式的程式指到這些替身**：正式的程式只連 `https://`、不連內部位址、只連白名單裡的主機，替身全部會被擋掉。所以有三個只給開發和測試用的環境變數（[02-architecture.md](02-architecture.md)、[12-auth.md](12-auth.md)）：
 

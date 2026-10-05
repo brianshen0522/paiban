@@ -109,6 +109,7 @@ docker compose -f deploy/docker-compose.yml build    # 建置映像檔(paiban-se
 docker compose -f deploy/docker-compose.yml up -d    # 起五個容器;網址是 deploy/.env 的 PUBLIC_URL
 scripts/phase0/reference-in-image.sh                 # 在映像檔裡跑全部參考測試與 pipeline 比對
 pnpm test:image [檔案…]                              # 在映像檔裡跑伺服器測試(需要 ffmpeg、ffsubsync、bsdtar、語音辨識的那些在主機上會略過);先 pnpm db:test
+pnpm test:image test/e2e-flow.test.ts                # 離線的完整流程(搜尋→下載→分析→字幕→對齊→匯出→下載 MKV→刪除),約 1.5 分鐘
 SEED_EXTRA_FILM=<Blender 開放電影的路徑> pnpm dev       # 本機開發時多一個長片版本(2160p),拿來走完整流程
 ```
 

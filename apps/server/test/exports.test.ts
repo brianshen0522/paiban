@@ -109,9 +109,14 @@ describe('starting an export', () => {
     // Another holder sees it in the workspace, without the right to delete it.
     const seen = await exportsForTorrent(t.deps, f.tid, haoId);
     expect(seen.map((x) => [x.id, x.canDelete])).toEqual([[e.id, false]]);
-    // The workspace endpoint carries it too (it used to answer an empty list).
-    const ws = (await call(t.app, 'GET', `/api/library/${f.tid}`, { cookie: mei })).json();
-    expect(ws.exports.map((x: { id: string; canDelete: boolean }) => [x.id, x.canDelete])).toEqual([[e.id, true]]);
+    // ...and that is what the workspace endpoint answers (docs/04-api.md, `GET /api/library/:torrentId`).
+    const workspace = async (cookie: string) =>
+      (await call(t.app, 'GET', `/api/library/${f.tid}`, { cookie })).json().exports as {
+        id: string;
+        canDelete: boolean;
+      }[];
+    expect((await workspace(hao)).map((x) => [x.id, x.canDelete])).toEqual([[e.id, false]]);
+    expect((await workspace(mei)).map((x) => [x.id, x.canDelete])).toEqual([[e.id, true]]);
   });
 
   it('refuses tracks that are missing, unconfirmed or of another film', async () => {

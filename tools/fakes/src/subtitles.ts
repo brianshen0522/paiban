@@ -10,7 +10,8 @@ import { fileURLToPath } from 'node:url';
  * reaches it through SOURCE_OVERRIDES; `overrides(url)` gives that map.
  *
  * Only Inception (IMDb tt1375666, TMDB 27205) has results, like the recordings; any other film is
- * "not found" in each source's own way. `setMode` makes one source misbehave; `requests` records
+ * "not found" in each source's own way. `answerAsInception` lists other IMDb codes the sources
+ * treat as Inception's, so a film the fake YTS offers (and the local seeder serves) has results too. `setMode` makes one source misbehave; `requests` records
  * what arrived and when, so tests can check pacing and that a source was never contacted.
  */
 export type FakeSource =
@@ -48,7 +49,11 @@ const recorded = (f: string) => readFileSync(repo(`reference/providers/${f}`), '
 
 export const INCEPTION = { imdb: 'tt1375666', tmdb: 27205 } as const;
 
-export async function startFakeSources(opts: { port?: number; host?: string } = {}): Promise<FakeSources> {
+export async function startFakeSources(
+  opts: { port?: number; host?: string; answerAsInception?: string[] } = {},
+): Promise<FakeSources> {
+  const isInception = (imdb: string | null | undefined) =>
+    imdb === INCEPTION.imdb || (!!imdb && (opts.answerAsInception ?? []).includes(imdb));
   const modes = new Map<FakeSource, FakeSourceMode>();
   const requests: FakeSources['requests'] = [];
   const archive = readFileSync(repo('fixtures/archive.zip'));
@@ -111,14 +116,14 @@ export async function startFakeSources(opts: { port?: number; host?: string } = 
         if (!auth && !key) return send(401, '{"status_code":7,"status_message":"Invalid API key"}');
         if ((key ?? auth ?? '').includes('rejected')) return send(401, '{"status_code":7}');
         const m = /^\/3\/find\/(tt\d+)$/.exec(path);
-        if (m?.[1] === INCEPTION.imdb) return send(200, tmdbFind);
+        if (isInception(m?.[1])) return send(200, tmdbFind);
         return send(200, '{"movie_results":[],"person_results":[],"tv_results":[]}');
       }
       case 'subdl': {
         const key = url.searchParams.get('api_key');
         if (!key) return send(200, '{"status":false,"error":"API key is required"}');
         if (key.includes('rejected')) return send(403, '{"status":false,"error":"Invalid API key"}');
-        if (url.searchParams.get('imdb_id') !== INCEPTION.imdb)
+        if (!isInception(url.searchParams.get('imdb_id')))
           return send(200, '{"status":false,"error":"can\'t find movie"}');
         return send(200, jsEn);
       }
@@ -127,7 +132,7 @@ export async function startFakeSources(opts: { port?: number; host?: string } = 
         return /\.zip$/.test(path) ? send(200, archive, 'application/zip') : send(404, '');
       case 'yify': {
         const m = /^\/movie-imdb\/(tt\d+)$/.exec(path);
-        if (m) return m[1] === INCEPTION.imdb ? send(200, yifyMovie, 'text/html') : send(404, 'not found', 'text/html');
+        if (m) return isInception(m[1]) ? send(200, yifyMovie, 'text/html') : send(404, 'not found', 'text/html');
         if (path.startsWith('/subtitles/'))
           return send(
             200,
