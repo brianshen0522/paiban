@@ -166,7 +166,7 @@ DHT 是開著的，所以 tracker 全部失效時通常還是找得到 peers，�
 
 ## 測試連線
 
-管理頁的「測試連線」呼叫 `list_movies.json?limit=1`。結果是 `SourceCheck`（`contracts/api.ts`）：
+管理頁的「測試連線」呼叫 `list_movies.json?limit=1`。結果是 `SourceCheck`（`packages/shared/src/contracts/api.ts`）：
 
 | 情況 | `code` | `data` |
 | --- | --- | --- |

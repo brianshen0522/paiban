@@ -18,8 +18,8 @@ run() {
 echo "== versions"
 run sh -c 'node -v; ffmpeg -version | head -1; /opt/ffs/bin/python --version; /opt/ffs/bin/ffsubsync --version; bsdtar --version'
 
-echo "== reference/sync-core (expect 17)"
-run node --test reference/sync-core/core.test.ts 2>&1 | grep -E '^ℹ (tests|pass|fail)'
+echo "== sync core in packages/shared (expect 17; needs pnpm install on the host first)"
+run sh -c 'cd packages/shared && ./node_modules/.bin/vitest run src/sync-core 2>&1' | grep -E 'Tests '
 
 echo "== reference/subtitles (expect 5)"
 run sh -c 'cd reference/subtitles && npm ci --silent && npm test 2>&1' | grep -E '^ℹ (tests|pass|fail)'

@@ -16,6 +16,14 @@
 
 ---
 
+## 2026-10-06 合約和對齊核心搬進 packages/shared
+
+- 原本：`contracts/api.ts`、`reference/sync-core/core.ts` 和它的測試在交接包的位置。
+- 改成：`packages/shared/src/contracts/api.ts`、`packages/shared/src/sync-core/`（`git mv`，只留一份）。測試從 `node:test` 改成 Vitest：只換了 `test` 的來源和 fixtures 的相對路徑，案例和預期值不動（`node:assert` 照用）。
+- 原因：`docs/14-plan.md` 階段 1 的第一步。Brian 在 2026-10-06 要求先做登入、YTS 搜尋和下載，這些都要用到合約的型別，所以提前做。
+- 改了哪些檔案：全 repo 提到舊路徑的地方（AGENTS.md、README.md、docs/、fixtures/README.md、prototype/README.md、reference/、db/schema.sql 的註解、scripts/phase0/）。`docs/14-plan.md` 描述這次搬移的段落和 `docs/reports/phase-0.md` 是紀錄，保留原本的路徑
+- Brian 是否已確認：不需要
+
 ## 2026-10-05 Playwright 的 Chromium 能不能解 H.264
 
 - 原本：docs/15-testing.md、08、09、fixtures/README.md、prototype/README.md 寫「Playwright 內建的 Chromium 不能解碼 H.264」。

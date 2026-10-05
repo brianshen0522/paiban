@@ -47,7 +47,7 @@ workbench/
 
 找某一句文案或某個行為時，直接在 `src/` 裡搜尋那句中文。
 
-`core.js` 是對齊核心的原始版本；整理成 TypeScript、補上測試的版本在 `reference/sync-core/core.ts`，以那個為準。
+`core.js` 是對齊核心的原始版本；整理成 TypeScript、補上測試的版本在 `packages/shared/src/sync-core/core.ts`，以那個為準。
 
 ## 重新建置與檢查
 

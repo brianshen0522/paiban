@@ -131,11 +131,11 @@ paiban/
 └── reference/              參考程式(只當參考,不出貨)
 ```
 
-交接包裡還有一個 `contracts/` 資料夾。它和 `reference/sync-core/` 在階段 1 搬進 `packages/shared`，之後就不存在了。
+交接包裡還有一個 `contracts/` 資料夾。它和 `packages/shared/src/sync-core/` 在階段 1 搬進 `packages/shared`，之後就不存在了。
 
 `apps/server/src` 建議依領域分資料夾，而不是依技術分層：`auth/`、`yts/`、`torrents/`、`storage/`、`media/`、`subtitles/`（裡面有 `providers/`）、`sync/`、`exports/`、`admin/`、`events/`、`db/`。
 
-對齊核心從 `reference/sync-core/core.ts` 搬進 `packages/shared`，瀏覽器和伺服器用同一份；`contracts/api.ts` 也搬進去。兩者都在階段 1 就搬（是搬，不是複製：只留一份），之後的階段直接用。搬的時候要跟著改哪些地方，列在 [14-plan.md](14-plan.md) 的階段 1。
+對齊核心從 `packages/shared/src/sync-core/core.ts` 搬進 `packages/shared`，瀏覽器和伺服器用同一份；`packages/shared/src/contracts/api.ts` 也搬進去。兩者都在階段 1 就搬（是搬，不是複製：只留一份），之後的階段直接用。搬的時候要跟著改哪些地方，列在 [14-plan.md](14-plan.md) 的階段 1。
 
 ## 技術選型
 

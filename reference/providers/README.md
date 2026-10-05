@@ -19,7 +19,9 @@ prove that the parser drops it. The recording script does this before writing to
 | `justsubtitles.search.sample.json` | JustSubtitles `GET https://search.justsubtitles.com/api/search?q=Inception` | **Recorded.** `{results: [...]}` in TMDB movie-search shape |
 | `yify.movie-page.sample.html` | YIFY Subtitles `GET /movie-imdb/tt1375666` | **Recorded**, whole page. The analytics beacon's `"token"` is `PLACEHOLDER` |
 | `yify.subtitle-page.sample.html` | YIFY Subtitles `GET /subtitles/<slug>` (a Chinese entry) | **Recorded**, whole page. `a#btn-download-subtitle[data-link]` is base64 of the zip URL |
-| `yts.list_movies.sample.json` | YTS `list_movies.json` (a `movie_details.json` answer holds the same movie object under `data.movie`) | Hand-written: no YTS address yet |
+| `yts.list_movies.sample.json` | YTS `GET https://yts.gg/api/v2/list_movies.json?query_term=tt1375666&limit=1` | **Recorded** 2026-10-06. YTS answers carry no keys |
+| `yts.movie_details.sample.json` | YTS `movie_details.json?movie_id=1606`: the same movie object under `data.movie` | **Recorded** |
+| `yts.list_movies.empty.sample.json` | A search with no result | **Recorded**: `data` has no `movies` key at all |
 | `tmdb.find.sample.json` | TMDB `GET /3/find/{imdb id}?external_source=imdb_id&language=zh-TW` | Hand-written: no TMDB key yet |
 | `assrt.search.sample.json`, `assrt.detail.sample.json` | 射手網(偽) API | Hand-written: no token yet. `langlist` key names still unconfirmed |
 

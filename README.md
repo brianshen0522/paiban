@@ -23,12 +23,12 @@
 | `PROMPT.md` | 貼給 coding agent 的啟動 prompt，以及後續階段用的 |
 | `AGENTS.md` | 給 coding agent 的工作規則。多數工具會自動讀它（`CLAUDE.md` 只是把它引入） |
 | `docs/` | 規格，18 份文件。見下方的閱讀順序 |
-| `contracts/api.ts` | API 的合約：每個端點的請求與回應型別、錯誤碼、即時事件 |
+| `packages/shared/src/contracts/api.ts` | API 的合約：每個端點的請求與回應型別、錯誤碼、即時事件 |
 | `db/schema.sql` | 資料庫的參考 schema，含用量計算與空間檢查的函式；`schema.test.mjs` 是它的測試 |
 | `deploy/` | Docker Compose、Dockerfile、Caddyfile、`.env` 的範例 |
 | `prototype/platform/` | 整個平台的可操作原型（單一 HTML 檔）、原始碼、30 張截圖、自動化檢查 |
 | `prototype/workbench/` | 字幕同步工作台的獨立原型，同上 |
-| `reference/sync-core/` | 對齊核心的 TypeScript 實作與 17 項測試。會直接成為產品的一部分 |
+| `packages/shared/src/sync-core/` | 對齊核心的 TypeScript 實作與 17 項測試。會直接成為產品的一部分 |
 | `reference/pipeline/` | 分析、預覽檔、對齊、封裝的可執行腳本 |
 | `reference/subtitles/` | 字幕的編碼判斷、繁簡轉換、ASS 轉換，與測試 |
 | `reference/torrent/` | WebTorrent 的離線測試：本機兩個用戶端互傳 |

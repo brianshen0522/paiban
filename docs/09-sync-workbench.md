@@ -4,7 +4,7 @@
 
 **原型是這一頁的行為依據。** `prototype/workbench/index.html` 是可以實際操作的工作台（用一段 92 秒的示範片段），`prototype/platform/index.html` 裡的「同步」分頁是它嵌進平台後的樣子。這份文件把原型的行為寫成規則，並補上原型沒有、正式版需要的部分。兩者衝突時以這份文件為準。
 
-邏輯在 `reference/sync-core/core.ts`（有 17 個測試）；原型的畫面程式在 `prototype/workbench/src/ui.js`。
+邏輯在 `packages/shared/src/sync-core/core.ts`（有 17 個測試）；原型的畫面程式在 `prototype/workbench/src/ui.js`。
 
 ## 使用者怎麼用
 
@@ -89,7 +89,7 @@
 
 ## 同步文件
 
-型別 `SyncDoc`（`reference/sync-core/core.ts`）：
+型別 `SyncDoc`（`packages/shared/src/sync-core/core.ts`）：
 
 ```ts
 {
@@ -345,7 +345,7 @@
 | 沒有儲存的概念 | 自動儲存、版本衝突處理 |
 | 沒有只有聲音的模式 | 有 |
 | 平台原型裡，確認之後再修改，標籤仍然顯示「已確認」（原型的簡化）；獨立的工作台原型會回到草稿 | 改動時間或文字就回到草稿 |
-| `core.js` 的 `toSrt` 不排序，也不保證每句的最短長度；`pickCheckpoints` 在句數比檢查點少時會重複挑同一句 | 以 `reference/sync-core/core.ts` 為準：`toSrt` 依開始時間排序、每句至少 0.2 秒；`pickCheckpoints` 最多挑到句數為止、不重複。這些差異是有意的 |
+| `core.js` 的 `toSrt` 不排序，也不保證每句的最短長度；`pickCheckpoints` 在句數比檢查點少時會重複挑同一句 | 以 `packages/shared/src/sync-core/core.ts` 為準：`toSrt` 依開始時間排序、每句至少 0.2 秒；`pickCheckpoints` 最多挑到句數為止、不重複。這些差異是有意的 |
 
 ## 驗收
 

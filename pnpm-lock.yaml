@@ -237,6 +237,9 @@ importers:
 
   packages/shared:
     devDependencies:
+      '@types/node':
+        specifier: '24'
+        version: 24.19.1
       typescript:
         specifier: 7.0.2
         version: 7.0.2

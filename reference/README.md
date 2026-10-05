@@ -1,10 +1,9 @@
 # 參考程式
 
-這裡的每一樣都實際跑過。它們不是產品，是讓實作時不用從零摸索的起點：有的會直接搬進專案，有的是示範做法。
+這裡的每一樣都實際跑過。原本在這裡的對齊核心（`sync-core/`）已經搬到 `packages/shared/src/sync-core/`。它們不是產品，是讓實作時不用從零摸索的起點：有的會直接搬進專案，有的是示範做法。
 
 | 資料夾 | 內容 | 怎麼跑 | 之後怎麼用 |
 | --- | --- | --- | --- |
-| `sync-core/` | 對齊核心：套用同步文件、分數、自動對齊、吸附、對齊點、檢查點、還原 ffsubsync 的結果、在多個候選之間挑選。17 項測試 | `node --test sync-core/core.test.ts`（Node 22.18 以上，不用裝任何東西） | 階段 1 連同測試搬進 `packages/shared`，瀏覽器和伺服器共用 |
 | `pipeline/` | `analyze.sh`（探測、波形、人聲）、`preview.sh`（聲音檔、預覽檔）、`mux.sh`（封裝）、`align.ts`（自動對齊的完整流程）、`peaks.mjs`、`npz_to_speech_json.py` | 需要 ffmpeg 和裝有 ffsubsync 0.5.1 的 Python（用環境變數 `FFSUBSYNC`、`FFS_PYTHON` 指到虛擬環境裡的執行檔）。每個檔案開頭有用法 | 邏輯改寫進 `media` 程式；指令的選項照用 |
 | `subtitles/` | 位元組變文字（編碼）、判斷語言與繁簡、簡轉繁、ASS 轉純文字。5 項測試 | `cd subtitles && npm ci && npm test` | 改寫成 TypeScript，測試一起搬 |
 | `torrent/` | WebTorrent 的離線測試：只憑 info hash 下載、暫停與接續、刪除 | `cd torrent && npm ci && npm test` | `torrent` 程式的做法依據；整合測試照這個方式做種 |

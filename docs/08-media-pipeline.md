@@ -230,7 +230,7 @@ ffmpeg -v error -nostdin -y -progress pipe:1 -nostats -i "$SRC" -map 0:V:0 -map 
 6. agree = 另一種方法的結果,每一句的開始時間都和選中的差不到 0.15 秒。
 ```
 
-括號右邊是 `reference/sync-core/core.ts` 裡對應的函式，全部有測試。
+括號右邊是 `packages/shared/src/sync-core/core.ts` 裡對應的函式，全部有測試。
 
 任何一次 ffsubsync 失敗（結束碼不是 0、沒有輸出、輸出的句數對不上、超過 20 秒）就略過那個候選，只要還有一個候選就照常回傳。兩種方法都失敗才算工作失敗。ffsubsync 正常不到 1 秒，20 秒已經很寬；對齊核心的時間可以預期（見「效能」），不另外設逾時。
 
@@ -256,7 +256,7 @@ ffmpeg -v error -nostdin -y -progress pipe:1 -nostats -i "$SRC" -map 0:V:0 -map 
 
 三種情境兩種方法都一致（`agree = true`）。前兩欄的原始數字在 `fixtures/expected.ffsubsync.json`，ffsubsync 的輸出檔在 `fixtures/ffsubsync/`，所以解析和比較的程式不用裝 ffsubsync 也能做單元測試。
 
-`reference/pipeline/align.ts` 印出來的是最後一欄（分段、速率、位移）加上分數和 `agree`，不是每一種方法各自的誤差。拿它驗證環境時，比對的是最後一欄：段數和速率相同，位移相差在 0.01 秒以內，`agree` 是 true。中間幾欄的誤差是 `reference/sync-core/core.test.ts` 在測的。
+`reference/pipeline/align.ts` 印出來的是最後一欄（分段、速率、位移）加上分數和 `agree`，不是每一種方法各自的誤差。拿它驗證環境時，比對的是最後一欄：段數和速率相同，位移相差在 0.01 秒以內，`agree` 是 true。中間幾欄的誤差是 `packages/shared/src/sync-core/core.test.ts` 在測的。
 
 `fixtures/film/film.json` 是一部 21.5 分鐘的合成影片（180 句）。對齊核心在三種情境都是 180 句全部落在 100 毫秒內；剪輯不同的那一種，落差是 40 秒，搜尋範圍 30 秒時找不到、60 秒時找得到。所以範圍定為 60 秒，和 ffsubsync 的預設上限相同。
 

@@ -14,7 +14,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import * as Core from '../sync-core/core.ts';
+import * as Core from '../../packages/shared/src/sync-core/core.ts';
 
 const [dir, subtitlePath, flag] = process.argv.slice(2);
 if (!dir || !subtitlePath) {

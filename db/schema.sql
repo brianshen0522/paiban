@@ -21,7 +21,7 @@ create table users (
   password_hash text not null,                         -- argon2id, PHC string
   role          text not null default 'member' check (role in ('admin', 'member')),
   disabled      boolean not null default false,
-  prefs         jsonb not null default '{}'::jsonb,    -- UserPrefs in contracts/api.ts
+  prefs         jsonb not null default '{}'::jsonb,    -- UserPrefs in packages/shared/src/contracts/api.ts
   created_at    timestamptz not null default now(),
   last_seen_at  timestamptz
 );
@@ -90,7 +90,7 @@ create table provider_cache (
 );
 
 -- The latest thing known about each outside source, from a test or from ordinary use
--- (SourceHealth in contracts/api.ts). One row per source, overwritten each time.
+-- (SourceHealth in packages/shared/src/contracts/api.ts). One row per source, overwritten each time.
 create table source_health (
   source     text primary key check (source in ('yts', 'tmdb', 'justsubtitles', 'subdl', 'yify', 'assrt')),
   state      text not null check (state in ('ok', 'warn', 'down')),
@@ -162,7 +162,7 @@ create table torrents (
   seeding               boolean not null default false,
   bitfield              bytea,                                    -- which pieces are on disk, for fast resume
   clean_stop            boolean not null default false,           -- the bitfield is trusted only after a clean stop
-  error_code            text,                                     -- TorrentErrorCode in contracts/api.ts
+  error_code            text,                                     -- TorrentErrorCode in packages/shared/src/contracts/api.ts
   error_message         text,                                     -- English, for logs and the administrator; never shown as is
 
   -- Storage accounting. While not completed the row counts size + preview reservation;
@@ -276,7 +276,7 @@ create table subtitle_candidates (
   cue_count         integer,
   align_state       text not null default 'none' check (align_state in ('none', 'queued', 'running', 'done', 'failed')),
   align_score       real,
-  align_result      jsonb,                             -- AlignResult in contracts/api.ts
+  align_result      jsonb,                             -- AlignResult in packages/shared/src/contracts/api.ts
   created_by        uuid references users (id) on delete set null,
   created_at        timestamptz not null default now(),
   unique (torrent_id, provider, provider_ref)
@@ -341,7 +341,7 @@ create table exports (
   reserved_bytes   bigint not null default 0 check (reserved_bytes >= 0),  -- counts while queued or running
   size_bytes       bigint not null default 0 check (size_bytes >= 0),      -- counts once done
   rel_path         text,                               -- /data/exports/<id>/<file_name>
-  error_code       text,                               -- ExportErrorCode in contracts/api.ts
+  error_code       text,                               -- ExportErrorCode in packages/shared/src/contracts/api.ts
   cancel_requested boolean not null default false,
   created_by       uuid references users (id) on delete set null,
   created_at       timestamptz not null default now(),

@@ -88,7 +88,7 @@ environment:
 
 | 來源 | 內容 | 搬到哪裡 |
 | --- | --- | --- |
-| `reference/sync-core/core.test.ts` | 對齊核心，17 項 | `packages/shared`（階段 1 搬過去，從 `node:test` 改成 Vitest） |
+| `packages/shared/src/sync-core/core.test.ts` | 對齊核心，17 項 | `packages/shared`（階段 1 搬過去，從 `node:test` 改成 Vitest） |
 | `reference/subtitles/text.test.mjs` | 編碼、語言、繁簡、ASS，5 項 | `apps/server` 的字幕模組 |
 | `db/schema.test.mjs` | 用量、admission、預覽計畫、請求排隊、約束，11 項 | `apps/server` 的資料庫測試，改成對 Drizzle 遷移出來的 schema |
 | `reference/torrent/local-swarm-test.mjs` | WebTorrent 的行為 | `torrent` 的整合測試 |

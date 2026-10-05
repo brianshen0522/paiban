@@ -13,13 +13,13 @@
 1. Brian 在對話裡直接說的話
 2. `docs/00-decisions.md`
 3. `docs/` 的其他文件：系統的**行為**以它們為準
-4. `contracts/api.ts`、`db/schema.sql`：資料的**形狀**（端點清單、欄位、型別、約束）以它們為準
+4. `packages/shared/src/contracts/api.ts`、`db/schema.sql`：資料的**形狀**（端點清單、欄位、型別、約束）以它們為準
 5. `prototype/`：畫面、文案和互動的參考
 6. `reference/`：演算法和指令的參考（對齊核心、字幕文字處理、ffmpeg 與 ffsubsync 的指令、WebTorrent 的用法）
 
 第 3 和第 4 項管的是不同的事。真的對不上時（文件提到合約裡沒有的欄位，或合約有文件沒說明的東西），行為聽文件的，然後把合約補齊，兩邊一起改。
 
-第 5 和第 6 項也是：原型管看得到的東西，參考程式管算出來的東西。原型裡也有一份對齊核心（`core.js`），那一份以 `reference/sync-core/core.ts` 為準。
+第 5 和第 6 項也是：原型管看得到的東西，參考程式管算出來的東西。原型裡也有一份對齊核心（`core.js`），那一份以 `packages/shared/src/sync-core/core.ts` 為準。
 
 遇到衝突或缺漏：記進 `docs/agent-notes.md`。能依上面的順序判斷的就判斷並寫下理由。要改動 `docs/00-decisions.md` 裡來源是「指定」「代決」或「假設」的決定，或你沒有把握的，停下來問；來源是「交接」的可以先照你認為更好的做法做，但要在報告裡講清楚。
 
@@ -77,13 +77,14 @@
 
 `reference/` 裡的東西都是實際跑過、有測試的：
 
-- `sync-core/core.ts`：對齊核心。階段 1 連同測試搬進 `packages/shared`（`contracts/api.ts` 也是；怎麼搬寫在 `docs/14-plan.md`）。改它之前先確定測試還會過。
 - `pipeline/`：ffmpeg 和 ffsubsync 的指令。指令的每個選項都有理由（寫在 `docs/08-media-pipeline.md`），不要隨意增減。
 - `subtitles/text.mjs`：編碼、語言判斷、ASS 轉換。改寫成 TypeScript，測試一起搬。
 - `torrent/local-swarm-test.mjs`：WebTorrent 的用法和離線測試的做法。
-- `providers/`：各來源回應的形狀。JustSubtitles 和 YIFY 的是階段 0 錄下來的真實回應；YTS、TMDB、射手網的仍是**手寫的示意**，拿到網址或金鑰後用 `scripts/phase0/check-sources.mjs` 換掉（哪個是哪個見它的 README）。
+- `providers/`：各來源回應的形狀。JustSubtitles、YIFY、YTS 的是錄下來的真實回應；TMDB、射手網的仍是**手寫的示意**，拿到網址或金鑰後用 `scripts/phase0/check-sources.mjs` 換掉（哪個是哪個見它的 README）。
 
-`contracts/api.ts` 和 `db/schema.sql` 是合約。要改可以，但要連同對應的文件一起改，並記在 `docs/changes.md`。階段 1 之後，合約的位置和 `db/schema.sql` 的角色會變（見 `docs/14-plan.md` 的階段 1）；到時候把這一節和上面的優先順序改成新的路徑。
+對齊核心（`packages/shared/src/sync-core/core.ts`）和 API 合約（`packages/shared/src/contracts/api.ts`）已經從交接包搬進 `packages/shared`，瀏覽器和伺服器共用同一份。改對齊核心之前先確定它的 17 項測試還會過。
+
+`packages/shared/src/contracts/api.ts` 和 `db/schema.sql` 是合約。要改可以，但要連同對應的文件一起改，並記在 `docs/changes.md`。`db/schema.sql` 同時就是資料庫的第一個遷移（`apps/server` 啟動時套用），見 `docs/changes.md`。
 
 ## 指令
 
@@ -109,7 +110,6 @@ scripts/phase0/reference-in-image.sh                 # 在映像檔裡跑全部�
 現在就能跑的（確認參考程式在你的環境正常）：
 
 ```bash
-node --test reference/sync-core/core.test.ts                    # Node 22.18 以上,不需要安裝任何東西
 (cd reference/subtitles && npm ci && npm test)
 (cd db && npm ci && npm test)
 (cd reference/torrent && npm ci && npm test)                  # 本機兩個用戶端互傳;成功時印出 PASS

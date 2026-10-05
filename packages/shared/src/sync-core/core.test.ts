@@ -1,23 +1,24 @@
 /**
- * Run with:  node --test reference/sync-core/core.test.ts      (Node 22.18+ or 24; no dependencies)
+ * Run with:  pnpm --filter @paiban/shared test
  *
  * The expected numbers were measured with the prototype's core.js and with ffsubsync 0.5.1
  * on the synthetic fixtures. They are regression values for this code, not accuracy claims
  * about real films: see docs/16-risks.md.
  */
-import { test } from 'node:test';
+
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import * as Core from './core.ts';
+import { test } from 'vitest';
+import * as Core from './core.js';
 
-const FIX = new URL('../../fixtures/', import.meta.url);
+const FIX = new URL('../../../../fixtures/', import.meta.url);
 const read = (p: string) => fs.readFileSync(new URL(p, FIX), 'utf8');
 
 /** Minimal SRT reader for the fixtures. The app should use a real parser. */
 function parseSrt(s: string): Core.Cue[] {
   const tc = (x: string) => {
     const m = x.match(/(\d+):(\d+):(\d+)[,.](\d+)/);
-    if (!m) throw new Error('bad timecode ' + x);
+    if (!m) throw new Error(`bad timecode ${x}`);
     return +m[1] * 3600 + +m[2] * 60 + +m[3] + +m[4] / 1000;
   };
   return s
@@ -33,7 +34,12 @@ function parseSrt(s: string): Core.Cue[] {
 
 const data = JSON.parse(read('data.json'));
 const sp = Core.makeSpeech({ hz: data.speechHz, frames: data.speechFrames, segments: data.speech });
-const truth: Core.Cue[] = data.cues.map((c: { id: number; start: number; end: number; zh: string }) => ({ id: c.id, start: c.start, end: c.end, text: c.zh }));
+const truth: Core.Cue[] = data.cues.map((c: { id: number; start: number; end: number; zh: string }) => ({
+  id: c.id,
+  start: c.start,
+  end: c.end,
+  text: c.zh,
+}));
 const wrong = (name: string) => parseSrt(read(`${name}.zh-TW.srt`));
 const ffs = (name: string) => parseSrt(read(`ffsubsync/${name}.out.srt`));
 const starts = (cues: Core.Cue[]) => cues.map((c) => c.start);
@@ -45,7 +51,10 @@ const near = (actual: number, expected: number, tolerance: number, what: string)
 test('fixtures are what the tests assume', () => {
   assert.equal(truth.length, 26);
   assert.equal(sp.n, 9242);
-  assert.deepEqual(starts(parseSrt(read('truth.zh-TW.srt'))).map((t) => Math.round(t * 1000)), starts(truth).map((t) => Math.round(t * 1000)));
+  assert.deepEqual(
+    starts(parseSrt(read('truth.zh-TW.srt'))).map((t) => Math.round(t * 1000)),
+    starts(truth).map((t) => Math.round(t * 1000)),
+  );
 });
 
 test('a correctly timed subtitle scores about 80%, not 100%', () => {
@@ -80,7 +89,10 @@ test('auto-align: subtitle from a different cut needs one split', () => {
   assert.equal(whole.segments.length, 1);
   assert.ok(maxError(base, whole.segments) > 10, 'one offset cannot fit both halves');
   const split = Core.autoAlign(sp, base, { allowSplit: true });
-  assert.deepEqual(split.segments.map((s) => s.from), [0, 13]);
+  assert.deepEqual(
+    split.segments.map((s) => s.from),
+    [0, 13],
+  );
   near(split.segments[0].offset, 1.2, 0.06, 'first half');
   near(split.segments[1].offset, 13.2, 0.06, 'second half');
   assert.ok(maxError(base, split.segments) <= 0.06);
@@ -95,7 +107,14 @@ test('the search radius limits how big a jump can be found', () => {
 
 test('snap to speech moves a nearly right offset onto the speech', () => {
   const base = wrong('late');
-  const b = Core.bestLinear(sp, base, base.map((_, i) => i), [1], -2.0, 1.5);
+  const b = Core.bestLinear(
+    sp,
+    base,
+    base.map((_, i) => i),
+    [1],
+    -2.0,
+    1.5,
+  );
   near(b.offset, -2.4, 0.06, 'offset');
 });
 
@@ -104,14 +123,23 @@ test('pins: one sets the offset, two far apart also recover the speed', () => {
   const one = Core.fitAnchors(base, { scale: 1, offset: 0 }, [{ cue: 5, t: truth[5].start }]);
   assert.equal(one.scale, 1);
   near(base[5].start + one.offset, truth[5].start, 0.001, 'pinned line');
-  const two = Core.fitAnchors(base, { scale: 1, offset: 0 }, [{ cue: 1, t: truth[1].start }, { cue: 24, t: truth[24].start }]);
+  const two = Core.fitAnchors(base, { scale: 1, offset: 0 }, [
+    { cue: 1, t: truth[1].start },
+    { cue: 24, t: truth[24].start },
+  ]);
   near(two.scale, 25 / 23.976, 1e-9, 'scale snaps to the known ratio');
   near(two.offset, -0.834, 0.002, 'offset');
 });
 
 test('checkpoints are spread over the film and stable', () => {
-  assert.deepEqual(Core.pickCheckpoints(truth, 5).map((c) => c.cue), [0, 5, 13, 18, 24]);
-  assert.deepEqual(Core.pickCheckpoints(truth, 8).map((c) => c.cue), [0, 5, 10, 13, 16, 18, 21, 24]);
+  assert.deepEqual(
+    Core.pickCheckpoints(truth, 5).map((c) => c.cue),
+    [0, 5, 13, 18, 24],
+  );
+  assert.deepEqual(
+    Core.pickCheckpoints(truth, 8).map((c) => c.cue),
+    [0, 5, 10, 13, 16, 18, 21, 24],
+  );
   assert.equal(Core.pickCheckpoints(truth.slice(0, 3), 8).length, 3);
   assert.deepEqual(Core.pickCheckpoints([], 5), []);
 });
@@ -119,7 +147,10 @@ test('checkpoints are spread over the film and stable', () => {
 test('applyDoc: segments, per-line deltas, text, deletion, minimum duration', () => {
   const doc: Core.SyncDoc = {
     v: 1,
-    segments: [{ from: 0, scale: 1, offset: 1 }, { from: 2, scale: 2, offset: -1 }],
+    segments: [
+      { from: 0, scale: 1, offset: 1 },
+      { from: 2, scale: 2, offset: -1 },
+    ],
     edits: { '2': { dStart: 0.5, text: 'changed' }, '3': { deleted: true }, '4': { dEnd: -100 } },
     anchors: [],
     checkpoints: [],
@@ -134,14 +165,30 @@ test('applyDoc: segments, per-line deltas, text, deletion, minimum duration', ()
   assert.deepEqual([m[0].start, m[0].end, m[0].seg, m[0].edited], [11, 13, 0, false]);
   assert.deepEqual([m[1].start, m[1].end, m[1].text, m[1].edited], [21.5, 23, 'changed', true]);
   assert.deepEqual([m[2].start, m[2].end, m[2].seg, m[2].deleted], [59, 63, 1, true]);
-  assert.deepEqual([m[3].start, Core.round3(m[3].end)], [79, 79.2], 'an end before the start is pushed to the minimum duration');
+  assert.deepEqual(
+    [m[3].start, Core.round3(m[3].end)],
+    [79, 79.2],
+    'an end before the start is pushed to the minimum duration',
+  );
   assert.equal(cues[1].text, 'b', 'inputs are not mutated');
-  near(Core.totalScore(sp, m), Core.totalScore(sp, m.filter((c) => !c.deleted)), 0, 'deleted cues do not count');
+  near(
+    Core.totalScore(sp, m),
+    Core.totalScore(
+      sp,
+      m.filter((c) => !c.deleted),
+    ),
+    0,
+    'deleted cues do not count',
+  );
 });
 
 test('toSrt: numbering, order, deleted lines, negative times', () => {
   const m = Core.applyDoc(
-    [{ id: 7, start: 5, end: 6, text: 'second' }, { id: 8, start: 1, end: 2, text: 'gone' }, { id: 9, start: 0.5, end: 1.5, text: 'first' }],
+    [
+      { id: 7, start: 5, end: 6, text: 'second' },
+      { id: 8, start: 1, end: 2, text: 'gone' },
+      { id: 9, start: 0.5, end: 1.5, text: 'first' },
+    ],
     { segments: [{ from: 0, scale: 1, offset: -1 }], edits: { '8': { deleted: true } } },
   );
   assert.equal(Core.toSrt(m), '1\n00:00:00,000 --> 00:00:00,500\nfirst\n\n2\n00:00:04,000 --> 00:00:05,000\nsecond\n');
@@ -164,7 +211,10 @@ test('ffsubsync, single offset: the exact transform is recovered from its output
 test('ffsubsync, piecewise: segments are recovered, then re-centred on the speech', () => {
   const base = wrong('cut');
   const raw = Core.fitPiecewise(starts(base), starts(ffs('cut.split')));
-  assert.deepEqual(raw.map((s) => s.from), [0, 13]);
+  assert.deepEqual(
+    raw.map((s) => s.from),
+    [0, 13],
+  );
   const early = maxError(base, raw);
   assert.ok(early > 0.2 && early < 0.3, 'piecewise mode lands about a quarter second early on lingering cues');
   const refined = Core.refineSegments(sp, base, raw);
@@ -181,8 +231,14 @@ test('ffsubsync, piecewise: segments are recovered, then re-centred on the speec
 
 test('segmentsFromOffsets ignores stray cues and merges equal neighbours', () => {
   assert.deepEqual(
-    Core.segmentsFromOffsets([1, 1.01, 0.99, 1, 5, 1.02, 1, 13, 13.01, 13, 12.99, 13.02], 1).map((s) => [s.from, s.offset]),
-    [[0, 1], [7, 13]],
+    Core.segmentsFromOffsets([1, 1.01, 0.99, 1, 5, 1.02, 1, 13, 13.01, 13, 12.99, 13.02], 1).map((s) => [
+      s.from,
+      s.offset,
+    ]),
+    [
+      [0, 1],
+      [7, 13],
+    ],
   );
   assert.deepEqual(Core.segmentsFromOffsets([], 1), [{ from: 0, scale: 1, offset: 0 }]);
   assert.deepEqual(Core.segmentsFromOffsets([2], 1), [{ from: 0, scale: 1, offset: 2 }]);
@@ -192,8 +248,14 @@ test('choosing between engines: the recipe in docs/08-media-pipeline.md', () => 
   for (const name of ['late', 'rate', 'cut']) {
     const base = wrong(name);
     const candidates: Core.AlignCandidate[] = [
-      { method: 'ffsubsync-linear', segments: Core.refineSegments(sp, base, [Core.fitLinearSegment(starts(base), starts(ffs(`${name}.linear`)))]) },
-      { method: 'ffsubsync-split', segments: Core.refineSegments(sp, base, Core.fitPiecewise(starts(base), starts(ffs(`${name}.split`)))) },
+      {
+        method: 'ffsubsync-linear',
+        segments: Core.refineSegments(sp, base, [Core.fitLinearSegment(starts(base), starts(ffs(`${name}.linear`)))]),
+      },
+      {
+        method: 'ffsubsync-split',
+        segments: Core.refineSegments(sp, base, Core.fitPiecewise(starts(base), starts(ffs(`${name}.split`)))),
+      },
       { method: 'core', segments: Core.autoAlign(sp, base, { allowSplit: true }).segments },
     ];
     const pick = Core.pickAlignment(sp, base, candidates);
@@ -223,7 +285,9 @@ test('film-length fixture: late, speed and cut are all recovered within 100 ms',
   const check = (name: string, allowSplit: boolean) => {
     const base: Core.Cue[] = film[name];
     const r = Core.autoAlign(fsp, base, { allowSplit });
-    const errors = Core.applyDoc(base, { segments: r.segments, edits: {} }).map((c) => Math.abs(c.start - (truthStart.get(c.id) as number)));
+    const errors = Core.applyDoc(base, { segments: r.segments, edits: {} }).map((c) =>
+      Math.abs(c.start - (truthStart.get(c.id) as number)),
+    );
     return { r, good: errors.filter((e) => e <= 0.1).length, n: errors.length };
   };
   const late = check('late', false);
@@ -236,6 +300,9 @@ test('film-length fixture: late, speed and cut are all recovered within 100 ms',
   assert.ok(cutWhole.good < cutWhole.n, 'one offset leaves part of the film wrong');
   const cut = check('cut', true);
   assert.equal(cut.good, cut.n);
-  assert.deepEqual(cut.r.segments.map((s) => s.from), [0, 33]);
+  assert.deepEqual(
+    cut.r.segments.map((s) => s.from),
+    [0, 33],
+  );
   near(cut.r.segments[1].offset - cut.r.segments[0].offset, 40, 0.05, 'the missing scene is 40 s long');
 });

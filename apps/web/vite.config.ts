@@ -1,7 +1,7 @@
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 // Relative import: the config is loaded before workspace packages are built.
-import { SITE_NAME } from '../../packages/shared/src/site.ts';
+import { SITE_NAME } from '../../packages/shared/src/constants.ts';
 
 export default defineConfig({
   plugins: [

@@ -16,7 +16,7 @@
  *   English and meant for logs. Film titles, file names, release names and version labels
  *   ("1080p BluRay x264") are data, not wording.
  */
-import type { Cue, Segment, SpeechData, SyncDoc } from '../reference/sync-core/core.ts';
+import type { Cue, Segment, SpeechData, SyncDoc } from '../sync-core/core.js';
 
 export type { Cue, Segment, SpeechData, SyncDoc };
 
@@ -121,7 +121,14 @@ export type Me = {
 };
 
 /** `os` and `browser` are plain names taken from the user agent ("Windows", "Edge"); null when unknown. */
-export type Session = { id: Id; os: string | null; browser: string | null; current: boolean; lastSeenAt: IsoTime; createdAt: IsoTime };
+export type Session = {
+  id: Id;
+  os: string | null;
+  browser: string | null;
+  current: boolean;
+  lastSeenAt: IsoTime;
+  createdAt: IsoTime;
+};
 
 /* ------------------------------------------------------------------ search */
 
@@ -191,7 +198,14 @@ export type VersionLocal =
  */
 export type TorrentStatus = 'queued' | 'downloading' | 'paused' | 'analyzing' | 'ready' | 'failed';
 
-export type TorrentErrorCode = 'STALLED' | 'METADATA_TIMEOUT' | 'SIZE_MISMATCH' | 'NO_VIDEO_FILE' | 'UNSAFE_PATH' | 'DISK_FULL' | 'IO_ERROR';
+export type TorrentErrorCode =
+  | 'STALLED'
+  | 'METADATA_TIMEOUT'
+  | 'SIZE_MISMATCH'
+  | 'NO_VIDEO_FILE'
+  | 'UNSAFE_PATH'
+  | 'DISK_FULL'
+  | 'IO_ERROR';
 
 export type Torrent = {
   id: Id;
@@ -221,7 +235,13 @@ export type Torrent = {
 
 export type AssetState = 'none' | 'pending' | 'running' | 'ready' | 'failed';
 
-export type MediaErrorCode = 'NO_AUDIO' | 'PROBE_FAILED' | 'PEAKS_FAILED' | 'SPEECH_FAILED' | 'TRANSCODE_FAILED' | 'PREVIEW_NO_SPACE';
+export type MediaErrorCode =
+  | 'NO_AUDIO'
+  | 'PROBE_FAILED'
+  | 'PEAKS_FAILED'
+  | 'SPEECH_FAILED'
+  | 'TRANSCODE_FAILED'
+  | 'PREVIEW_NO_SPACE';
 
 export type MediaStatus = {
   id: Id;
@@ -436,7 +456,13 @@ export type StorageFinding = {
 
 export type Notification = {
   id: number;
-  kind: 'download.completed' | 'download.failed' | 'export.completed' | 'export.failed' | 'subtitle.confirmed' | 'item.deleted';
+  kind:
+    | 'download.completed'
+    | 'download.failed'
+    | 'export.completed'
+    | 'export.failed'
+    | 'subtitle.confirmed'
+    | 'item.deleted';
   /** Everything the client needs to write the sentence in zh-TW. */
   data: {
     movieTitle?: string;
@@ -474,13 +500,35 @@ export type ServerEvent =
 
 /* ------------------------------------------------------------------ administration */
 
-export type AdminUser = User & { disabled: boolean; lastSeenAt: IsoTime | null; held: number; activeDownloads: number; soleHolderOf: number };
+export type AdminUser = User & {
+  disabled: boolean;
+  lastSeenAt: IsoTime | null;
+  held: number;
+  activeDownloads: number;
+  soleHolderOf: number;
+};
 
-export type Invite = { id: Id; code: string; url: string; role: Role; state: 'open' | 'used' | 'expired'; createdBy: UserRef | null; expiresAt: IsoTime; usedBy: UserRef | null };
+export type Invite = {
+  id: Id;
+  code: string;
+  url: string;
+  role: Role;
+  state: 'open' | 'used' | 'expired';
+  createdBy: UserRef | null;
+  expiresAt: IsoTime;
+  usedBy: UserRef | null;
+};
 
 export type SourceId = 'yts' | 'tmdb' | 'justsubtitles' | 'subdl' | 'yify' | 'assrt';
 
-export type SourceCheckCode = 'OK' | 'NOT_CONFIGURED' | 'INVALID_KEY' | 'UNREACHABLE' | 'BAD_RESPONSE' | 'REDIRECTED' | 'RATE_LIMITED';
+export type SourceCheckCode =
+  | 'OK'
+  | 'NOT_CONFIGURED'
+  | 'INVALID_KEY'
+  | 'UNREACHABLE'
+  | 'BAD_RESPONSE'
+  | 'REDIRECTED'
+  | 'RATE_LIMITED';
 
 /**
  * Result of trying a source once. `data` holds the numbers and names the sentence needs:
@@ -516,7 +564,12 @@ export type Task = {
 };
 
 /** `version` is the build the service reports in its heartbeat; null for postgres and for a service that never reported. */
-export type ServiceStatus = { name: 'api' | 'torrent' | 'media' | 'postgres'; state: 'up' | 'down'; since: IsoTime | null; version: string | null };
+export type ServiceStatus = {
+  name: 'api' | 'torrent' | 'media' | 'postgres';
+  state: 'up' | 'down';
+  since: IsoTime | null;
+  version: string | null;
+};
 
 /**
  * One entry per thing to deal with: FAILED_DOWNLOAD once per failed download, FAILED_TASK once
@@ -542,7 +595,12 @@ export type AdminOverview = {
   downloads: { active: number; maxActive: number; queued: number };
   users: { active: number; disabled: number; openInvites: number };
   tasks: { running: number; current: Task | null };
-  problems: { level: 'bad' | 'warn'; code: ProblemCode; data: Record<string, string | number>; page: 'storage' | 'downloads' | 'sources' | 'system' }[];
+  problems: {
+    level: 'bad' | 'warn';
+    code: ProblemCode;
+    data: Record<string, string | number>;
+    page: 'storage' | 'downloads' | 'sources' | 'system';
+  }[];
   sources: SourceHealth[];
   recent: AuditEntry[];
 };
@@ -551,7 +609,14 @@ export type AdminOverview = {
  * `action` is a stable code (docs/12-auth.md). `target` is what it was done to, as data.
  * `actorName` is the name as it was at the time, so the line still reads after the account is gone.
  */
-export type AuditEntry = { id: number; at: IsoTime; actor: UserRef | null; actorName: string; action: string; target: Record<string, string | number> };
+export type AuditEntry = {
+  id: number;
+  at: IsoTime;
+  actor: UserRef | null;
+  actorName: string;
+  action: string;
+  target: Record<string, string | number>;
+};
 
 /** The capacity limit is not here: it has its own endpoint and is reported in Usage. */
 export type Settings = {
@@ -593,7 +658,9 @@ export type DiskInfo = { totalBytes: Bytes; availableBytes: Bytes; reserveBytes:
 
 export type SecretName = 'tmdbKey' | 'subdlKey' | 'assrtToken';
 
-type DeepPartial<T> = { [K in keyof T]?: T[K] extends (infer U)[] ? U[] : T[K] extends object ? DeepPartial<T[K]> : T[K] };
+type DeepPartial<T> = {
+  [K in keyof T]?: T[K] extends (infer U)[] ? U[] : T[K] extends object ? DeepPartial<T[K]> : T[K];
+};
 
 /* ------------------------------------------------------------------ endpoints */
 
@@ -612,7 +679,10 @@ export interface Endpoints {
   'POST /api/auth/logout': { ok: null };
   'GET /api/auth/me': { ok: Me };
   'GET /api/invites/:code': { ok: { role: Role; expiresAt: IsoTime } };
-  'POST /api/auth/register': { body: { code: string; displayName: string; username: string; password: string }; ok: Me };
+  'POST /api/auth/register': {
+    body: { code: string; displayName: string; username: string; password: string };
+    ok: Me;
+  };
   'GET /api/auth/reset/:token': { ok: { username: string } };
   'POST /api/auth/reset/:token': { body: { password: string }; ok: null };
   'PATCH /api/me': { body: { displayName?: string; prefs?: Partial<UserPrefs> }; ok: User };
@@ -622,7 +692,14 @@ export interface Endpoints {
 
   /* search */
   'GET /api/yts/movies': {
-    query: { q?: string; quality?: '720p' | '1080p' | '2160p'; genre?: string; minRating?: number; sort?: SortKey; page?: number };
+    query: {
+      q?: string;
+      quality?: '720p' | '1080p' | '2160p';
+      genre?: string;
+      minRating?: number;
+      sort?: SortKey;
+      page?: number;
+    };
     ok: { items: MovieSummary[]; total: number; page: number; pageSize: number };
   };
   'GET /api/yts/movies/:ytsId': { ok: MovieDetail };
@@ -653,7 +730,10 @@ export interface Endpoints {
 
   /* subtitles */
   'GET /api/torrents/:id/candidates': { ok: CandidateList };
-  'POST /api/torrents/:id/subtitle-search': { body: { languages: Lang[]; provider?: ProviderId; refresh?: boolean }; ok: CandidateList };
+  'POST /api/torrents/:id/subtitle-search': {
+    body: { languages: Lang[]; provider?: ProviderId; refresh?: boolean };
+    ok: CandidateList;
+  };
   'POST /api/torrents/:id/candidates/rank': { body: { languages: Lang[] }; ok: CandidateList };
   'POST /api/torrents/:id/uploads': { body: 'multipart/form-data: one field "file"'; ok: CandidateList };
   'POST /api/candidates/:id/add': { body: { convertToTraditional?: boolean }; ok: Subtitle };
@@ -670,7 +750,10 @@ export interface Endpoints {
   'DELETE /api/subtitles/:id': { ok: null };
 
   /* exports */
-  'POST /api/torrents/:id/exports': { body: { fileName: string; tracks: { subtitleId: Id; isDefault: boolean }[] }; ok: Export };
+  'POST /api/torrents/:id/exports': {
+    body: { fileName: string; tracks: { subtitleId: Id; isDefault: boolean }[] };
+    ok: Export;
+  };
   'GET /api/exports': { query: { scope?: 'mine' | 'all' }; ok: Export[] };
   'GET /api/exports/:id/file': { ok: 'video/x-matroska with Range, attachment' };
   'DELETE /api/exports/:id': { ok: { freedBytes: Bytes } };
@@ -691,13 +774,18 @@ export interface Endpoints {
   'GET /api/admin/invites': { ok: Invite[] };
   'POST /api/admin/invites': { body: { role: Role; days: 1 | 3 | 7 }; ok: Invite };
   'DELETE /api/admin/invites/:id': { ok: null };
-  'GET /api/admin/storage': { ok: { usage: Usage; items: StorageItem[]; disk: DiskInfo; findings: StorageFinding[]; rescan: Task | null } };
+  'GET /api/admin/storage': {
+    ok: { usage: Usage; items: StorageItem[]; disk: DiskInfo; findings: StorageFinding[]; rescan: Task | null };
+  };
   'PUT /api/admin/storage/limit': { body: { limitBytes: Bytes }; ok: Usage };
   'POST /api/admin/storage/rescan': { ok: Task };
   /** `:kind` is a StorageItemKind, or 'orphan' with the id of a StorageFinding. */
   'DELETE /api/admin/storage/items/:kind/:id': { ok: { freedBytes: Bytes } };
   'GET /api/admin/settings': { ok: { settings: Settings; info: SettingsInfo; sources: SourceHealth[] } };
-  'PATCH /api/admin/settings': { body: DeepPartial<Settings>; ok: { settings: Settings; info: SettingsInfo; sources: SourceHealth[] } };
+  'PATCH /api/admin/settings': {
+    body: DeepPartial<Settings>;
+    ok: { settings: Settings; info: SettingsInfo; sources: SourceHealth[] };
+  };
   'PUT /api/admin/secrets/:name': { body: { value: string }; ok: null };
   'DELETE /api/admin/secrets/:name': { ok: null };
   /** Always 200: a source that cannot be reached is a result, not an error of this endpoint. */
@@ -705,7 +793,10 @@ export interface Endpoints {
   'GET /api/admin/system': { ok: { services: ServiceStatus[]; tasks: Task[]; disk: DiskInfo } };
   /** Answers with the task that was retried, unchanged. The new task shows up in GET /api/admin/system after the `admin` event. */
   'POST /api/admin/tasks/:id/retry': { ok: Task };
-  'GET /api/admin/audit': { query: { userId?: Id; before?: number }; ok: { items: AuditEntry[]; nextBefore: number | null } };
+  'GET /api/admin/audit': {
+    query: { userId?: Id; before?: number };
+    ok: { items: AuditEntry[]; nextBefore: number | null };
+  };
 }
 
 export type EndpointKey = keyof Endpoints;

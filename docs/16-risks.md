@@ -10,7 +10,7 @@
 | --- | --- |
 | WebTorrent 3.0.21 在 Node 22 和 24 上載得起來（含 uTP、WebRTC 原生模組）；只憑 info hash 下載；用 bitfield 接續；`skipVerify`；刪除檔案；限速 | `reference/torrent/` |
 | `torrent.pause()` 不會停止現有連線 | WebTorrent 官方文件；原始碼 `lib/torrent.js` |
-| 對齊核心在三種情境下的結果；搜尋範圍的影響；對齊點；檢查點的挑選 | `reference/sync-core/`，17 項測試 |
+| 對齊核心在三種情境下的結果；搜尋範圍的影響；對齊點；檢查點的挑選 | `packages/shared/src/sync-core/`，17 項測試 |
 | ffsubsync 0.5.1：`--vad webrtc` 的必要性、快取檔寫在哪裡、不給字幕也能做人聲偵測、用快取重新對齊只要不到一秒 | `reference/pipeline/analyze.sh`；[08-media-pipeline.md](08-media-pipeline.md) |
 | ffsubsync 的分段模式在字幕停留較久時偏早約 0.25 到 0.3 秒；重新對正後消失 | `fixtures/ffsubsync/`、`fixtures/expected.ffsubsync.json`、核心測試第 13 項 |
 | 兩種對齊方法合併挑選的做法，在三份測試字幕上都落在 60 毫秒內而且彼此一致 | `reference/pipeline/align.ts` |
@@ -19,7 +19,7 @@
 | 封裝：影像和聲音的封包和原檔相同；語言標籤與預設軌；`0:V` 才不會把封面圖當成影像軌；沒有聲音軌的來源也能封裝；所有軌一起位移；Big5 的檔案用串流複製會靜靜地封進亂碼 | `reference/pipeline/mux.sh` |
 | 編碼判斷（UTF-8、UTF-16、Big5、GB18030、Windows-1252）、繁簡判斷、簡轉繁、ASS 轉純文字 | `reference/subtitles/`，5 項測試 |
 | 資料庫 schema 可以建立；用量與 admission 的每一種情況；預覽計畫的欄位；請求排隊的函式；各項約束 | `db/`，11 項測試（PGlite，PostgreSQL 18.3，單一連線） |
-| API 合約的型別沒有錯誤 | `contracts/api.ts`，TypeScript 7.0.2 strict |
+| API 合約的型別沒有錯誤 | `packages/shared/src/contracts/api.ts`，TypeScript 7.0.2 strict |
 | compose 檔的語法、變數替換、必填變數的錯誤訊息 | `docker compose config`（Compose v5.5） |
 | 兩個原型的行為 | `prototype/*/e2e.cjs`：工作台 40 項、平台 72 項 |
 | JustSubtitles 介面、YIFY Subtitles 頁面結構 | 2026-10-04 用瀏覽器實際查看，見 [07-subtitle-providers.md](07-subtitle-providers.md) 的最後一節 |

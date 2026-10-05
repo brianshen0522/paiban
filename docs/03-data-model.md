@@ -129,7 +129,7 @@ API 回給前端的 `TorrentStatus` 是算出來的，不是存起來的：
 | `direct_play` | 布林 | ffprobe 之後才確定。規則在 [08-media-pipeline.md](08-media-pipeline.md)：MP4 裡的 H.264（8-bit 4:2:0）加 AAC 或 MP3；或 WebM 裡的 VP8、VP9、AV1 加 Opus 或 Vorbis |
 | `reserve_bytes` | 位元組 | 還沒做完的預覽資產佔的預留量。每次狀態變動時重算：進行中或等待中的資產各算它的估計值，其餘算 0 |
 | `analysis_bytes`、`audio_bytes`、`proxy_bytes` | 位元組 | 實際大小，檔案完成時寫入。`analysis_bytes` 是 `probe.json`、`peaks.bin`、`ref.npz`、`speech.json` 的總和 |
-| `error` | `{asset, code}` | 最近一次失敗，或沒有做預覽影片的原因（`PREVIEW_NO_SPACE`）。那個資產重新被要求時清掉。代碼的清單是 `contracts/api.ts` 的 `MediaErrorCode` |
+| `error` | `{asset, code}` | 最近一次失敗，或沒有做預覽影片的原因（`PREVIEW_NO_SPACE`）。那個資產重新被要求時清掉。代碼的清單是 `packages/shared/src/contracts/api.ts` 的 `MediaErrorCode` |
 
 資產在最後一次嘗試也失敗時（見 [08-media-pipeline.md](08-media-pipeline.md) 的「工作的共通規矩」），它的預留量才釋出；之後要再做，得重新通過 admission。
 
@@ -164,7 +164,7 @@ API 回給前端的 `TorrentStatus` 是算出來的，不是存起來的：
 
 - 資料夾裡有 `original.<ext>`（原始位元組）和 `cues.json`（句子清單，之後所有地方都用這一份）。加入時做了簡轉繁的話，`cues.json` 是轉換後的，轉換前的另存成 `cues.original.json`，`converted_s2t = true`。
 - `format` 是原始檔的格式；`.ssa` 記成 `ass`。
-- `doc` 是同步文件（型別 `SyncDoc`，定義在 `reference/sync-core/core.ts`）。候選如果已經對齊過，初始的 `doc` 就用那次的結果；否則是「不動」。
+- `doc` 是同步文件（型別 `SyncDoc`，定義在 `packages/shared/src/sync-core/core.ts`）。候選如果已經對齊過，初始的 `doc` 就用那次的結果；否則是「不動」。
 - `doc_rev` 從 0 開始，每次儲存加 1。儲存時要帶上原本的 `rev`，不一致就拒絕（`REVISION_CONFLICT`）。
 - `status`：`draft` 或 `confirmed`。**會改變時間或文字的儲存（送來的 `segments` 或 `edits` 和資料庫裡的不一樣）會把它變回 `draft`**；只動到對齊點或檢查點狀態的儲存不會。只有「確認」會把它變成 `confirmed`。
 - `score`：最後一次儲存時算出的對齊分數（伺服器算，不採用前端送來的數字）。

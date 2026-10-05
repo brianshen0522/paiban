@@ -2,7 +2,7 @@
 
 管理員在介面上調整的東西存在 `settings` 資料表（一項一列），金鑰存在 `secrets`。部署時決定的東西是環境變數，見 [02-architecture.md](02-architecture.md)。
 
-API 的形狀是 `contracts/api.ts` 的 `Settings`、`SettingsInfo`。`PATCH /api/admin/settings` 只送要改的部分；任何一項不合法就整個拒絕，回 `SETTING_INVALID`，`details.fields` 指出是哪一項、什麼原因。每次成功的變更寫一筆 `admin.settings.change`（記改了哪些鍵，不記金鑰的內容）。
+API 的形狀是 `packages/shared/src/contracts/api.ts` 的 `Settings`、`SettingsInfo`。`PATCH /api/admin/settings` 只送要改的部分；任何一項不合法就整個拒絕，回 `SETTING_INVALID`，`details.fields` 指出是哪一項、什麼原因。每次成功的變更寫一筆 `admin.settings.change`（記改了哪些鍵，不記金鑰的內容）。
 
 容量上限也存在 `settings` 資料表，但它不在 `Settings` 這個型別裡：它有自己的端點和驗證（`PUT /api/admin/storage/limit`），目前的值在 `Usage.limitBytes`。
 

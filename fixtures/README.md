@@ -80,7 +80,7 @@
 | `ffsubsync/<情境>.split.out.srt` | 加上 `--split-penalty` 的輸出 |
 | `expected.ffsubsync.json` | 每次執行 ffsubsync 自己印出的位移、速率、分段，以及和 `truth` 比較的誤差 |
 
-有了這些，解析 ffsubsync 輸出、還原變換、挑選結果的程式不用安裝 ffsubsync 就能做單元測試（`reference/sync-core/core.test.ts` 就是這樣做的）。
+有了這些，解析 ffsubsync 輸出、還原變換、挑選結果的程式不用安裝 ffsubsync 就能做單元測試（`packages/shared/src/sync-core/core.test.ts` 就是這樣做的）。
 
 ## 比較長的素材
 

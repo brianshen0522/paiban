@@ -36,7 +36,7 @@ interface SubtitleProvider {
   search(film: FilmContext, languages: Lang[]): Promise<FoundSubtitle[]>;
   /** 回傳現在可以下載的網址。有些來源的下載網址是臨時的,所以要在下載前才解析。 */
   resolveDownload(ref: string): Promise<{ url: string; fileName?: string }[]>;
-  /** 回代碼和資料,不回句子。SourceCheck 定義在 contracts/api.ts。 */
+  /** 回代碼和資料,不回句子。SourceCheck 定義在 packages/shared/src/contracts/api.ts。 */
   test(): Promise<SourceCheck>;
 }
 
@@ -408,7 +408,7 @@ GET https://api.assrt.net/v1/sub/detail?id=<id>
 
 ## 來源狀況
 
-每個來源最近一次查詢或測試的結果存在 `source_health` 資料表（每個來源一列，每次覆寫），API 的形狀是 `SourceHealth`（`contracts/api.ts`）：狀態（`ok`、`warn`、`down`）、時間、代碼、資料。和其他地方一樣，存的是代碼和數字，句子由前端寫。管理員的總覽頁和來源設定頁讀它。字幕庫固定是 `manual`；停用的來源是 `off`。
+每個來源最近一次查詢或測試的結果存在 `source_health` 資料表（每個來源一列，每次覆寫），API 的形狀是 `SourceHealth`（`packages/shared/src/contracts/api.ts`）：狀態（`ok`、`warn`、`down`）、時間、代碼、資料。和其他地方一樣，存的是代碼和數字，句子由前端寫。管理員的總覽頁和來源設定頁讀它。字幕庫固定是 `manual`；停用的來源是 `off`。
 
 | 發生什麼 | 狀態 |
 | --- | --- |

@@ -45,7 +45,7 @@ export type MappedCue = {
   edited: boolean;
 };
 
-/** What autoAlign returns. (The API's AlignResult in contracts/api.ts is the richer answer built from this.) */
+/** What autoAlign returns. (The API's AlignResult in packages/shared/src/contracts/api.ts is the richer answer built from this.) */
 export type AutoAlignResult = { J: number; segments: Segment[] };
 
 export type AlignOptions = {
@@ -134,7 +134,10 @@ export function cueScore(sp: Speech, c: { start: number; end: number }): number 
 }
 
 /** Share of all cue time that overlaps detected speech, 0 to 1. Deleted cues do not count. */
-export function totalScore(sp: Speech, mapped: ReadonlyArray<{ start: number; end: number; deleted?: boolean }>): number {
+export function totalScore(
+  sp: Speech,
+  mapped: ReadonlyArray<{ start: number; end: number; deleted?: boolean }>,
+): number {
   let ov = 0;
   let len = 0;
   for (const c of mapped) {
@@ -345,7 +348,10 @@ export function pickCheckpoints(cues: ReadonlyArray<Cue>, count: number): Checkp
  * ffsubsync logs its result to three decimals only; fitting its output cue starts (y)
  * against the input cue starts (x) recovers the exact transform.
  */
-export function fitLinear(xs: ReadonlyArray<number>, ys: ReadonlyArray<number>): { scale: number; offset: number; maxResidual: number } {
+export function fitLinear(
+  xs: ReadonlyArray<number>,
+  ys: ReadonlyArray<number>,
+): { scale: number; offset: number; maxResidual: number } {
   const n = Math.min(xs.length, ys.length);
   if (n === 0) return { scale: 1, offset: 0, maxResidual: 0 };
   let mx = 0;
@@ -387,13 +393,22 @@ export function fitLinearSegment(xs: ReadonlyArray<number>, ys: ReadonlyArray<nu
  * Re-centre each segment's offset on the speech around it, keeping its speed. This removes the
  * systematic early bias of ffsubsync's piecewise mode (about 0.3 s when cues linger after speech).
  */
-export function refineSegments(sp: Speech, cues: ReadonlyArray<Cue>, segments: ReadonlyArray<Segment>, radius = 1.5): Segment[] {
+export function refineSegments(
+  sp: Speech,
+  cues: ReadonlyArray<Cue>,
+  segments: ReadonlyArray<Segment>,
+  radius = 1.5,
+): Segment[] {
   return segments.map((s, k) => {
     const to = k + 1 < segments.length ? segments[k + 1].from : cues.length;
     const idxs: number[] = [];
     for (let i = s.from; i < to; i++) idxs.push(i);
     if (!idxs.length) return { ...s };
-    return { from: s.from, scale: s.scale, offset: round3(bestLinear(sp, cues, idxs, [s.scale], s.offset, radius).offset) };
+    return {
+      from: s.from,
+      scale: s.scale,
+      offset: round3(bestLinear(sp, cues, idxs, [s.scale], s.offset, radius).offset),
+    };
   });
 }
 
@@ -409,7 +424,12 @@ function median(values: ReadonlyArray<number>): number {
  * cues are treated as noise and folded into a neighbour. Each segment's offset is the
  * median of its cues.
  */
-export function segmentsFromOffsets(offsets: ReadonlyArray<number>, scale: number, tolerance = 0.05, minRun = 3): Segment[] {
+export function segmentsFromOffsets(
+  offsets: ReadonlyArray<number>,
+  scale: number,
+  tolerance = 0.05,
+  minRun = 3,
+): Segment[] {
   if (!offsets.length) return [{ from: 0, scale, offset: 0 }];
   let runs: { from: number; to: number }[] = [];
   for (let i = 0; i < offsets.length; i++) {
@@ -419,9 +439,17 @@ export function segmentsFromOffsets(offsets: ReadonlyArray<number>, scale: numbe
   }
   // fold short runs into the run before them (or after, for the first one)
   for (let k = 0; k < runs.length && runs.length > 1; ) {
-    if (runs[k].to - runs[k].from >= minRun) { k += 1; continue; }
-    if (k > 0) { runs[k - 1].to = runs[k].to; runs.splice(k, 1); }
-    else { runs[1].from = runs[0].from; runs.splice(0, 1); }
+    if (runs[k].to - runs[k].from >= minRun) {
+      k += 1;
+      continue;
+    }
+    if (k > 0) {
+      runs[k - 1].to = runs[k].to;
+      runs.splice(k, 1);
+    } else {
+      runs[1].from = runs[0].from;
+      runs.splice(0, 1);
+    }
   }
   // neighbours that ended up with the same offset are one segment
   const offsetOf = (r: { from: number; to: number }) => median(offsets.slice(r.from, r.to));
@@ -439,7 +467,12 @@ export function segmentsFromOffsets(offsets: ReadonlyArray<number>, scale: numbe
  * A single line through such data is meaningless, so the speed is the median slope between
  * consecutive cues, which the few cue pairs that straddle a break cannot disturb.
  */
-export function fitPiecewise(xs: ReadonlyArray<number>, ys: ReadonlyArray<number>, tolerance = 0.05, minRun = 3): Segment[] {
+export function fitPiecewise(
+  xs: ReadonlyArray<number>,
+  ys: ReadonlyArray<number>,
+  tolerance = 0.05,
+  minRun = 3,
+): Segment[] {
   const n = Math.min(xs.length, ys.length);
   const slopes: number[] = [];
   for (let i = 1; i < n; i++) {
@@ -454,7 +487,11 @@ export function fitPiecewise(xs: ReadonlyArray<number>, ys: ReadonlyArray<number
 }
 
 /** Largest difference between where two alignments put the start of any cue. */
-export function maxStartDifference(cues: ReadonlyArray<Cue>, a: ReadonlyArray<Segment>, b: ReadonlyArray<Segment>): number {
+export function maxStartDifference(
+  cues: ReadonlyArray<Cue>,
+  a: ReadonlyArray<Segment>,
+  b: ReadonlyArray<Segment>,
+): number {
   let worst = 0;
   cues.forEach((c, i) => {
     const sa = a[segmentIndex({ segments: a as Segment[] }, i)];
@@ -497,9 +534,16 @@ export function pickAlignment(
   const near = all.filter((c) => c.J >= top - 0.3 * sp.hz);
   const best = near
     .map((c, order) => ({ c, order }))
-    .sort((a, b) => a.c.segments.length - b.c.segments.length || rateRank(a.c.segments[0].scale) - rateRank(b.c.segments[0].scale) || a.order - b.order)[0].c;
+    .sort(
+      (a, b) =>
+        a.c.segments.length - b.c.segments.length ||
+        rateRank(a.c.segments[0].scale) - rateRank(b.c.segments[0].scale) ||
+        a.order - b.order,
+    )[0].c;
   const engine = (m: string) => m.split('-')[0];
-  const agree = all.some((c) => engine(c.method) !== engine(best.method) && maxStartDifference(cues, c.segments, best.segments) <= 0.15);
+  const agree = all.some(
+    (c) => engine(c.method) !== engine(best.method) && maxStartDifference(cues, c.segments, best.segments) <= 0.15,
+  );
   return { best, agree, all };
 }
 
@@ -518,7 +562,7 @@ export function formatTimecode(t: number, sep = ','): string {
   const h = Math.floor(ms / 3600000);
   const m = Math.floor(ms / 60000) % 60;
   const s = Math.floor(ms / 1000) % 60;
-  return (neg ? '-' : '') + pad(h, 2) + ':' + pad(m, 2) + ':' + pad(s, 2) + sep + pad(ms % 1000, 3);
+  return `${(neg ? '-' : '') + pad(h, 2)}:${pad(m, 2)}:${pad(s, 2)}${sep}${pad(ms % 1000, 3)}`;
 }
 
 /**
@@ -526,7 +570,10 @@ export function formatTimecode(t: number, sep = ','): string {
  * cues in start order, numbered from 1. UTF-8 text, LF line endings.
  */
 export function toSrt(mapped: ReadonlyArray<MappedCue>): string {
-  const kept = mapped.filter((c) => !c.deleted).slice().sort((a, b) => a.start - b.start || a.i - b.i);
+  const kept = mapped
+    .filter((c) => !c.deleted)
+    .slice()
+    .sort((a, b) => a.start - b.start || a.i - b.i);
   return kept
     .map((c, n) => {
       const start = Math.max(0, c.start);
