@@ -110,6 +110,7 @@ docker compose -f deploy/docker-compose.yml build    # 建置映像檔(paiban-se
 docker compose -f deploy/docker-compose.yml up -d    # 起五個容器;網址是 deploy/.env 的 PUBLIC_URL
 scripts/phase0/reference-in-image.sh                 # 在映像檔裡跑全部參考測試與 pipeline 比對
 pnpm test:image [檔案…]                              # 在映像檔裡跑伺服器測試(需要 ffmpeg、ffsubsync、bsdtar 的那些在主機上會略過)
+pnpm test:image test/e2e-flow.test.ts                # 離線的完整流程(搜尋→下載→分析→字幕→對齊→匯出→下載 MKV→刪除),約 1.5 分鐘
 ```
 
 階段 0 的手動檢查（不進自動化測試，會連外部網路）在 `scripts/phase0/`，每支檔案開頭有用法：`check-sources.mjs`（真實的字幕來源）、`real-swarm.mjs`（真實的 BitTorrent 下載，Blender 開放電影）、`real-film.sh`（真實電影的對齊）、`make-archives.sh` / `check-archives.sh`（壓縮檔）、`playback/`（瀏覽器播放測試頁）。

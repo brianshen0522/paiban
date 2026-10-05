@@ -17,6 +17,17 @@
 
 ---
 
+## 2026-10-06 完整流程的端對端測試發現的事
+
+- 在哪裡：docs/14-plan.md 階段 9 第一項、docs/15-testing.md「離線的完整流程」、docs/04-api.md `GET /api/library/:torrentId`
+- 問題：
+  1. 工作區端點回的 `exports` 一直是空陣列：階段 3 留的佔位函式，階段 7 寫了 `exportsForTorrent` 也測了它，卻沒有接到路由上。已修正（另一個提交，附回歸測試）。
+  2. 假的字幕來源只替 *Inception* 回答，本機做種的 *Charade* 找不到任何字幕，完整流程走不下去。已讓假來源也替 `tt9000002` 回答（記在 changes）。
+  3. 完整流程測試以 API 為層級：三個服務在同一個 Vitest 行程裡，共用一個資料夾，用定時呼叫 `worker.tick()`、`media.reconcile()` 代替它們自己的迴圈和 NOTIFY。瀏覽器那一層（Playwright、`pnpm test:e2e`）還沒有。
+  4. 主機上缺工具時，`describe.skipIf` 的檔案頂端那行 `console.warn` 在 Vitest 預設的回報格式裡看不到（只有 `--reporter=verbose` 才印），只看得到「skipped」的數字。media、exports-mux、subtitles 那幾個檔案也一樣。沒有改。
+- 判斷：1、2 照規格修；3、4 寫在這裡，留給之後決定。
+- 需要 Brian 確認：否
+
 ## 2026-10-05 自動對齊的分段模式在真實電影上會產生假斷點
 
 - 在哪裡：docs/08-media-pipeline.md「自動對齊」、`packages/shared/src/sync-core/core.ts` 的 `autoAlign`（`allowSplit`）與 `pickAlignment`
