@@ -105,7 +105,7 @@
 
 ## 回應標頭
 
-由 Caddy 加（`deploy/Caddyfile.example`）：`Content-Security-Policy`（只允許同源；不載入任何外部資源）、`X-Content-Type-Options: nosniff`、`Referrer-Policy: no-referrer`、`X-Frame-Options: DENY`。
+由 Caddy 加（`deploy/Caddyfile`）：`Content-Security-Policy`（只允許同源；不載入任何外部資源）、`X-Content-Type-Options: nosniff`、`Referrer-Policy: no-referrer`、`X-Frame-Options: DENY`。
 
 `Referrer-Policy: no-referrer` 有實際的用途：使用者從這裡點連結到字幕庫或來源頁時，不會把這個網站的網址告訴對方。對外的連結另外加 `rel="noopener noreferrer"`。
 

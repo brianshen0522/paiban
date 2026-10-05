@@ -1,4 +1,4 @@
-# Copy to deploy/Caddyfile. Not yet run against a real Caddy: check it with `caddy validate`.
+# Served by the `proxy` image (deploy/Dockerfile, target proxy).
 #
 # SITE_ADDRESS comes from .env:
 #   :80                  plain HTTP (LAN only, or TLS is terminated by something in front)

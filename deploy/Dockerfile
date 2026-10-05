@@ -1,10 +1,7 @@
 # syntax=docker/dockerfile:1
 #
-# Copy to deploy/Dockerfile once the repository layout in docs/02-architecture.md exists.
-# Not yet built: the sandbox this package was prepared in could not reach Docker Hub.
-# What was checked there, outside Docker: webtorrent 3.0.21 loads with its native uTP and WebRTC
-# add-ons on Node 22.22 and 24.21 (glibc, x86-64), and ffsubsync 0.5.1 installs into a fresh
-# virtual environment with uv on Python 3.11 and 3.13.
+# One image for api, torrent and media (target `server`) and one for the web app behind Caddy
+# (target `proxy`). Built from deploy/docker-compose.yml:  docker compose -f deploy/docker-compose.yml build
 
 ARG NODE_VERSION=24
 ARG PNPM_VERSION=12
@@ -14,7 +11,7 @@ FROM node:${NODE_VERSION}-trixie-slim AS build
 ARG PNPM_VERSION
 RUN npm install -g pnpm@${PNPM_VERSION}
 WORKDIR /repo
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.base.json ./
 COPY apps/server/package.json apps/server/
 COPY apps/web/package.json apps/web/
 COPY packages/shared/package.json packages/shared/
@@ -22,7 +19,7 @@ RUN --mount=type=cache,target=/root/.local/share/pnpm/store pnpm install --froze
 COPY . .
 RUN pnpm -r build
 # A self-contained copy of the server with production dependencies only.
-RUN pnpm --filter @paiban/server deploy --prod /out/server
+RUN pnpm --filter @paiban/server deploy --legacy --prod /out/server
 
 # ---------------------------------------------------------------- api, torrent and media
 FROM node:${NODE_VERSION}-trixie-slim AS server
