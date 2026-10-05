@@ -14,6 +14,7 @@ import {
 } from '@paiban/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { llmHeard } from '../asr/align.js';
 import { audit } from '../audit.js';
 import { prefsOf } from '../auth/users.js';
 import { one, pgCode, tx, UNIQUE_VIOLATION } from '../db/pool.js';
@@ -565,12 +566,15 @@ export function subtitleRoutes(app: FastifyInstance, deps: Deps): void {
     const { id } = parse(IdParams, req.params);
     const { allowSplit } = parse(z.object({ allowSplit: z.boolean() }), req.body);
     const { s, t } = await holderSubtitle(user, id);
-    if (!(await speechFor(pool, config.dataDir, s.torrent_id)))
-      throw new ApiError('MEDIA_NOT_READY', 'no speech data for this film');
+    const sp = await speechFor(pool, config.dataDir, s.torrent_id);
+    if (!sp) throw new ApiError('MEDIA_NOT_READY', 'no speech data for this film');
+    // A subtitle in another language than the one spoken is paired by the language model here,
+    // where the key is; the media service does the rest (docs/08, "語言模型").
+    const heard = await llmHeard(deps, sp.mediaId, await readCues(config.dataDir, s.rel_dir), s.language);
     const task = await one<{ id: string }>(
       pool,
       `insert into tasks (kind, torrent_id, subject, input, created_by) values ('align', $1, $2, $3, $4) returning id`,
-      [s.torrent_id, { movieTitle: t.title, language: s.language }, { subtitleId: id, allowSplit }, user.id],
+      [s.torrent_id, { movieTitle: t.title, language: s.language }, { subtitleId: id, allowSplit, heard }, user.id],
     );
     const taskId = task?.id as string;
     await pool.query(`select pg_notify('paiban_media', '{}')`);

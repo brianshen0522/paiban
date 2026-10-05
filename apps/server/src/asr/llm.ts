@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
-import type { SyncCore } from '@paiban/shared';
+import type { LlmErrorCode, SyncCore } from '@paiban/shared';
 import { z } from 'zod';
 import type { Pair } from './fit.js';
 import { type AsrTranscript, cuesBetween, sourceRange } from './text.js';
@@ -19,14 +19,7 @@ export type Match = { heard: number; line: number };
 /** One request to a language model: which heard lines and subtitle lines say the same thing. */
 export type Matcher = (req: MatchRequest, signal?: AbortSignal) => Promise<Match[]>;
 
-export type LlmErrorCode =
-  | 'NOT_CONFIGURED'
-  | 'AUTH'
-  | 'RATE_LIMITED'
-  | 'REFUSED'
-  | 'BAD_RESPONSE'
-  | 'UNREACHABLE'
-  | 'TIMEOUT';
+export type { LlmErrorCode };
 export class LlmError extends Error {
   readonly code: LlmErrorCode;
   constructor(code: LlmErrorCode, message: string) {

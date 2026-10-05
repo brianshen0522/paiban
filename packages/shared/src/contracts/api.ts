@@ -374,10 +374,32 @@ export type AlignResult = {
   segments: Segment[];
   scoreBefore: number;
   score: number;
-  method: 'ffsubsync-linear' | 'ffsubsync-split' | 'core';
+  method: 'ffsubsync-linear' | 'ffsubsync-split' | 'core' | 'asr' | 'asr-llm';
   /** Two independent engines put every line within 0.15 s of each other. */
   agree: boolean;
+  /**
+   * What speech recognition contributed (docs/08, "語音辨識"); null when the film has none.
+   * `pairs`: recognised lines matched with subtitle lines, by text (`via: 'text'`, same language)
+   * or by the language model (`'llm'`). `support`: how many of them the chosen alignment agrees
+   * with. `via: 'none'` with `llmError` set: the model was asked and failed.
+   */
+  heard: {
+    language: string;
+    pairs: number;
+    support: number;
+    via: 'text' | 'llm' | 'none';
+    llmError: LlmErrorCode | null;
+  } | null;
 };
+
+export type LlmErrorCode =
+  | 'NOT_CONFIGURED'
+  | 'AUTH'
+  | 'RATE_LIMITED'
+  | 'REFUSED'
+  | 'BAD_RESPONSE'
+  | 'UNREACHABLE'
+  | 'TIMEOUT';
 
 /* ------------------------------------------------------------------ exports */
 
