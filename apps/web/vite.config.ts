@@ -12,5 +12,5 @@ export default defineConfig({
   ],
   resolve: { conditions: ['@paiban/source'], alias: workspaceAlias },
   server: { proxy: { '/api': 'http://localhost:3000' } },
-  test: { environment: 'jsdom', include: ['src/**/*.test.tsx'] },
+  test: { environment: 'jsdom', include: ['src/**/*.test.ts', 'src/**/*.test.tsx'] },
 });

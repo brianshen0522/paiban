@@ -1,0 +1,22 @@
+# PostgreSQL for `pnpm dev` (scripts/dev.mjs). Localhost only; the password is a development value.
+name: paiban-dev
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: paiban
+      POSTGRES_PASSWORD: paiban-dev-not-real
+      POSTGRES_DB: paiban
+    ports:
+      - "127.0.0.1:55433:5432"
+    volumes:
+      - pg_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paiban -d paiban"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  pg_dev:

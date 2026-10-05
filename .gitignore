@@ -21,3 +21,6 @@ test-results/
 
 *.log
 .DS_Store
+
+# local development (pnpm dev)
+/.dev-data/
