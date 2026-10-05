@@ -8,7 +8,13 @@ import { startSeeder } from './seed.ts';
 const fixtures = (f: string) => fileURLToPath(new URL(`../../../fixtures/${f}`, import.meta.url));
 const port = Number(process.env.SEED_PORT ?? 51801);
 const out = process.env.LOCAL_VERSIONS ?? fileURLToPath(new URL('../local-versions.json', import.meta.url));
-const s = await startSeeder([fixtures('clip.webm'), fixtures('clip.mp4'), fixtures('clip.hevc10.mp4')], port);
+// SEED_EXTRA_FILM: a longer film on this machine to try the whole flow on, listed as a 2160p
+// version of the same film. Only ever a Blender Foundation open movie (AGENTS.md rule 5).
+const extraFilm = process.env.SEED_EXTRA_FILM;
+const s = await startSeeder(
+  [fixtures('clip.webm'), fixtures('clip.mp4'), fixtures('clip.hevc10.mp4'), ...(extraFilm ? [extraFilm] : [])],
+  port,
+);
 const [webm, mp4, hevc] = s.seeded;
 if (!webm || !mp4 || !hevc) throw new Error('seeding failed');
 const versions: LocalVersion[] = [
@@ -43,5 +49,17 @@ const versions: LocalVersion[] = [
     sizeBytes: hevc.length,
   },
 ];
+const extra = s.seeded[3];
+if (extra)
+  versions.push({
+    ytsId: 2,
+    quality: '2160p',
+    type: 'web',
+    videoCodec: 'x264',
+    bitDepth: 8,
+    audio: '2.0',
+    hash: extra.hash,
+    sizeBytes: extra.length,
+  });
 await writeFile(out, `${JSON.stringify(versions, null, 2)}\n`);
 console.log(`seeding ${s.seeded.length} fixture clips on port ${s.port}; versions written to ${out}`);
