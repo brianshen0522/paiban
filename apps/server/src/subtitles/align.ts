@@ -49,7 +49,7 @@ export function computeAlignment(
   const pairs = heard?.pairs ?? [];
   const fit = pairs.length ? fitPairs(cues, pairs, sp, opts.allowSplit) : null;
   if (fit) candidates.unshift({ method: heard?.via === 'llm' ? 'asr-llm' : 'asr', segments: fit.segments });
-  const pick = pickWithPairs(sp, cues, candidates, pairs);
+  const pick = pickWithPairs(sp, cues, candidates, pairs, heard?.heardAt ?? []);
   const before = SyncCore.totalScore(sp, SyncCore.applyDoc(cues, opts.before ?? SyncCore.identityDoc()));
   return {
     segments: tidy(pick.best.segments),

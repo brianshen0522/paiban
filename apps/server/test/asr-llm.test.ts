@@ -89,7 +89,7 @@ describe('asking the language model from the api', () => {
   it('pairs through an OpenAI-compatible server, with no key needed', async () => {
     await configure('openai');
     const r = await llmHeard({ pool, config, log }, mediaId, cues, 'fr');
-    expect(r).toEqual({ language: 'en', pairs: [{ cue: 0, y: 11 }], via: 'llm', llmError: null });
+    expect(r).toEqual({ language: 'en', pairs: [{ cue: 0, y: 11 }], heardAt: [11], via: 'llm', llmError: null });
     expect(asked).toBe(1);
   });
 

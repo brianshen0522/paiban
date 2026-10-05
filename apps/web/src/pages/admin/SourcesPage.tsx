@@ -478,7 +478,7 @@ function CommonCard({ settings }: { settings: Settings }) {
     setSaving(false);
   };
   return (
-    <section className="card">
+    <section className="card stack">
       <h2>{c().common}</h2>
       <form className="stack" onSubmit={submit} noValidate>
         <Field label={c().cacheHours} help={c().cacheHelp} error={errors['providers.cacheHours']}>

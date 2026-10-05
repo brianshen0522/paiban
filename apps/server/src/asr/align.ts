@@ -23,6 +23,8 @@ type Cue = SyncCore.Cue;
 export type HeardPairs = {
   language: string;
   pairs: Pair[];
+  /** When each recognised line starts: where recognition listened and heard something. */
+  heardAt?: number[];
   via: 'text' | 'llm' | 'none';
   llmError: LlmErrorCode | null;
 };
@@ -62,9 +64,16 @@ export function localPairs(
   language: string,
 ): HeardPairs | null {
   if (!transcript) return null;
+  const heardAt = transcript.segments.map((s) => s.start);
   if (!sameLanguage(language, transcript.language))
-    return { language: transcript.language, pairs: [], via: 'none', llmError: null };
-  return { language: transcript.language, pairs: sameLanguagePairs(cues, transcript), via: 'text', llmError: null };
+    return { language: transcript.language, pairs: [], heardAt, via: 'none', llmError: null };
+  return {
+    language: transcript.language,
+    pairs: sameLanguagePairs(cues, transcript),
+    heardAt,
+    via: 'text',
+    llmError: null,
+  };
 }
 
 /** How long the api spends asking the model before it hands the alignment to the media service. */
@@ -112,7 +121,13 @@ export async function llmHeard(
       { mediaId, provider: llm.provider, pairs: r.pairs.length, failedWindows: r.failed, ms: Date.now() - started },
       'language model paired recognised speech',
     );
-    return { language: transcript.language, pairs: r.pairs, via: 'llm', llmError: null };
+    return {
+      language: transcript.language,
+      pairs: r.pairs,
+      heardAt: transcript.segments.map((s) => s.start),
+      via: 'llm',
+      llmError: null,
+    };
   } catch (err) {
     const code: LlmErrorCode =
       err instanceof LlmError

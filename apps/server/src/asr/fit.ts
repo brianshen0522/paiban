@@ -160,10 +160,46 @@ function agreeing(cues: ReadonlyArray<Cue>, pairs: ReadonlyArray<Pair>, segments
   return out;
 }
 
+/** Recognised lines inside a segment's film time before one of them is expected to agree with it. */
+const HEARD_TO_JUDGE = 2;
+
+/**
+ * Segments that recognition listened to and found nothing for: at least HEARD_TO_JUDGE recognised
+ * lines start inside the stretch of film the segment puts its cues in, and not one pair agrees
+ * with it. A stretch nobody listened to is not judged.
+ */
+export function unheardSegments(
+  cues: ReadonlyArray<Cue>,
+  pairs: ReadonlyArray<Pair>,
+  segments: ReadonlyArray<Segment>,
+  heardAt: ReadonlyArray<number>,
+): number {
+  let n = 0;
+  segments.forEach((seg, k) => {
+    const to = k + 1 < segments.length ? segments[k + 1].from : cues.length;
+    if (to <= seg.from) return;
+    const a = cues[seg.from].start * seg.scale + seg.offset;
+    const b = cues[to - 1].start * seg.scale + seg.offset;
+    const heard = heardAt.filter((t) => t >= a && t <= b).length;
+    if (heard < HEARD_TO_JUDGE) return;
+    const backed = pairs.some(
+      (p) =>
+        p.cue >= seg.from &&
+        p.cue < to &&
+        Math.abs(p.y - (cues[p.cue].start * seg.scale + seg.offset)) <= PAIR_TOLERANCE,
+    );
+    if (!backed) n++;
+  });
+  return n;
+}
+
 /**
  * Choose among every engine's alignment. When recognised speech gives enough pairs, it is the
  * referee: the alignment that agrees with the most pairs sets the standard, and an alignment
  * that contradicts any of the pairs it agrees with (more than one in twenty, for slips) is out.
+ * Of the rest, alignments with a segment that recognition listened to and found no agreeing line
+ * for (`unheardSegments`) go too, if any alignment is left without one: speech detection invents
+ * cuts in loud passages, and a cut nobody heard is not believed over one the words support.
  * The usual scoring (docs/08-media-pipeline.md, pickAlignment) chooses among the rest. Detected
  * speech alone is easily fooled by music and effects; words that match are not. Without enough
  * pairs this is pickAlignment unchanged.
@@ -173,6 +209,7 @@ export function pickWithPairs(
   cues: ReadonlyArray<Cue>,
   candidates: ReadonlyArray<SyncCore.AlignCandidate>,
   pairs: ReadonlyArray<Pair>,
+  heardAt: ReadonlyArray<number> = [],
 ): { best: SyncCore.ScoredCandidate; agree: boolean; support: number } {
   const sets = candidates.map((c) => agreeing(cues, pairs, c.segments));
   let top = 0;
@@ -183,6 +220,8 @@ export function pickWithPairs(
   if (sets[top] && sets[top].size >= MIN_PAIRS) {
     const slack = Math.floor(0.05 * sets[top].size);
     eligible = candidates.filter((_, i) => [...sets[top]].filter((k) => !sets[i].has(k)).length <= slack);
+    const heardOut = eligible.filter((c) => unheardSegments(cues, pairs, c.segments, heardAt) === 0);
+    if (heardOut.length) eligible = heardOut;
   }
   const { best } = SyncCore.pickAlignment(sp, cues, eligible);
   const engine = (m: string) => m.split('-')[0];
