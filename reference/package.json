@@ -1,0 +1,6 @@
+{
+  "name": "paiban-reference",
+  "private": true,
+  "type": "module",
+  "description": "Runnable reference code. Each subfolder says how to run it; nothing here is the application."
+}

@@ -1,0 +1,41 @@
+# Copy to deploy/Caddyfile. Not yet run against a real Caddy: check it with `caddy validate`.
+#
+# SITE_ADDRESS comes from .env:
+#   :80                  plain HTTP (LAN only, or TLS is terminated by something in front)
+#   films.example.net    Caddy gets and renews the certificate itself
+
+{$SITE_ADDRESS::80} {
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		X-Frame-Options DENY
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		# The web app loads nothing from other origins. 'wasm-unsafe-eval' is for the ASS renderer.
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; worker-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+		-Server
+	}
+
+	# Subtitle uploads are the only large request bodies.
+	@upload path_regexp ^/api/torrents/[^/]+/uploads$
+	request_body @upload {
+		max_size 25MB
+	}
+
+	handle /api/* {
+		reverse_proxy api:3000 {
+			# Live updates are server-sent events: pass them through as they are written.
+			flush_interval -1
+		}
+	}
+
+	# Everything else is the single-page app.
+	handle {
+		root * /srv
+		@assets path /assets/*
+		header @assets Cache-Control "public, max-age=31536000, immutable"
+		try_files {path} /index.html
+		file_server
+	}
+}

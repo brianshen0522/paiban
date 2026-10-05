@@ -1,0 +1,126 @@
+# Paiban on one machine. Copy to docker-compose.yml, copy .env.example to .env, then:
+#
+#   docker compose up -d --build
+#
+# Five containers:
+#   proxy     Caddy: serves the web app and passes /api to the API
+#   api       sign-in, search, settings, file streaming, live updates
+#   torrent   the BitTorrent client; separate so that updating the site never interrupts a download
+#   media     ffmpeg and ffsubsync jobs: analysis, preview files, alignment, MKV export
+#   postgres  data and the job queue
+#
+# api, torrent and media are the same image started with different commands. They talk to each
+# other only through PostgreSQL and the shared /data folder.
+#
+# Only the proxy (web) and the torrent container (BitTorrent) publish ports. The API listens on
+# 3000 inside the compose network, where the proxy and the healthcheck reach it.
+#
+# ALLOW_LOCAL_SOURCES, SOURCE_OVERRIDES and TORRENT_TEST_PEERS (docs/15-testing.md) belong in the
+# development and test compose files only. With NODE_ENV=production the services refuse to start
+# if any of them is set.
+
+name: paiban
+
+x-server: &server
+  build:
+    context: ..
+    dockerfile: deploy/Dockerfile
+    target: server
+  restart: unless-stopped
+  user: "${PUID:-1000}:${PGID:-1000}"
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  volumes:
+    - ${DATA_PATH:-./data}:/data
+  depends_on:
+    postgres:
+      condition: service_healthy
+
+x-server-env: &server-env
+  NODE_ENV: production
+  TZ: ${TZ:-Asia/Taipei}
+  DATABASE_URL: postgres://paiban:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/paiban
+  DATA_DIR: /data
+  STORAGE_RESERVE_GB: ${STORAGE_RESERVE_GB:-2}
+  TORRENT_PORT: ${TORRENT_PORT:-51413}
+  TORRENT_DHT_PORT: ${TORRENT_DHT_PORT:-51414}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+
+services:
+  proxy:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+      target: proxy
+    restart: unless-stopped
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    ports:
+      - "${HTTP_PORT:-8080}:80"
+      - "${HTTPS_PORT:-8443}:443"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+
+  api:
+    <<: *server
+    command: ["node", "dist/api.js"]
+    environment:
+      <<: *server-env
+      PUBLIC_URL: ${PUBLIC_URL:?set PUBLIC_URL in .env}
+      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY in .env}
+      STORAGE_LIMIT_GB: ${STORAGE_LIMIT_GB:-50}
+      BOOTSTRAP_ADMIN_USERNAME: ${BOOTSTRAP_ADMIN_USERNAME:-}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+      start_period: 20s
+
+  torrent:
+    <<: *server
+    command: ["node", "dist/torrent.js"]
+    environment:
+      <<: *server-env
+    ports:
+      - "${TORRENT_PORT:-51413}:${TORRENT_PORT:-51413}/tcp"
+      - "${TORRENT_PORT:-51413}:${TORRENT_PORT:-51413}/udp"
+      - "${TORRENT_DHT_PORT:-51414}:${TORRENT_DHT_PORT:-51414}/udp"
+    # Give the client time to save its state before the container is killed.
+    stop_grace_period: 30s
+
+  media:
+    <<: *server
+    command: ["node", "dist/media.js"]
+    environment:
+      <<: *server-env
+    # A long transcode should not be cut off by a restart; the job resumes from the queue anyway.
+    stop_grace_period: 20s
+
+  postgres:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: paiban
+      POSTGRES_DB: paiban
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      TZ: ${TZ:-Asia/Taipei}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paiban -d paiban"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pg_data:
+  caddy_data:
+  caddy_config:

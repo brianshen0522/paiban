@@ -1,0 +1,20 @@
+# Keep the build context small and free of secrets. The image is built from apps/ and packages/;
+# the hand-off material is mounted into a container when its tests need to run there.
+.git
+**/node_modules
+**/dist
+# .env files at any depth (the real one lives in deploy/); the example may be copied
+**/.env
+**/.env.*
+!**/.env.example
+data
+deploy/data
+.scratch
+prototype
+reference
+fixtures
+docs
+db
+coverage
+playwright-report
+test-results

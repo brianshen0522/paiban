@@ -1,0 +1,168 @@
+<div class="app">
+  <header class="bar">
+    <div>
+      <p class="meta">示範片段 · <span class="mono">00:01:32</span> · H.264 · <span class="mono">23.976</span> fps · 26 句 · 合成語音。原型裡每部片的同步頁都用這一段代替。</p>
+    </div>
+    <div class="bar-actions">
+      <label for="scenario">這份字幕的問題
+        <select id="scenario"></select>
+      </label>
+      <span id="status" class="pill">草稿</span>
+      <button id="confirm" class="primary" type="button">確認同步</button>
+    </div>
+  </header>
+
+  <section class="brief" aria-label="說明">
+    <p><strong id="hint-title"></strong> <span id="hint"></span></p>
+    <ol class="steps">
+      <li>播放,看字幕差多少</li>
+      <li>按「自動對齊」</li>
+      <li>用檢查點聽五句</li>
+      <li>不準就微調</li>
+      <li>確認同步</li>
+    </ol>
+  </section>
+
+  <main class="work">
+    <section class="stage" aria-label="影片">
+      <div class="screen" id="screen">
+        <video id="video" playsinline preload="auto"></video>
+        <div id="overlay" class="subs"></div>
+        <span class="tag demo" id="media-tag">示範影片</span>
+        <span class="tag orig" id="orig-tag" hidden>原始時間</span>
+      </div>
+      <div class="transport">
+        <button id="play" type="button" class="strong">播放</button>
+        <button id="back" type="button" aria-label="倒退 1 秒">−1 秒</button>
+        <button id="fwd" type="button" aria-label="前進 1 秒">+1 秒</button>
+        <span class="clock mono"><output id="clock">00:00:00,000</output> <span class="dur">/ 00:01:32</span></span>
+        <span class="push">
+          <label class="chk" for="speed">速度
+            <select id="speed">
+              <option value="0.5">0.5×</option>
+              <option value="0.75">0.75×</option>
+              <option value="1" selected>1×</option>
+              <option value="1.25">1.25×</option>
+              <option value="1.5">1.5×</option>
+            </select>
+          </label>
+          <label class="chk" for="bilingual"><input type="checkbox" id="bilingual"> 中英雙語</label>
+        </span>
+      </div>
+    </section>
+
+    <aside class="cues" aria-label="字幕清單">
+      <div class="cues-head">
+        <input id="search" type="search" placeholder="搜尋台詞,例如 電梯" aria-label="搜尋台詞">
+        <div class="switch" role="group" aria-label="清單模式">
+          <button id="mode-sync" type="button" aria-pressed="true">同步</button>
+          <button id="mode-edit" type="button" aria-pressed="false">逐句編輯</button>
+        </div>
+      </div>
+      <ol id="list" class="list"></ol>
+    </aside>
+  </main>
+
+  <section class="timeline" aria-label="時間軸">
+    <div class="tl-head">
+      <div class="score">對齊分數 <strong id="score">–</strong> <small>字幕與人聲重疊的比例,只是輔助,最後以耳朵為準</small></div>
+      <div class="tl-tools">
+        <button id="zoom-out" type="button" aria-label="縮小時間軸">縮小</button>
+        <button id="zoom-in" type="button" aria-label="放大時間軸">放大</button>
+        <button id="zoom-fit" type="button">全片</button>
+        <label class="chk" for="follow"><input type="checkbox" id="follow" checked> 跟著播放位置</label>
+      </div>
+    </div>
+    <canvas id="overview" role="img" aria-label="全片概覽:人聲、字幕對齊狀況與目前顯示範圍"></canvas>
+    <canvas id="tl" role="img" aria-label="時間軸:波形、人聲區段與字幕區塊"></canvas>
+    <ul class="legend">
+      <li><i class="k-wave"></i>波形</li>
+      <li><i class="k-speech"></i>偵測到的人聲</li>
+      <li><i class="k-a"></i>字幕(第 1 段)</li>
+      <li><i class="k-b"></i>字幕(第 2 段)</li>
+      <li>在字幕列左右拖曳可以直接移動字幕</li>
+    </ul>
+  </section>
+
+  <p id="log" class="log" role="status" aria-live="polite"></p>
+
+  <section class="tools" aria-label="同步工具">
+    <div class="tool">
+      <h2>自動</h2>
+      <div class="ctl">
+        <button id="auto" type="button" class="strong">自動對齊</button>
+        <label class="chk" for="allow-split"><input type="checkbox" id="allow-split" checked> 允許分段</label>
+        <button id="snap" type="button">吸附到人聲</button>
+      </div>
+      <p>自動對齊會試所有常見影格率和整片位移;吸附只在目前位置前後 1.5 秒內微調。</p>
+    </div>
+
+    <div class="tool">
+      <h2>位移與速率 <span id="scope" class="chip"></span></h2>
+      <div class="ctl">
+        <button type="button" data-nudge="-0.5">−500</button>
+        <button type="button" data-nudge="-0.05">−50</button>
+        <input id="offset" type="number" step="0.01" class="mono" aria-label="位移(秒)">
+        <span>秒</span>
+        <button type="button" data-nudge="0.05">+50</button>
+        <button type="button" data-nudge="0.5">+500</button>
+      </div>
+      <div class="ctl">
+        <label class="chk grow" for="rate">速率 <select id="rate"></select></label>
+      </div>
+    </div>
+
+    <div class="tool">
+      <h2>對齊點與分段</h2>
+      <div class="ctl">
+        <button id="anchor" type="button">把選取的句子對到現在</button>
+        <button id="split" type="button">從選取的句子分段</button>
+        <button id="merge" type="button" hidden>併回前一段</button>
+      </div>
+      <div class="chips" id="segs"></div>
+      <p id="anchor-note"></p>
+    </div>
+
+    <div class="tool">
+      <h2>檢查點</h2>
+      <div class="ctl">
+        <button id="cp-next" type="button">聽下一個</button>
+        <span class="dots" id="cp-dots"></span>
+      </div>
+      <div class="ctl">
+        <button id="cp-ok" type="button">這句準</button>
+        <button id="cp-bad" type="button">這句不準</button>
+      </div>
+    </div>
+
+    <div class="tool">
+      <h2>比較與復原</h2>
+      <div class="ctl">
+        <button id="orig" type="button">按住看原始時間</button>
+        <button id="undo" type="button">復原</button>
+        <button id="redo" type="button">重做</button>
+        <button id="reset" type="button">全部重設</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="summary" class="summary" hidden aria-label="確認結果"></section>
+
+  <details class="keys">
+    <summary>快捷鍵</summary>
+    <dl>
+      <div><dt><kbd>空白鍵</kbd></dt><dd>播放或暫停</dd></div>
+      <div><dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>前後 1 秒,加 <kbd>Shift</kbd> 為 5 秒</dd></div>
+      <div><dt><kbd>,</kbd> <kbd>.</kbd></dt><dd>字幕提前或延後 50 毫秒,加 <kbd>Shift</kbd> 為 500</dd></div>
+      <div><dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>選上一句或下一句</dd></div>
+      <div><dt><kbd>Enter</kbd></dt><dd>把選取的句子對到現在</dd></div>
+      <div><dt><kbd>A</kbd></dt><dd>自動對齊</dd></div>
+      <div><dt><kbd>N</kbd></dt><dd>聽下一個檢查點</dd></div>
+      <div><dt><kbd>O</kbd></dt><dd>按住看原始時間</dd></div>
+      <div><dt><kbd>Z</kbd></dt><dd>復原,加 <kbd>Shift</kbd> 為重做</dd></div>
+    </dl>
+  </details>
+
+
+</div>
+

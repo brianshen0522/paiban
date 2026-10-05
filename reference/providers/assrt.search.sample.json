@@ -1,0 +1,38 @@
+{
+  "status": 0,
+  "sub": {
+    "action": "search",
+    "keyword": "sample movie 2010",
+    "result": "succeed",
+    "subs": [
+      {
+        "id": 600001,
+        "native_name": "範例電影 / Sample Movie",
+        "videoname": "Sample.Movie.2010.BluRay.1080p.x264-GROUP",
+        "revision": 0,
+        "subtype": "Subrip(srt)",
+        "upload_time": "2015-04-10 20:13:00",
+        "vote_score": 0,
+        "release_site": "個人",
+        "lang": {
+          "desc": "繁 英 雙語",
+          "langlist": { "langcht": true, "langeng": true, "langdou": true }
+        }
+      },
+      {
+        "id": 600002,
+        "native_name": "范例电影 / Sample Movie",
+        "videoname": "Sample.Movie.2010.720p.BluRay.x264-OTHER",
+        "revision": 0,
+        "subtype": "ASS/SSA",
+        "upload_time": "2014-01-02 03:04:05",
+        "vote_score": 0,
+        "release_site": "字幕組",
+        "lang": {
+          "desc": "简",
+          "langlist": { "langchs": true }
+        }
+      }
+    ]
+  }
+}

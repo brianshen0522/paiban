@@ -1,0 +1,12 @@
+{
+  "name": "paiban-schema-reference",
+  "private": true,
+  "type": "module",
+  "description": "Loads schema.sql into an embedded PostgreSQL (PGlite) and checks the storage accounting. No server needed.",
+  "scripts": {
+    "test": "node --test schema.test.mjs"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "^0.5.8"
+  }
+}

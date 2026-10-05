@@ -1,0 +1,9 @@
+{
+  "name": "paiban-sync-core-reference",
+  "private": true,
+  "type": "module",
+  "description": "Reference implementation of the sync core with its tests. In phase 1 core.ts and its tests move into packages/shared (moved, not copied) and the tests are ported to the project test runner.",
+  "scripts": {
+    "test": "node --test core.test.ts"
+  }
+}

@@ -1,0 +1,23 @@
+# dependencies and build output
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+
+# secrets: only the example file belongs in the repository
+.env
+.env.*
+!.env.example
+
+# where the films, previews, subtitles and exports live when the site runs from this folder
+/data/
+/deploy/data/
+*.part
+
+# scratch space for the manual checks against real sources (docs/14-plan.md, phase 0):
+# downloaded subtitle archives and raw responses stay here and are never committed
+/.scratch/
+
+*.log
+.DS_Store

@@ -1,0 +1,25 @@
+{
+  "movie_results": [
+    {
+      "adult": false,
+      "backdrop_path": "/example-backdrop.jpg",
+      "id": 27205,
+      "title": "全面啟動",
+      "original_language": "en",
+      "original_title": "Inception",
+      "overview": "(zh-TW overview text)",
+      "poster_path": "/example-poster.jpg",
+      "media_type": "movie",
+      "genre_ids": [28, 878, 12],
+      "popularity": 0,
+      "release_date": "2010-07-15",
+      "video": false,
+      "vote_average": 0,
+      "vote_count": 0
+    }
+  ],
+  "person_results": [],
+  "tv_results": [],
+  "tv_episode_results": [],
+  "tv_season_results": []
+}

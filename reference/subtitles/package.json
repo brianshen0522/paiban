@@ -1,0 +1,13 @@
+{
+  "name": "paiban-subtitle-text-reference",
+  "private": true,
+  "type": "module",
+  "description": "Reference for turning a downloaded subtitle file into UTF-8 cues: encoding, Chinese script, ASS to plain text.",
+  "scripts": {
+    "test": "node --test text.test.mjs"
+  },
+  "dependencies": {
+    "iconv-lite": "^0.7.3",
+    "opencc-js": "^1.4.2"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "paiban-torrent-reference",
+  "private": true,
+  "type": "module",
+  "description": "Hermetic check of the WebTorrent behaviour the torrent worker relies on. No tracker, no DHT, no internet.",
+  "scripts": {
+    "test": "node local-swarm-test.mjs"
+  },
+  "dependencies": {
+    "webtorrent": "3.0.21"
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "status": true,
+  "subtitles": [
+    {
+      "release_name": "Sample.Movie.2010.1080p.BluRay.x264.YIFY",
+      "name": "SUBDL.com::sample-movie-2010-english.zip",
+      "lang": "english",
+      "author": "example_uploader",
+      "url": "/subtitle/1111111-2222222.zip",
+      "subtitlePage": "/subtitle/sd1111111/sample-movie/english/2222222",
+      "season": 0,
+      "episode": null,
+      "language": "EN",
+      "framerate": null,
+      "fps": null,
+      "hi": false,
+      "episode_from": null,
+      "episode_end": 0,
+      "full_season": false
+    },
+    {
+      "release_name": "Sample.Movie.2010.1080p.BluRay.x264.YIFY.cht",
+      "name": "SUBDL.com::sample-movie-2010-chinese.zip",
+      "lang": "chinese-bg-code",
+      "author": "another_uploader",
+      "url": "/subtitle/1111111-3333333.zip?api_key=PLACEHOLDER",
+      "subtitlePage": "/subtitle/sd1111111/sample-movie/chinese-bg-code/3333333",
+      "season": 0,
+      "episode": null,
+      "language": "ZH",
+      "framerate": null,
+      "fps": null,
+      "hi": false,
+      "episode_from": null,
+      "episode_end": 0,
+      "full_season": false
+    },
+    {
+      "release_name": "Sample.Movie.2010.720p.BrRip.x264.YIFY",
+      "name": "SUBDL.com::sample-movie-2010-big5.zip",
+      "lang": "big_5_code",
+      "author": "third_uploader",
+      "url": "/subtitle/1111111-4444444.zip",
+      "subtitlePage": "/subtitle/sd1111111/sample-movie/big_5_code/4444444",
+      "season": 0,
+      "episode": null,
+      "language": "ZH_BG",
+      "framerate": null,
+      "fps": null,
+      "hi": true,
+      "episode_from": null,
+      "episode_end": 0,
+      "full_season": false
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "status": 0,
+  "sub": {
+    "action": "detail",
+    "result": "succeed",
+    "subs": [
+      {
+        "id": 600001,
+        "filename": "Sample.Movie.2010.BluRay.1080p.x264-GROUP.rar",
+        "native_name": "範例電影 / Sample Movie",
+        "videoname": "Sample.Movie.2010.BluRay.1080p.x264-GROUP",
+        "title": "Sample Movie",
+        "size": 45678,
+        "subtype": "Subrip(srt)",
+        "upload_time": "2015-04-10 20:13:00",
+        "vote_score": 0,
+        "view_count": 123,
+        "down_count": 45,
+        "release_site": "個人",
+        "producer": { "producer": "", "verifier": "", "uploader": "example", "source": "" },
+        "lang": {
+          "desc": "繁 英 雙語",
+          "langlist": { "langcht": true, "langeng": true, "langdou": true }
+        },
+        "url": "https://file.example.invalid/download/600001/Sample.Movie.2010.rar?SIGNED-TEMPORARY-QUERY",
+        "filelist": [
+          {
+            "f": "Sample.Movie.2010.cht&eng.srt",
+            "s": "98KB",
+            "url": "https://file.example.invalid/onthefly/600001/-/1/Sample.Movie.2010.cht&eng.srt?SIGNED-TEMPORARY-QUERY"
+          },
+          {
+            "f": "Sample.Movie.2010.cht.srt",
+            "s": "61KB",
+            "url": "https://file.example.invalid/onthefly/600001/-/2/Sample.Movie.2010.cht.srt?SIGNED-TEMPORARY-QUERY"
+          }
+        ]
+      }
+    ]
+  }
+}

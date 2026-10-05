@@ -1,0 +1,23 @@
+{
+  "results": [
+    {
+      "id": 27205,
+      "media_type": "movie",
+      "title": "Inception",
+      "original_title": "Inception",
+      "release_date": "2010-07-15",
+      "poster_path": "/example-poster.jpg",
+      "overview": "(text)",
+      "vote_average": 0
+    },
+    {
+      "id": 99999,
+      "media_type": "tv",
+      "name": "Inception: A Series That Does Not Exist",
+      "first_air_date": "2019-01-01",
+      "poster_path": null,
+      "overview": "(text)",
+      "vote_average": 0
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+# Test material is compared byte for byte (encodings, BOMs, CRLF on purpose in some files):
+# never let git convert line endings in it.
+fixtures/** -text
+reference/providers/** -text
+
+# Scripts must keep LF even on a Windows checkout.
+*.sh text eol=lf

@@ -1,0 +1,103 @@
+{
+ "tool": "ffsubsync 0.5.1, speech cached from clip.mp4 with --vad webrtc",
+ "note": "A 92-second clip is too short for the speed search to be reliable on its own; see docs/08-media-pipeline.md.",
+ "results": {
+  "late.linear": {
+   "offset_seconds": [
+    -2.34
+   ],
+   "framerate_scale": [
+    0.999
+   ],
+   "segments": [],
+   "within_100ms": 26,
+   "within_250ms": 26,
+   "cues": 26,
+   "max_error_ms": 54
+  },
+  "late.split": {
+   "offset_seconds": [
+    -2.34
+   ],
+   "framerate_scale": [
+    0.999
+   ],
+   "segments": [
+    {
+     "cues": 26,
+     "offset_seconds": -2.65
+    }
+   ],
+   "within_100ms": 0,
+   "within_250ms": 26,
+   "cues": 26,
+   "max_error_ms": 250
+  },
+  "rate.linear": {
+   "offset_seconds": [
+    -0.78
+   ],
+   "framerate_scale": [
+    1.042
+   ],
+   "segments": [],
+   "within_100ms": 26,
+   "within_250ms": 26,
+   "cues": 26,
+   "max_error_ms": 50
+  },
+  "rate.split": {
+   "offset_seconds": [
+    -0.78
+   ],
+   "framerate_scale": [
+    1.042
+   ],
+   "segments": [
+    {
+     "cues": 26,
+     "offset_seconds": -1.08
+    }
+   ],
+   "within_100ms": 0,
+   "within_250ms": 26,
+   "cues": 26,
+   "max_error_ms": 247
+  },
+  "cut.linear": {
+   "offset_seconds": [
+    1.17
+   ],
+   "framerate_scale": [
+    0.999
+   ],
+   "segments": [],
+   "within_100ms": 13,
+   "within_250ms": 13,
+   "cues": 26,
+   "max_error_ms": 12104
+  },
+  "cut.split": {
+   "offset_seconds": [
+    1.17
+   ],
+   "framerate_scale": [
+    0.999
+   ],
+   "segments": [
+    {
+     "cues": 13,
+     "offset_seconds": 0.99
+    },
+    {
+     "cues": 13,
+     "offset_seconds": 13.02
+    }
+   ],
+   "within_100ms": 0,
+   "within_250ms": 24,
+   "cues": 26,
+   "max_error_ms": 254
+  }
+ }
+}

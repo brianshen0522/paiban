@@ -1,0 +1,73 @@
+{
+  "status": "ok",
+  "status_message": "Query was successful",
+  "data": {
+    "movie_count": 1,
+    "limit": 24,
+    "page_number": 1,
+    "movies": [
+      {
+        "id": 1001,
+        "url": "https://yts.example/movies/sample-movie-1968",
+        "imdb_code": "tt0000001",
+        "title": "Sample Movie",
+        "title_english": "Sample Movie",
+        "title_long": "Sample Movie (1968)",
+        "slug": "sample-movie-1968",
+        "year": 1968,
+        "rating": 7.8,
+        "runtime": 96,
+        "genres": ["Horror", "Thriller"],
+        "summary": "Illustrative text.",
+        "description_full": "Illustrative text.",
+        "synopsis": "Illustrative text.",
+        "yt_trailer_code": "",
+        "language": "en",
+        "mpa_rating": "",
+        "background_image": "https://yts.example/assets/images/movies/sample_movie_1968/background.jpg",
+        "background_image_original": "https://yts.example/assets/images/movies/sample_movie_1968/background.jpg",
+        "small_cover_image": "https://yts.example/assets/images/movies/sample_movie_1968/small-cover.jpg",
+        "medium_cover_image": "https://yts.example/assets/images/movies/sample_movie_1968/medium-cover.jpg",
+        "large_cover_image": "https://yts.example/assets/images/movies/sample_movie_1968/large-cover.jpg",
+        "state": "ok",
+        "torrents": [
+          {
+            "url": "https://yts.example/torrent/download/0123456789ABCDEF0123456789ABCDEF01234567",
+            "hash": "0123456789ABCDEF0123456789ABCDEF01234567",
+            "quality": "720p",
+            "type": "bluray",
+            "is_repack": "0",
+            "video_codec": "x264",
+            "bit_depth": "8",
+            "audio_channels": "2.0",
+            "seeds": 412,
+            "peers": 38,
+            "size": "881.3 MB",
+            "size_bytes": 924110029,
+            "date_uploaded": "2020-01-02 03:04:05",
+            "date_uploaded_unix": 1577934245
+          },
+          {
+            "url": "https://yts.example/torrent/download/89ABCDEF0123456789ABCDEF0123456789ABCDEF",
+            "hash": "89ABCDEF0123456789ABCDEF0123456789ABCDEF",
+            "quality": "2160p",
+            "type": "bluray",
+            "is_repack": "0",
+            "video_codec": "x265",
+            "bit_depth": "10",
+            "audio_channels": "5.1",
+            "seeds": 188,
+            "peers": 24,
+            "size": "5.9 GB",
+            "size_bytes": 6335076761,
+            "date_uploaded": "2021-02-03 04:05:06",
+            "date_uploaded_unix": 1612325106
+          }
+        ],
+        "date_uploaded": "2020-01-02 03:04:05",
+        "date_uploaded_unix": 1577934245
+      }
+    ]
+  },
+  "@meta": { "server_time": 1790000000, "server_timezone": "CET", "api_version": 2, "execution_time": "0 ms" }
+}

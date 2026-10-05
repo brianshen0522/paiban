@@ -1,0 +1,49 @@
+<!-- Reduced sketch, not a captured page. What was verified on 2026-10-04:
+     - {base}/movie-imdb/{imdb id} is server-rendered and holds one table of subtitles
+     - its columns are: Rating, Language, Release, Uploader, Download
+     - each row links to /subtitles/{slug}
+     - the detail page has an <a id="btn-download-subtitle"> whose data-link attribute is the
+       base64 of the zip URL (https://subtitles.yts-subs.com/subtitles/{slug}.zip)
+     Class names and wrappers below are placeholders: select by structure, not by class. -->
+
+<!-- 1. movie page: GET {base}/movie-imdb/tt0000001 -->
+<table>
+  <thead>
+    <tr><th>Rating</th><th>Language</th><th>Release</th><th>Uploader</th><th>Download</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>12</td>
+      <td>English</td>
+      <td><a href="/subtitles/sample-movie-2010-english-yify-11111">Sample Movie 2010 1080p BluRay x264 [YTS.AG]</a></td>
+      <td><a href="/user/example">example</a></td>
+      <td><a href="/subtitles/sample-movie-2010-english-yify-11111">download</a></td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>Chinese</td>
+      <td><a href="/subtitles/sample-movie-2010-chinese-yify-22222">Sample Movie 2010 720p BrRip x264 YIFY</a></td>
+      <td><a href="/user/someone">someone</a></td>
+      <td><a href="/subtitles/sample-movie-2010-chinese-yify-22222">download</a></td>
+    </tr>
+    <tr>
+      <td>1</td>
+      <td>Big 5 code</td>
+      <td><a href="/subtitles/sample-movie-2010-big-5-code-yify-33333">Sample Movie 2010 1080p BrRip x264 YIFY</a></td>
+      <td><a href="/user/geo">geo</a></td>
+      <td><a href="/subtitles/sample-movie-2010-big-5-code-yify-33333">download</a></td>
+    </tr>
+    <tr>
+      <td>0</td>
+      <td>Chinese BG code</td>
+      <td><a href="/subtitles/sample-movie-2010-chinese-bg-code-yify-44444">Sample Movie 2010 BluRay 720p x264-CHD</a></td>
+      <td><a href="/user/lin">lin</a></td>
+      <td><a href="/subtitles/sample-movie-2010-chinese-bg-code-yify-44444">download</a></td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- 2. detail page: GET {base}/subtitles/sample-movie-2010-english-yify-11111
+     atob(data-link) === "https://subtitles.yts-subs.com/subtitles/sample-movie-2010-english-yify-11111.zip" -->
+<a id="btn-download-subtitle" href="#"
+   data-link="aHR0cHM6Ly9zdWJ0aXRsZXMueXRzLXN1YnMuY29tL3N1YnRpdGxlcy9zYW1wbGUtbW92aWUtMjAxMC1lbmdsaXNoLXlpZnktMTExMTEuemlw">Download subtitle</a>
