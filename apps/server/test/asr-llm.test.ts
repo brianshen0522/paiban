@@ -113,6 +113,26 @@ describe('asking the language model from the api', () => {
     expect(asked).toBe(0);
   });
 
+  it('never writes the key to the log, whether the model answers or refuses it', async () => {
+    const lines: string[] = [];
+    const captured = pino({ level: 'debug' }, { write: (l: string) => void lines.push(l) });
+    await configure('openai');
+    const { nonce, ciphertext } = sealSecret(config.secretKey, 'llmKey', 'test-key-not-real');
+    await pool.query('insert into secrets (name, nonce, ciphertext) values ($1, $2, $3)', [
+      'llmKey',
+      nonce,
+      ciphertext,
+    ]);
+    await llmHeard({ pool, config, log: captured }, mediaId, cues, 'fr');
+    status = 401;
+    await llmHeard({ pool, config, log: captured }, mediaId, cues, 'fr');
+    expect(lines.length).toBeGreaterThanOrEqual(2);
+    for (const l of lines) {
+      expect(l).not.toContain('test-key-not-real');
+      expect(l).not.toContain('Bonjour');
+    }
+  });
+
   it('does nothing for a film without recognition', async () => {
     await configure('openai');
     expect(await llmHeard({ pool, config, log }, '00000000-0000-4000-8000-000000000002', cues, 'fr')).toBeNull();

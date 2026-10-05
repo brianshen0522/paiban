@@ -120,6 +120,32 @@ export function extractJson(text: string): unknown {
   }
 }
 
+/** A pairing answer is a few kilobytes; anything near this is not one. */
+const MAX_ANSWER_BYTES = 1024 * 1024;
+
+/** The body as JSON, or null when it is not JSON or grows past `cap` bytes. */
+async function readCapped(res: Response, cap: number): Promise<unknown> {
+  const reader = res.body?.getReader();
+  if (!reader) return null;
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > cap) {
+      await reader.cancel();
+      throw new LlmError('BAD_RESPONSE', 'the answer is too large');
+    }
+    chunks.push(value);
+  }
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Any server that speaks the OpenAI chat-completions protocol: Qwen through DashScope, a local
  * Ollama or vLLM, and so on. The administrator sets the address, so it may be on the local
@@ -151,6 +177,8 @@ export function openAiCompatibleMatcher(
           ],
         }),
         signal: AbortSignal.any([AbortSignal.timeout(timeoutMs), ...(signal ? [signal] : [])]),
+        // An API answers where it was asked; a redirect is not followed with the key attached.
+        redirect: 'manual',
       });
     } catch (err) {
       if (err instanceof DOMException && err.name === 'TimeoutError')
@@ -160,7 +188,7 @@ export function openAiCompatibleMatcher(
     if (res.status === 401 || res.status === 403) throw new LlmError('AUTH', 'the key was refused');
     if (res.status === 429) throw new LlmError('RATE_LIMITED', 'rate limited');
     if (!res.ok) throw new LlmError('BAD_RESPONSE', `HTTP ${res.status}`);
-    const parsed = ChatResponse.safeParse(await res.json().catch(() => null));
+    const parsed = ChatResponse.safeParse(await readCapped(res, MAX_ANSWER_BYTES));
     if (!parsed.success) throw new LlmError('BAD_RESPONSE', 'unexpected response shape');
     const answer = Matches.safeParse(extractJson(parsed.data.choices[0].message.content ?? ''));
     if (!answer.success) throw new LlmError('BAD_RESPONSE', 'the answer does not follow the format');
