@@ -46,6 +46,8 @@ const stopHeartbeat = startHeartbeat(pool, 'api');
 
 await app.listen({ host: '0.0.0.0', port: config.port });
 log.info({ port: config.port }, 'api listening');
+// Subtitle searches and downloads left unfinished by the previous run continue (docs/07, "誰做哪一步").
+await app.subtitleWorker.start();
 
 for (const signal of ['SIGTERM', 'SIGINT'] as const) {
   process.once(signal, () => {

@@ -1,4 +1,6 @@
 import cookie from '@fastify/cookie';
+import multipart from '@fastify/multipart';
+import { UPLOAD_MAX_BYTES } from '@paiban/shared';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { overviewRoutes } from './admin/overview-routes.js';
 import { storageDeleteRoutes } from './admin/storage-delete-routes.js';
@@ -16,6 +18,7 @@ import { notificationRoutes } from './notifications/routes.js';
 import { settingsRoutes } from './settings/routes.js';
 import { secretRoutes } from './settings/secrets.js';
 import { storageRoutes } from './storage/routes.js';
+import { subtitleRoutes } from './subtitles/routes.js';
 import { torrentRoutes } from './torrents/routes.js';
 import { ytsRoutes } from './yts/routes.js';
 
@@ -33,6 +36,8 @@ export function buildApp(deps: Deps): FastifyInstance {
     bodyLimit: 1024 * 1024,
   });
   app.register(cookie);
+  // Subtitle uploads only (docs/07, "上傳"): one file, 20 MB.
+  app.register(multipart, { limits: { fileSize: UPLOAD_MAX_BYTES, files: 1, fields: 5, parts: 6 } });
   // A write without a body may still say application/json (docs/04-api.md: no Content-Type is
   // required then); treat an empty body as no body instead of failing.
   app.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body, done) => {
@@ -111,6 +116,7 @@ export function buildApp(deps: Deps): FastifyInstance {
   ytsRoutes(app, deps);
   torrentRoutes(app, deps);
   storageRoutes(app, deps);
+  subtitleRoutes(app, deps);
   libraryRoutes(app, deps);
   notificationRoutes(app, deps);
   settingsRoutes(app, deps);

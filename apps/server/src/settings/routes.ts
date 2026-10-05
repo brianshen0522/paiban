@@ -7,8 +7,10 @@ import type { Deps } from '../http/context.js';
 import { ApiError } from '../http/errors.js';
 import { parse, requireAdmin } from '../http/guards.js';
 import { diskInfo } from '../storage/usage.js';
+import { testSubtitleSource } from '../subtitles/providers/index.js';
 import { YtsClient } from '../yts/client.js';
 import { readSourceHealth, recordSourceHealth } from './health.js';
+import { readSecret } from './secrets.js';
 import { readSettings, validatePatch, writeSettings } from './settings.js';
 
 export async function settingsInfo(deps: Deps): Promise<SettingsInfo> {
@@ -65,11 +67,30 @@ export function settingsRoutes(app: FastifyInstance, deps: Deps): void {
 
   app.post('/api/admin/sources/:id/test', async (req) => {
     requireAdmin(req);
-    const { id } = parse(z.object({ id: z.enum(['yts']) }), req.params);
-    const result = await testSource(deps, id);
+    const { id } = parse(
+      z.object({ id: z.enum(['yts', 'tmdb', 'justsubtitles', 'subdl', 'yify', 'assrt']) }),
+      req.params,
+    );
+    const result = id === 'yts' ? await testSource(deps, id) : await testSubtitle(deps, id);
     deps.events.toAdmins({ type: 'admin', what: 'sources' });
     return result;
   });
+}
+
+/** A subtitle source or TMDB, tried once (docs/07-subtitle-providers.md, each source's "測試連線"). */
+async function testSubtitle(
+  deps: Deps,
+  id: 'tmdb' | 'justsubtitles' | 'subdl' | 'yify' | 'assrt',
+): Promise<SourceCheck> {
+  const settings = await readSettings(deps.pool);
+  const r = await testSubtitleSource(
+    { pool: deps.pool, outbound: deps.outbound, log: deps.log, secret: (name) => readSecret(deps, name) },
+    settings,
+    id,
+  );
+  const state = r.ok ? 'ok' : r.code === 'NOT_CONFIGURED' || r.code === 'RATE_LIMITED' ? 'warn' : 'down';
+  await recordSourceHealth(deps.pool, id, state, r.code, r.data);
+  return r;
 }
 
 /** Tries a source once. Always a result, never an error of the endpoint (docs/13-settings.md). */

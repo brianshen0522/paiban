@@ -36,6 +36,8 @@ export async function removeDownloadFiles(
     ...d.mediaIds.map((id) => under(dataDir, 'media', id)),
     ...d.subtitleIds.map((id) => under(dataDir, 'subtitles', id)),
     ...d.candidateIds.map((id) => under(dataDir, 'subtitles', 'candidates', id)),
+    // An upload or a download still waiting to be processed: its staging folder goes with it.
+    ...d.candidateIds.map((id) => under(dataDir, 'tmp', 'uploads', id)),
   ];
   for (const dir of dirs) await rm(dir, { recursive: true, force: true });
   log.info({ infoHash: d.infoHash, folders: dirs.length }, 'download removed (requested by a person)');
@@ -74,6 +76,22 @@ export async function removeOrphanFolder(
   const path = root === 'candidates' ? under(dataDir, 'subtitles', 'candidates', name) : under(dataDir, root, name);
   await rm(path, { recursive: true, force: true });
   log.info({ root, name }, 'orphan folder removed (requested by an administrator)');
+}
+
+/**
+ * A holder removed a candidate subtitle (docs/04-api.md, `DELETE /api/candidates/:id`): what was
+ * fetched for it, and the upload or download still waiting to be processed.
+ */
+export async function removeCandidateFiles(dataDir: string, candidateId: string, log: Logger): Promise<void> {
+  await rm(under(dataDir, 'subtitles', 'candidates', candidateId), { recursive: true, force: true });
+  await rm(under(dataDir, 'tmp', 'uploads', candidateId), { recursive: true, force: true });
+  log.info({ candidateId }, 'candidate removed (requested by a person)');
+}
+
+/** A holder removed a subtitle and its sync result (`DELETE /api/subtitles/:id`). */
+export async function removeSubtitleFiles(dataDir: string, subtitleId: string, log: Logger): Promise<void> {
+  await rm(under(dataDir, 'subtitles', subtitleId), { recursive: true, force: true });
+  log.info({ subtitleId }, 'subtitle removed (requested by a person)');
 }
 
 /* ---------------------------------------------------------------- scratch (docs/10-storage.md, "哪些清理不算自動刪除") */
@@ -138,4 +156,27 @@ export async function removeOwnMediaOutput(dataDir: string, mediaId: string, fil
     if (!allowed.has(f)) throw new Error(`not a media output: ${f}`);
     await rm(under(dataDir, 'media', mediaId, f), { force: true });
   }
+}
+
+/**
+ * A subtitle or candidate folder that a job (or the api's "add") just moved into place, when its
+ * final conditional write found the film being removed, the row gone, or the same subtitle added
+ * by someone else meanwhile (docs/03-data-model.md, "刪除一個下載時發生的事"; docs/07, "加入" step 6).
+ */
+export async function removeOwnSubtitleOutput(
+  dataDir: string,
+  kind: 'subtitle' | 'candidate',
+  id: string,
+): Promise<void> {
+  const dir = kind === 'subtitle' ? under(dataDir, 'subtitles', id) : under(dataDir, 'subtitles', 'candidates', id);
+  await rm(dir, { recursive: true, force: true });
+}
+
+/**
+ * An upload or download waiting under /data/tmp/uploads, when the job that uses it ends, or when
+ * the request that wrote it found nothing to do with it (the same file again). `name` is the
+ * candidate id or the request's own temporary name.
+ */
+export async function removeStaging(dataDir: string, name: string): Promise<void> {
+  await rm(under(dataDir, 'tmp', 'uploads', name), { recursive: true, force: true });
 }

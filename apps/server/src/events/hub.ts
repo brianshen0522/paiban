@@ -8,6 +8,25 @@ type Client = { userId: string; admin: boolean; write: (chunk: string) => void }
 
 export class EventHub {
   private readonly clients = new Set<Client>();
+  private readonly taskWaiters = new Map<string, Set<() => void>>();
+
+  /** Calls `fn` when another service announces that task `id` changed (NOTIFY {type: 'task', id}). */
+  onTask(id: string, fn: () => void): () => void {
+    let set = this.taskWaiters.get(id);
+    if (!set) {
+      set = new Set();
+      this.taskWaiters.set(id, set);
+    }
+    set.add(fn);
+    return () => {
+      set.delete(fn);
+      if (set.size === 0) this.taskWaiters.delete(id);
+    };
+  }
+
+  taskChanged(id: string): void {
+    for (const fn of [...(this.taskWaiters.get(id) ?? [])]) fn();
+  }
 
   add(client: Client): () => void {
     this.clients.add(client);

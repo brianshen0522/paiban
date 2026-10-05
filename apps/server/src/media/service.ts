@@ -2,6 +2,15 @@ import { many, one } from '../db/pool.js';
 import { cleanScratchOnStart } from '../storage/remove.js';
 import { versionLabel } from '../torrents/view.js';
 import { analysisJob, type JobDeps, MEDIA_ROW, type MediaRow, previewJob, probeJob, rescanJob } from './jobs.js';
+import {
+  alignJob,
+  cleanStagingOnStart,
+  failStuckFetches,
+  ingestJob,
+  isStaged,
+  rankJob,
+  settleRanks,
+} from './subtitle-jobs.js';
 
 /**
  * The media service's scheduling (docs/02-architecture.md "服務之間怎麼溝通", docs/08 "對帳").
@@ -9,7 +18,8 @@ import { analysisJob, type JobDeps, MEDIA_ROW, type MediaRow, previewJob, probeJ
  * a job claims its row with a conditional update, so running it twice does it once. Each kind of
  * work runs one at a time, so a long transcode never blocks analysis or a recalculation.
  */
-type Queue = 'analyze' | 'preview' | 'rescan';
+type Queue = 'analyze' | 'preview' | 'rescan' | 'ingest' | 'rank' | 'align';
+const QUEUES: Queue[] = ['analyze', 'preview', 'rescan', 'ingest', 'rank', 'align'];
 
 export class MediaService {
   private readonly d: JobDeps;
@@ -27,6 +37,7 @@ export class MediaService {
   async start(): Promise<void> {
     const { pool, config, log } = this.d;
     await cleanScratchOnStart(config.dataDir, log);
+    await cleanStagingOnStart(this.d);
     await pool.query(
       `update media_files set probe_state = case when probe_state = 'running' then 'pending' else probe_state end,
               analysis_state = case when analysis_state = 'running' then 'pending' else analysis_state end,
@@ -85,7 +96,10 @@ export class MediaService {
                            where mf.id::text = tasks.input->>'mediaId' and t.want <> 'remove')`,
     );
     if (need.length) await pool.query(`select pg_notify('paiban_events', '{"type":"task"}')`);
-    for (const q of ['analyze', 'preview', 'rescan'] as const) this.kick(q);
+    // Subtitles: rankings whose candidates changed, candidates stuck while fetching (docs/08, "對帳" items 2 and 3).
+    await settleRanks(pool);
+    await failStuckFetches(pool);
+    for (const q of QUEUES) this.kick(q);
   }
 
   kick(q: Queue): void {
@@ -104,6 +118,7 @@ export class MediaService {
   }
 
   private async drain(q: Queue): Promise<void> {
+    const tried = new Set<string>();
     for (;;) {
       if (this.stopping) return;
       const did =
@@ -111,9 +126,60 @@ export class MediaService {
           ? await this.nextRescan()
           : q === 'analyze'
             ? await this.nextAnalysis()
-            : await this.nextPreview();
+            : q === 'preview'
+              ? await this.nextPreview()
+              : q === 'ingest'
+                ? await this.nextIngest(tried)
+                : q === 'rank'
+                  ? await this.nextRank(tried)
+                  : await this.nextAlign();
       if (!did) return;
     }
+  }
+
+  /** An upload or a download the api staged (docs/07, "subtitle.ingest" and the processing half of "subtitle.fetch"). */
+  private async nextIngest(tried: Set<string>): Promise<boolean> {
+    const rows = await many<{ id: string }>(
+      this.d.pool,
+      `select c.id from subtitle_candidates c join torrents t on t.id = c.torrent_id
+        where c.fetch_state = 'fetching' and t.want <> 'remove' order by c.fetch_started_at`,
+    );
+    for (const r of rows) {
+      if (tried.has(r.id)) continue;
+      tried.add(r.id);
+      if (!(await isStaged(this.d.config.dataDir, r.id))) continue;
+      await ingestJob(this.d, r.id);
+      this.kick('rank');
+      return true;
+    }
+    return false;
+  }
+
+  /** A fetched candidate waiting in an unfinished ranking run. */
+  private async nextRank(tried: Set<string>): Promise<boolean> {
+    const r = await one<{ id: string }>(
+      this.d.pool,
+      `select c.id from subtitle_candidates c join torrents t on t.id = c.torrent_id
+        where c.align_state = 'queued' and c.fetch_state = 'ready' and t.want <> 'remove' and not (c.id = any($1::uuid[]))
+          and exists (select 1 from tasks k where k.kind = 'rank' and k.torrent_id = c.torrent_id and k.state in ('queued', 'running')
+                        and k.input->'candidateIds' ? c.id::text)
+        order by c.created_at limit 1`,
+      [[...tried]],
+    );
+    if (!r) return false;
+    tried.add(r.id);
+    await rankJob(this.d, r.id);
+    return true;
+  }
+
+  private async nextAlign(): Promise<boolean> {
+    const t = await one<{ id: string }>(
+      this.d.pool,
+      `select id from tasks where kind = 'align' and state = 'queued' order by created_at limit 1`,
+    );
+    if (!t) return false;
+    await alignJob(this.d, t.id);
+    return true;
   }
 
   private cool(id: string): boolean {

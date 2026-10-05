@@ -70,7 +70,8 @@ export async function testApp(pool: Pool, over: Partial<Config> = {}): Promise<T
   const deps: Deps = {
     pool,
     config: testConfig({ dataDir, ...over }),
-    log: pino({ level: 'silent' }),
+    // TEST_LOG=debug shows the app's log while debugging a test.
+    log: pino({ level: process.env.TEST_LOG ?? 'silent' }),
     events: new EventHub(),
     disk: async () => ({ ...disk }),
     outbound: { allowLocal: over.allowLocalSources ?? true, overrides: over.sourceOverrides ?? {} },

@@ -2,7 +2,7 @@ import pg from 'pg';
 import type { Logger } from 'pino';
 import type { Pool } from '../db/pool.js';
 import type { EventHub } from './hub.js';
-import { publishNotification, publishTorrent, publishUsage } from './publish.js';
+import { publishCandidates, publishNotification, publishTorrent, publishUsage } from './publish.js';
 
 /**
  * LISTEN paiban_events on a dedicated connection (not one borrowed from the pool) and turn the
@@ -25,8 +25,11 @@ export function listenForEvents(databaseUrl: string, pool: Pool, hub: EventHub, 
       else if (msg.type === 'torrent.removed' && msg.id) hub.toAll({ type: 'torrent.removed', id: msg.id });
       else if (msg.type === 'usage') await publishUsage(pool, hub);
       else if (msg.type === 'notification' && msg.id) await publishNotification(pool, hub, Number(msg.id));
-      else if (msg.type === 'task') hub.toAdmins({ type: 'admin', what: 'tasks' });
-      else if (msg.type === 'storage') {
+      else if (msg.type === 'candidates' && msg.id) await publishCandidates(pool, hub, msg.id);
+      else if (msg.type === 'task') {
+        if (msg.id) hub.taskChanged(msg.id);
+        hub.toAdmins({ type: 'admin', what: 'tasks' });
+      } else if (msg.type === 'storage') {
         hub.toAdmins({ type: 'admin', what: 'storage' });
         await publishUsage(pool, hub);
       }
