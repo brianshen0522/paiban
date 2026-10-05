@@ -159,7 +159,7 @@ paiban/
 | 編碼轉換 | iconv-lite | 0.7 | |
 | 繁簡轉換 | opencc-js | 1.4 | |
 | 字幕解析 | subsrt-ts、ass-compiler | 2.1 / 0.1 | 或同等的函式庫；`reference/subtitles/` 有最小可行的 ASS 轉換 |
-| 影音處理 | ffmpeg | 6 以上 | 指令在 6.1.1 上實測 |
+| 影音處理 | ffmpeg | 6 以上 | 指令在 6.1.1 上實測。映像檔（Debian trixie）帶的是 7.1.5，階段 0 在上面重跑全部參考指令，結果和 6.1.1 完全相同（分析的輸出逐位元組相同） |
 | 人聲偵測與對齊 | ffsubsync | **0.5.1** | Python 3.11 到 3.13，裝在獨立的虛擬環境 |
 | 前端框架 | React | 19 | |
 | 建置 | Vite | 8 | |

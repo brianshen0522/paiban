@@ -63,7 +63,7 @@ direct_play =
 ```
 
 - ffprobe 對 MP4 回的 `format_name` 是 `mov,mp4,m4a,3gp,3g2,mj2`。對 MKV 和 WebM 回的是同一個值（`matroska,webm`），所以 WebM 要另外看副檔名是不是 `.webm`。MKV 一律不算能直接播。
-- WebM 這一條主要是為了測試：Playwright 內建的 Chromium 不能解碼 H.264，端對端測試用 `fixtures/clip.webm`。YTS 不發 WebM，正式環境幾乎遇不到。
+- WebM 這一條主要是為了測試：端對端測試用 `fixtures/clip.webm`，這樣不依賴測試用的瀏覽器能不能解 H.264（交接時的 Playwright Chromium 不能；階段 0 用的 Playwright 1.63 可以，見 15-testing.md）。YTS 不發 WebM，正式環境幾乎遇不到。
 - 判定寫成一個函式，之後要調整（例如某些瀏覽器播不了 5.1 聲道的 AAC）只改一個地方。
 
 預測和實際不同時：

@@ -81,7 +81,7 @@
 - `pipeline/`：ffmpeg 和 ffsubsync 的指令。指令的每個選項都有理由（寫在 `docs/08-media-pipeline.md`），不要隨意增減。
 - `subtitles/text.mjs`：編碼、語言判斷、ASS 轉換。改寫成 TypeScript，測試一起搬。
 - `torrent/local-swarm-test.mjs`：WebTorrent 的用法和離線測試的做法。
-- `providers/`：各來源回應的形狀。**值是手寫的示意**，階段 0 要用真實回應換掉。
+- `providers/`：各來源回應的形狀。JustSubtitles 和 YIFY 的是階段 0 錄下來的真實回應；YTS、TMDB、射手網的仍是**手寫的示意**，拿到網址或金鑰後用 `scripts/phase0/check-sources.mjs` 換掉（哪個是哪個見它的 README）。
 
 `contracts/api.ts` 和 `db/schema.sql` 是合約。要改可以，但要連同對應的文件一起改，並記在 `docs/changes.md`。階段 1 之後，合約的位置和 `db/schema.sql` 的角色會變（見 `docs/14-plan.md` 的階段 1）；到時候把這一節和上面的優先順序改成新的路徑。
 
@@ -89,9 +89,22 @@
 
 隨著專案長出來，把實際的指令填在這裡，並保持更新。階段 0 結束時至少有安裝、型別檢查、lint、測試、建置映像檔；端對端測試和本機開發的指令在它們做出來的那個階段補上。
 
+需要 Node.js 24、pnpm 12、Docker（含 Compose v2）。
+
+```bash
+pnpm install                                         # 安裝
+pnpm typecheck                                       # 型別檢查(TypeScript 7,strict)
+pnpm lint                                            # Biome:lint + 格式檢查;pnpm format 會直接修正
+pnpm test                                            # 各套件的 Vitest
+pnpm build                                           # 建置 shared、server、web
+
+mkdir -p deploy/data                                 # 第一次:先建資料夾,否則 Docker 會用 root 建立
+docker compose -f deploy/docker-compose.yml build    # 建置映像檔(paiban-server、paiban-proxy)
+docker compose -f deploy/docker-compose.yml up -d    # 起五個容器;網址是 deploy/.env 的 PUBLIC_URL
+scripts/phase0/reference-in-image.sh                 # 在映像檔裡跑全部參考測試與 pipeline 比對
 ```
-(還沒有:專案的骨架在階段 0 建立)
-```
+
+階段 0 的手動檢查（不進自動化測試，會連外部網路）在 `scripts/phase0/`，每支檔案開頭有用法：`check-sources.mjs`（真實的字幕來源）、`real-swarm.mjs`（真實的 BitTorrent 下載，Blender 開放電影）、`real-film.sh`（真實電影的對齊）、`make-archives.sh` / `check-archives.sh`（壓縮檔）、`playback/`（瀏覽器播放測試頁）。
 
 現在就能跑的（確認參考程式在你的環境正常）：
 

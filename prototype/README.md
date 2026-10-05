@@ -58,7 +58,7 @@ python3 build.py --webm    # 產生 preview_webm.html,給自動化檢查用
 node e2e.cjs               # 需要 playwright 套件和它的 Chromium
 ```
 
-自動化檢查用 WebM 版的影片，因為 Playwright 內建的 Chromium 不能解碼 H.264。跑完會重新產生 `screenshots/`。
+自動化檢查用 WebM 版的影片，因為交接時的 Playwright Chromium 不能解碼 H.264（Playwright 1.63 的可以，見 `docs/15-testing.md`）。跑完會重新產生 `screenshots/`。
 
 ## 原型和正式版不同的地方
 

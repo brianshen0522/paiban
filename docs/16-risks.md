@@ -25,9 +25,28 @@
 | JustSubtitles 介面、YIFY Subtitles 頁面結構 | 2026-10-04 用瀏覽器實際查看，見 [07-subtitle-providers.md](07-subtitle-providers.md) 的最後一節 |
 | 套件版本 | 2026-10-04 的 npm registry |
 
+## 階段 0 之後的狀態（2026-10-05）
+
+下面「還沒驗證的」每一項，階段 0 做了什麼、結論是什麼。細節和數字在 [reports/phase-0.md](reports/phase-0.md)。環境是開發機（Debian 13、x86-64、8 核心、32 GB）；部署的機器是不是同一台還不知道。
+
+| # | 項目 | 狀態 |
+| --- | --- | --- |
+| 1 | 真實電影的人聲偵測與自動對齊 | **部分不成立。** *Tears of Steel*：ffsubsync 單一位移很準（0.034 秒內），但對齊核心的分段模式產生假斷點、而且被選中；剪輯不同的情境兩種方法都失敗。*Sintel*（配樂重）：webrtc 偵測抓不到對白，全部失敗。silero 試過，和 ffsubsync 0.5.1 不相容。階段 6 要調整 |
+| 2 | 從伺服器連到各個來源 | JustSubtitles、YIFY 確認可以，形狀和文件相符（兩處小差異已改）。TMDB、射手網、SubDL 沒有金鑰，YTS 沒有網址：**還沒確認** |
+| 3 | 映像檔沒有建置過 | **確認。** 建置成功、五個容器起得來；改了幾處（`docs/changes.md`） |
+| 4 | RAR 解壓縮 | **確認**（RAR5、7z、zip）。RAR4 沒有樣本可測 |
+| 5 | ARM | 沒有 ARM 的機器，**沒有確認** |
+| 6 | 目標機器的效能 | 開發機上：12 分鐘的片分析 13 秒、15 分鐘的 18 秒；ffsubsync 兩次約 2 秒（交接時是 0.7 秒）。部署機器待量 |
+| 7 | 瀏覽器直接播放 | Playwright 的 Chromium 確認可以（立體聲和 5.1、`moov` 在檔尾、能拖動）。Chrome、Firefox、Safari 要請 Brian 開測試頁 |
+| 8 | WebTorrent 在真實環境 | **確認**（短時間）：Docker bridge 裡 DHT、uTP、tracker 都正常，暫停接續、強制終止後重新驗證都對。長時間和大檔案還沒有 |
+| 9 | 憑記憶寫的細節 | tracker 清單：兩個已失效，已改。JustSubtitles 片名搜尋的外層欄位：已補。YTS 類型參數、射手網 `langlist`：還沒確認 |
+| 10 | 工具鏈 | TypeScript 7.0.2、Vite 8、Vitest 5、Biome 2 在骨架上相容。`docker compose run` 的指令跑過了（`scripts/phase0/reference-in-image.sh`）。Drizzle、pg-boss 階段 1 才會碰到 |
+| 13 | 相依套件的安全通報 | 現況不變：webtorrent 仍是 3.0.21，`ip` 2.0.1 的通報沒有修正版 |
+| 14 | 分數的門檻 | 正確字幕在 *Tears of Steel* 是 67%，三成的句子低於 50%：門檻偏高，階段 6 調整 |
+
 ## 還沒驗證的
 
-依「出錯的話影響多大」排序。每一項都寫了在哪個階段確認、不成立時怎麼辦。
+依「出錯的話影響多大」排序。這一節是交接時的原文；現在的狀態看上一節。每一項都寫了在哪個階段確認、不成立時怎麼辦。
 
 ### 1. 真實電影上的人聲偵測與自動對齊
 

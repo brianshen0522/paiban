@@ -123,16 +123,16 @@ needBytes    = size_bytes + previewBytes
 magnet:?xt=urn:btih:<小寫 hash>&dn=<片名+年份+畫質,URL 編碼>&tr=<tracker 1>&tr=<tracker 2>…
 ```
 
-tracker 清單是設定 `downloads.trackers`。預設值請取自 YTS API 文件當時列出的清單；下面這幾個是憑記憶寫的常見公開 tracker，實作時要確認還活著：
+tracker 清單是設定 `downloads.trackers`。預設值請取自 YTS API 文件當時列出的清單（拿到 YTS 網址後確認）。在那之前用下面兩個，它們在 2026-10-05 的階段 0 實測（`scripts/phase0/real-swarm.mjs`）有回應：
 
 ```
 udp://tracker.opentrackr.org:1337/announce
 udp://open.demonii.com:1337/announce
-udp://tracker.openbittorrent.com:80
-udp://p4p.arenabg.com:1337
 ```
 
-DHT 是開著的，所以 tracker 全部失效時通常還是找得到 peers，只是比較慢。
+原本憑記憶寫的另外兩個已經不能用：`udp://tracker.openbittorrent.com:80` 查不到網域（`ENOTFOUND`），`udp://p4p.arenabg.com:1337` 逾時。
+
+DHT 是開著的，所以 tracker 全部失效時通常還是找得到 peers，只是比較慢。階段 0 在 Docker bridge 網路裡實測：DHT 和 uTP 都正常，加入後 4 到 8 秒拿到種子資訊。
 
 ## 快取
 

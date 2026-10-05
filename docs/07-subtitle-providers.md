@@ -123,7 +123,7 @@ GET https://www.justsubtitles.com/api/subtitles/<TMDB 編號>?lang=<語言代碼
 | 編號**只認 TMDB 編號**。給 IMDb 編號會回 0 筆 | 要先把 IMDb 編號換成 TMDB 編號，見下一小節 |
 | `lang` 一次一種：`EN`、`ZH`、`ZH_BG` | 每種語言一個請求 |
 | 每種語言最多回 30 筆，`page` 參數沒有作用 | 拿不到第 31 筆以後的。熱門片的英文字幕會被截斷 |
-| 編號不存在時回 **HTTP 500**，內容是 `{"status":false,"subtitles":[]}` | 這種 500 當成「沒有結果」，不是錯誤。判斷方式：內容是 JSON 而且 `status` 是 false |
+| 編號不存在時，內容是 `{"status":false,"subtitles":[]}`。2026-10-04 用瀏覽器看到的是 **HTTP 500**，2026-10-05 階段 0 從伺服器端查到的是 **HTTP 200** | 兩種都當成「沒有結果」，不是錯誤。判斷方式看內容不看狀態碼：回應是 JSON 而且 `status` 是 false（狀態碼是 200 或 500 都一樣） |
 | 回應帶 `cache-control: public, max-age=86400` | 我們也快取 24 小時 |
 | 不是瀏覽器發的請求也會回應；robots.txt 沒有限制 | |
 
@@ -135,7 +135,9 @@ GET https://www.justsubtitles.com/api/subtitles/<TMDB 編號>?lang=<語言代碼
 | 繁體中文 | `ZH_BG` 和 `ZH` 都查 | `big_5_code`；`chinese-bg-code` |
 | 簡體中文 | `ZH` | `chinese-bg-code` |
 
-`ZH_BG` 是 SubDL 的「Big 5 code」，名義上是繁體；`ZH` 是「Chinese BG code」，名義上是簡體。以 *Inception* 為例查到 `EN` 30 筆、`ZH` 7 筆、`ZH_BG` 3 筆，而且 `ZH` 裡有檔名帶 `.cht` 的繁體字幕。
+`ZH_BG` 是 SubDL 的「Big 5 code」，名義上是繁體；`ZH` 是「Chinese BG code」，名義上是簡體。以 *Inception* 為例查到 `EN` 30 筆、`ZH` 7 筆、`ZH_BG` 3 筆，而且 `ZH` 裡有檔名帶 `.cht` 的繁體字幕。階段 0 從 `ZH` 下載的第一個檔案就是繁體（`.hk.srt`，UTF-8）。
+
+**別人的金鑰確實會出現**：階段 0 錄到的回應裡，`ZH` 和 `ZH_BG` 的**每一筆** `url` 都帶 `?api_key=…`，`EN` 的都沒有。去掉 query string 之後，從 `dl.subdl.com` 下載照樣成功（200、`application/zip`），所以不需要、也不使用那個金鑰。
 
 回應（範例在 `reference/providers/justsubtitles.subtitles.sample.json`）：
 
@@ -179,7 +181,7 @@ YTS 給的是 IMDb 編號。依序嘗試：
    ```
    GET https://search.justsubtitles.com/api/search?q=<片名>
    ```
-   它回的是 TMDB 形狀的結果。只在「是電影、片名（或原文片名）不分大小寫完全相同、上映年份和 YTS 的年份相同」時採用那一筆的 `id`。有多筆符合或沒有符合就放棄。這個端點外層的欄位名稱沒有記下來，以實際回應為準。
+   回應是 `{"results": [...]}`，每一筆是 TMDB「搜尋電影」的形狀：`id`、`title`、`original_title`、`release_date`（`YYYY-MM-DD`，可能是 null）、`original_language` 等（範例在 `reference/providers/justsubtitles.search.sample.json`，階段 0 錄的）。結果只有電影，沒有 `media_type` 欄位，所以「是電影」這一條不用另外判斷。只在「片名（或原文片名）不分大小寫完全相同、`release_date` 的年份和 YTS 的年份相同」時採用那一筆的 `id`。有多筆符合或沒有符合就放棄。查 *Inception* 時有兩筆片名完全相同（2010 和 1980），年份這一條是必要的。
 4. 都失敗：這個來源回報 `NOT_CONFIGURED`，訊息引導管理員設定 TMDB 金鑰。其他來源不受影響。
 
 ### 備援模式（`subdl`）
@@ -217,7 +219,7 @@ TMDB 的測試（`…/tmdb/test`）：對 `tt1375666` 呼叫 find。有結果是
 GET <base>/movie-imdb/<IMDb 編號>
 ```
 
-頁面裡有一張表，欄位依序是 Rating、Language、Release、Uploader、Download。每一列有一個連到 `/subtitles/<slug>` 的連結，`<slug>` 就是 `ref`。*Inception* 的頁面有 402 列（English 147、Chinese 6、Big 5 code 2、Chinese BG code 2，其餘是其他語言）。
+頁面裡有一張表，欄位依序是 Rating、Language、Release、Uploader、Download。每一列有連到 `/subtitles/<slug>` 的連結（一列裡有兩個指向同一個 slug 的連結，去重），`<slug>` 就是 `ref`。*Inception* 的頁面有 402 列（English 147、Chinese 6、Big 5 code 2、Chinese BG code 2，其餘是其他語言）。整頁約 290 KB，在 2 MB 的上限內。
 
 - 用結構找（「有這五個欄位標題的表格」），不要依賴 class 名稱。範例在 `reference/providers/yify.movie-page.sample.html`。
 - 只留要找的語言的列，其他丟掉。
@@ -418,10 +420,10 @@ GET https://api.assrt.net/v1/sub/detail?id=<id>
 
 | 項目 | 狀況 |
 | --- | --- |
-| JustSubtitles 介面的網址、參數、回應欄位、30 筆上限、500 的行為、下載網址 | 2026-10-04 用瀏覽器實際查過。下載網址只做過 HEAD 請求（回 200、`application/zip`），**沒有下載過壓縮檔的內容** |
-| JustSubtitles 片名搜尋 | 確認存在、回 TMDB 形狀的結果；外層欄位沒有記錄 |
+| JustSubtitles 介面的網址、參數、回應欄位、30 筆上限、下載網址 | 2026-10-04 用瀏覽器查過；**2026-10-05 階段 0 從伺服器端（`User-Agent: Paiban/…`，沒有偽裝成瀏覽器）實際呼叫**：欄位相同、`EN` 30 筆、沒有擋非瀏覽器的請求。不存在的編號回 200（不是 500）。下載了一個壓縮檔看格式：zip、一個 UTF-8 的 `.srt`，看完已刪 |
+| JustSubtitles 片名搜尋 | 階段 0 實際呼叫：外層是 `{results: [...]}`，見上 |
 | SubDL 官方 API | 依它的文件；沒有金鑰，沒有實際呼叫過 |
-| YIFY Subtitles 的頁面結構和下載連結 | 2026-10-04 實際查過；沒有下載過壓縮檔 |
+| YIFY Subtitles 的頁面結構和下載連結 | 2026-10-04 用瀏覽器查過；**2026-10-05 階段 0 從伺服器端實際抓頁面和下載**：表格欄位順序、`a#btn-download-subtitle` 的 `data-link`（base64）、解出來的主機 `subtitles.yts-subs.com` 都和文件相同，沒有驗證碼或挑戰頁。壓縮檔：zip、一個 UTF-8（有 BOM）的 `.srt`，看完已刪 |
 | 射手網 API 的端點、限制、錯誤碼、標示來源的要求 | 依官方文件；沒有 token，沒有實際呼叫過。`langlist` 的鍵名是憑記憶 |
 | TMDB 的 find 端點 | 依官方文件；沒有金鑰，沒有實際呼叫過 |
-| 從架站的那台機器能不能連到這些網站 | 沒有驗證 |
+| 從架站的那台機器能不能連到這些網站 | JustSubtitles、YIFY Subtitles 可以（階段 0，在開發機上；部署機器是不是同一台待確認）。TMDB、射手網、SubDL 沒有金鑰，還沒有確認 |

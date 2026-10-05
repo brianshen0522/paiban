@@ -75,7 +75,7 @@ environment:
 
 ## 瀏覽器測試的注意事項
 
-- **Playwright 內建的 Chromium 不能解碼 H.264。** 需要真的播放的測試，做種的檔案用 `fixtures/clip.webm`。「能不能直接播」的規則把 WebM（VP9 加 Opus）算成能直接播，就是為了讓這條路不依賴環境（[08-media-pipeline.md](08-media-pipeline.md)）。另一個做法是用安裝在系統上的 Chrome（`channel: 'chrome'`），但那要求每台跑測試的機器都裝了 Chrome。
+- **不要依賴測試用的 Chromium 能解 H.264。** 交接時的 Playwright Chromium 不能；2026-10-05 階段 0 實測 Playwright 1.63 內建的 Chromium（153）可以（H.264 High + AAC 立體聲和 5.1、`moov` 在檔尾，能播、能拖動），但換版本可能又變。需要真的播放的測試，做種的檔案仍然用 `fixtures/clip.webm`。「能不能直接播」的規則把 WebM（VP9 加 Opus）算成能直接播，就是為了讓這條路不依賴環境（[08-media-pipeline.md](08-media-pipeline.md)）。另一個做法是用安裝在系統上的 Chrome（`channel: 'chrome'`），但那要求每台跑測試的機器都裝了 Chrome。
 - **用 WebM 時分數可能差 1 個百分點。** WebM 的聲音重新編碼過，人聲偵測的結果和 `clip.mp4` 有極小的差異（9,242 個影格裡 28 個不同）。位移和速率不受影響。用 WebM 的測試比對分數時容許正負 1 個百分點；要比對到完全相等的（分析結果對 `data.json`）用 `clip.mp4`，放在不經過瀏覽器的測試裡。
 - 需要讓影片自動播放：啟動瀏覽器時加 `--autoplay-policy=no-user-gesture-required`。
 - 不要用固定的 `waitForTimeout` 等非同步的結果；等畫面上的狀態（分數變了、狀態標籤變了）。原型的 `e2e.cjs` 裡有固定等待，那是原型，不要照抄。
