@@ -62,6 +62,11 @@ describe('deleting files', () => {
       removePreviewFiles: ['admin/storage-delete-routes.ts'],
       removeExportFiles: ['admin/storage-delete-routes.ts'],
       removeOrphanFolder: ['admin/storage-delete-routes.ts'],
+      // The listed scratch clean-ups: start-up drafts, a job's own work folder, a job's own output
+      // when its final update found the row gone or cancelled.
+      cleanScratchOnStart: ['media/service.ts'],
+      removeWorkDir: ['media/jobs.ts'],
+      removeOwnMediaOutput: ['media/jobs.ts'],
     };
     const exported = [
       ...(await readFile(join(SRC, 'storage/remove.ts'), 'utf8')).matchAll(/export async function (\w+)/g),

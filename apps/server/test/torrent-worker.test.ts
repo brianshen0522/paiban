@@ -139,9 +139,9 @@ describe('the torrent service', { timeout: 90_000 }, () => {
     expect(r.disk_bytes).toBeGreaterThan(0);
     const media = (await db.pool.query('select rel_path, direct_play, analysis_state, audio_state from media_files'))
       .rows[0];
-    expect(media).toEqual({ rel_path: 'clip.mp4', direct_play: true, analysis_state: 'none', audio_state: 'none' });
+    expect(media).toEqual({ rel_path: 'clip.mp4', direct_play: true, analysis_state: 'pending', audio_state: 'none' });
     const torrent = (await call(t.app, 'GET', `/api/torrents/${id}`, { cookie: mei })).json();
-    expect(torrent.status).toBe('ready');
+    expect(torrent.status).toBe('analyzing');
     const notes = (await call(t.app, 'GET', '/api/notifications', { cookie: mei })).json();
     expect(notes.items[0]).toMatchObject({
       kind: 'download.completed',

@@ -404,11 +404,11 @@ export class TorrentWorker {
         [a.id, bytes, settings.downloads.seedMode === 'ratio'],
       );
       if (!t) return null;
-      // No media service yet (phase 3 of docs/14-plan.md): analysis stays 'none'. The preview assets
-      // are planned as 'pending' with their reservation, for the media service to pick up.
+      // Analysis waits for the media service when automatic analysis is on, otherwise for someone to
+      // open the film. The preview plan frozen at admission moves over unchanged (D40).
       await c.query(
         `insert into media_files (torrent_id, rel_path, size_bytes, direct_play, analysis_state, audio_state, proxy_state, proxy_res, reserve_bytes)
-         values ($1, $2, $3, $4, 'none', $5, $6, $7, $8)`,
+         values ($1, $2, $3, $4, $9, $5, $6, $7, $8)`,
         [
           a.id,
           main?.path ?? '',
@@ -418,6 +418,7 @@ export class TorrentWorker {
           t.preview_proxy_res ? 'pending' : 'none',
           t.preview_proxy_res,
           t.preview_reserve_bytes,
+          settings.media.analyzeAuto ? 'pending' : 'none',
         ],
       );
       await c.query('update torrents set preview_reserve_bytes = 0 where id = $1', [a.id]);

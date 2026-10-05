@@ -13,7 +13,8 @@
     "format": "biome check --write .",
     "test": "pnpm -r test",
     "dev": "node scripts/dev.mjs",
-    "db:test": "docker compose -f deploy/docker-compose.test.yml up -d --wait"
+    "db:test": "docker compose -f deploy/docker-compose.test.yml up -d --wait",
+    "test:image": "scripts/test-image.sh"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

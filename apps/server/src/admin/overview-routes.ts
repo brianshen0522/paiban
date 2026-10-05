@@ -8,6 +8,7 @@ import { readSourceHealth } from '../settings/health.js';
 import { readSettings } from '../settings/settings.js';
 import { diskInfo, readUsage } from '../storage/usage.js';
 import { versionLabel } from '../torrents/view.js';
+import { toTask } from './system-routes.js';
 
 type Problem = AdminOverview['problems'][number];
 
@@ -145,6 +146,11 @@ export function overviewRoutes(app: FastifyInstance, deps: Deps): void {
     if (c.no_holders > 0) add('warn', 'NO_HOLDERS', 'storage', { count: c.no_holders });
     problems.sort((a, b) => (a.level === b.level ? 0 : a.level === 'bad' ? -1 : 1));
 
+    const current = await one<Parameters<typeof toTask>[0]>(
+      pool,
+      `select id, kind, subject, input, state, progress, error_code, result, created_at, started_at, finished_at
+         from tasks where state = 'running' order by started_at desc limit 1`,
+    );
     const sources: SourceHealth[] = [
       yts ?? { id: 'yts', state: settings.yts.baseUrl ? 'ok' : 'off', checkedAt: null, code: null, data: {} },
     ];
@@ -165,7 +171,7 @@ export function overviewRoutes(app: FastifyInstance, deps: Deps): void {
       usage,
       downloads: { active: c.active, maxActive: settings.downloads.maxActive, queued: c.queued },
       users: { active: c.users, disabled: c.disabled, openInvites: c.invites },
-      tasks: { running: c.running, current: null },
+      tasks: { running: c.running, current: current ? toTask(current) : null },
       problems,
       sources,
       recent: recent.map(

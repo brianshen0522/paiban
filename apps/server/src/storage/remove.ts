@@ -1,4 +1,4 @@
-import { rm, unlink } from 'node:fs/promises';
+import { readdir, rm, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Logger } from 'pino';
 import type { Engine } from '../torrent/engine.js';
@@ -74,4 +74,68 @@ export async function removeOrphanFolder(
   const path = root === 'candidates' ? under(dataDir, 'subtitles', 'candidates', name) : under(dataDir, root, name);
   await rm(path, { recursive: true, force: true });
   log.info({ root, name }, 'orphan folder removed (requested by an administrator)');
+}
+
+/* ---------------------------------------------------------------- scratch (docs/10-storage.md, "哪些清理不算自動刪除") */
+
+/**
+ * The media service at start-up: the work folders of jobs that did not finish, and half-written
+ * `*.part` files under /data/media and /data/exports (never under /data/torrents, which belongs to
+ * WebTorrent). These are the program's own drafts, not anybody's files.
+ */
+export async function cleanScratchOnStart(dataDir: string, log: Logger): Promise<number> {
+  await rm(join(dataDir, 'tmp', 'work'), { recursive: true, force: true });
+  let parts = 0;
+  for (const root of ['media', 'exports']) {
+    const base = join(dataDir, root);
+    let dirs: string[] = [];
+    try {
+      dirs = await readdir(base);
+    } catch {
+      continue;
+    }
+    for (const d of dirs) {
+      let files: string[] = [];
+      try {
+        files = await readdir(join(base, d));
+      } catch {
+        continue;
+      }
+      for (const f of files)
+        if (f.endsWith('.part')) {
+          await rm(join(base, d, f), { force: true });
+          parts++;
+        }
+    }
+  }
+  log.info({ parts }, 'scratch cleaned at start-up');
+  return parts;
+}
+
+/** A job's own work folder under /data/tmp/work, when the job ends either way. */
+export async function removeWorkDir(dataDir: string, jobDir: string): Promise<void> {
+  if (!jobDir.startsWith(join(dataDir, 'tmp', 'work'))) throw new Error('not a work folder');
+  await rm(jobDir, { recursive: true, force: true });
+}
+
+/**
+ * A job's own output that it just wrote, when its final conditional update found the row gone,
+ * cancelled or being deleted (docs/08-media-pipeline.md, "工作的共通規矩"). Only names under
+ * /data/media/<id> that a media job writes.
+ */
+export async function removeOwnMediaOutput(dataDir: string, mediaId: string, files: string[]): Promise<void> {
+  const allowed = new Set([
+    'probe.json',
+    'peaks.bin',
+    'ref.npz',
+    'speech.json',
+    'audio.m4a',
+    'proxy.mp4',
+    'audio.m4a.part',
+    'proxy.mp4.part',
+  ]);
+  for (const f of files) {
+    if (!allowed.has(f)) throw new Error(`not a media output: ${f}`);
+    await rm(under(dataDir, 'media', mediaId, f), { force: true });
+  }
 }

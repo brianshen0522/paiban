@@ -237,6 +237,6 @@
 
 - 字幕搜尋時個別來源的失敗，寫在那個來源的 `ProviderStatus.error` 裡，其他來源照常回傳。
 - 候選字幕抓檔失敗，寫在 `Candidate.fetchError`。
-- 分析、預覽資產的失敗，寫在 `MediaStatus.error`。
+- 分析、預覽資產的失敗，寫在 `MediaStatus.errors`（每種資產一格）。
 - 下載的失敗，寫在 `Torrent.error`。
 - 管理頁測試來源的結果，寫在回應的 `ok` 和 `code`。

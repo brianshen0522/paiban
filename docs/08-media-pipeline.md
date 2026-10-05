@@ -71,7 +71,7 @@ direct_play =
 | 預測 | 實際 | 處理 |
 | --- | --- | --- |
 | 不能播 | 能播 | `audio_state`、`proxy_state` 改成 `none`，`reserve_bytes` 歸零 |
-| 能播 | 不能播 | 之前沒有預留，也沒有預覽計畫，所以依**現在**的設定算。在交易裡 `storage_admit(預覽預留)`：通過就把 `audio_state`（和 `proxy_state`，如果自動轉檔有開）設成 `pending` 並寫入預留量；不通過就維持 `none`，`error` 記 `{asset: 'proxy', code: 'PREVIEW_NO_SPACE'}`，工作台會說明「下載完成時空間不足，沒有產生預覽檔。」並給「轉預覽檔」的按鈕 |
+| 能播 | 不能播 | 之前沒有預留，也沒有預覽計畫，所以依**現在**的設定算。在交易裡 `storage_admit(預覽預留)`：通過就把 `audio_state`（和 `proxy_state`，如果自動轉檔有開）設成 `pending` 並寫入預留量；不通過就維持 `none`，`error.proxy` 記 `PREVIEW_NO_SPACE`，工作台會說明「下載完成時空間不足，沒有產生預覽檔。」並給「轉預覽檔」的按鈕 |
 
 拿到實際片長後，用它重算預留量（下載前用的是 YTS 的片長，可能是 0）：
 
@@ -82,8 +82,8 @@ direct_play =
 
 | 情況 | 處理 |
 | --- | --- |
-| 沒有聲音軌 | 波形和人聲都做不出來：`analysis_state = 'failed'`，`error` 記 `{asset: 'analysis', code: 'NO_AUDIO'}`。聲音檔不做（`audio_state = 'none'`，那一部分的預留釋出）。預覽影片照做，只是沒有聲音。電影仍然可以進工作區，只是沒有波形、分數和自動對齊 |
-| ffprobe 讀不了這個檔案 | `probe_state = 'failed'`，`error` 記 `{asset: 'analysis', code: 'PROBE_FAILED'}`。等著做的分析也標成 `failed`；預覽資產放棄（`none`，預留釋出）。檔案很可能是壞的，介面上要看得到這個原因。它不會自動再試；有人按「重新分析」或「轉預覽檔」才會 |
+| 沒有聲音軌 | 波形和人聲都做不出來：`analysis_state = 'failed'`，`error.analysis` 記 `NO_AUDIO`。聲音檔不做（`audio_state = 'none'`，那一部分的預留釋出）。預覽影片照做，只是沒有聲音。電影仍然可以進工作區，只是沒有波形、分數和自動對齊 |
+| ffprobe 讀不了這個檔案 | `probe_state = 'failed'`，`error.analysis` 記 `PROBE_FAILED`。等著做的分析也標成 `failed`；預覽資產放棄（`none`，預留釋出）。檔案很可能是壞的，介面上要看得到這個原因。它不會自動再試；有人按「重新分析」或「轉預覽檔」才會 |
 
 探測成功：`probe_state = 'ready'`，其他欄位寫回資料庫，`NOTIFY paiban_media`（預覽資產可以排入了）和 `paiban_events`（`torrent`；預留量有變就再加 `usage`）。
 

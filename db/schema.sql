@@ -230,7 +230,7 @@ create table media_files (
   proxy_progress real not null default 0,
   proxy_bytes    bigint not null default 0,
   reserve_bytes  bigint not null default 0 check (reserve_bytes >= 0),  -- still reserved for preview assets not finished yet
-  error          jsonb,                                -- {asset, code}: the latest failure, cleared when that asset is requested again
+  error          jsonb,                                -- {analysis?, audio?, proxy?: MediaErrorCode}: one entry per asset, cleared when that asset is requested again
   created_at     timestamptz not null default now(),
   updated_at     timestamptz not null default now()
 );

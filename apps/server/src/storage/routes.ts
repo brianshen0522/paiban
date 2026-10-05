@@ -1,6 +1,7 @@
 import type { StorageItem, Usage } from '@paiban/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
+import { storageFindings } from '../admin/system-routes.js';
 import { audit } from '../audit.js';
 import { many, tx } from '../db/pool.js';
 import { publishUsage } from '../events/publish.js';
@@ -110,8 +111,7 @@ export function storageRoutes(app: FastifyInstance, deps: Deps): void {
       usage: await readUsage(pool),
       items: await storageItems(deps, null),
       disk: await diskInfo(pool, deps.disk, config.storageReserveBytes),
-      findings: [],
-      rescan: null,
+      ...(await storageFindings(deps)),
     };
   });
 

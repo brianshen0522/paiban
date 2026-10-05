@@ -16,6 +16,17 @@
 
 ---
 
+## 2026-10-06 media 服務：不用 pg-boss，錯誤每種資產一格，測試在映像檔裡跑
+
+- 原本：`docs/02-architecture.md` 用 pg-boss 當工作佇列；`media_files.error` 和 `MediaStatus.error` 只有一格。
+- 改成：
+  - `media` 直接從資料表認領工作：等待中的列就是待辦，帶條件的更新認領，所以重複排入只會做一次；重啟時把「進行中」改回「等待中」再對帳。三種工作（分析、預覽資產、重新計算用量）各自同時只跑一個。
+  - `media_files.error` 存 `{analysis?, audio?, proxy?}`，合約改成 `MediaStatus.errors`。之後預覽檔失敗不會蓋掉「為什麼沒有波形」。
+  - 需要 ffmpeg 和 ffsubsync 的測試（`apps/server/test/media.test.ts`）在主機上沒有這些工具時明確略過，`pnpm test:image` 在映像檔裡實際跑。
+- 原因：規格本來就以資料表為準，佇列只是「叫人去做事」；少一套東西，去重和重啟的行為也更容易驗證。錯誤一格是交叉比對時發現的規格缺陷。
+- 改了哪些檔案：docs/02-architecture.md、docs/03-data-model.md、docs/04-api.md、docs/08-media-pipeline.md、docs/09-sync-workbench.md、docs/11-pages.md、packages/shared/src/contracts/api.ts、db/schema.sql（註解）
+- Brian 是否已確認：否（交接層級）
+
 ## 2026-10-06 總覽的 DISK_LOW 門檻、media 服務的心跳
 
 - 原本：`docs/11-pages.md` 有 `DISK_LOW` 這個問題，但 10 和 13 都沒有定門檻；`media` 服務在它的階段之前不寫心跳。

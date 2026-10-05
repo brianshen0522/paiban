@@ -1,6 +1,7 @@
 import type { AssetState, MediaStatus, Torrent, TorrentErrorCode, TorrentStatus, UserRef } from '@paiban/shared';
 import type { Queryable } from '../db/pool.js';
 import { many } from '../db/pool.js';
+import { assetReserve, mimeOf } from '../media/probe.js';
 
 /** Raw row from TORRENT_SELECT. */
 export type TorrentRow = {
@@ -47,7 +48,11 @@ export type TorrentRow = {
   proxy_progress: number | null;
   proxy_bytes: number | null;
   reserve_bytes: number | null;
-  media_error: MediaStatus['error'];
+  media_error: MediaStatus['errors'] | null;
+  container: string | null;
+  rel_path: string | null;
+  probe_state: AssetState | null;
+  has_audio: boolean | null;
 };
 
 const TORRENT_SELECT = `
@@ -62,7 +67,8 @@ select t.id, t.info_hash, t.quality, t.source_type, t.video_codec, t.bit_depth, 
             then (select count(*)::int from torrents o where o.state = 'queued' and o.want = 'run' and o.queued_at <= t.queued_at)
        end as queue_position,
        mf.id as media_id, mf.duration_s, mf.fps_num, mf.fps_den, mf.direct_play, mf.analysis_state, mf.audio_state,
-       mf.audio_bytes, mf.proxy_state, mf.proxy_res, mf.proxy_progress, mf.proxy_bytes, mf.reserve_bytes, mf.error as media_error
+       mf.audio_bytes, mf.proxy_state, mf.proxy_res, mf.proxy_progress, mf.proxy_bytes, mf.reserve_bytes, mf.error as media_error,
+       mf.container, mf.rel_path, mf.probe_state, (mf.probe_state <> 'ready' or mf.audio_codec is not null) as has_audio
   from torrents t
   join movies m on m.id = t.movie_id
   left join users ru on ru.id = t.requested_by
@@ -80,11 +86,27 @@ export function statusOf(state: TorrentRow['state'], analysis: AssetState | null
 
 export const posterUrl = (ytsId: number) => `/api/yts/movies/${ytsId}/poster`;
 
-function mediaStatus(r: TorrentRow): MediaStatus | null {
+/**
+ * MediaStatus (docs/09-sync-workbench.md, "播哪個檔"): sources in the order the sync page should try
+ * them, and what asking for the missing preview assets would reserve now.
+ */
+export function mediaStatus(r: TorrentRow, proxyResolution: '480p' | '720p' = '480p'): MediaStatus | null {
   if (!r.media_id) return null;
   const fps = r.fps_num && r.fps_den ? r.fps_num / r.fps_den : null;
+  const id = r.media_id;
+  const sources: MediaStatus['sources'] = [];
+  if (r.direct_play && r.probe_state !== 'failed')
+    sources.push({ kind: 'original', url: `/api/media/${id}/original`, mime: mimeOf(r.container, r.rel_path ?? '') });
+  if (r.proxy_state === 'ready') sources.push({ kind: 'proxy', url: `/api/media/${id}/proxy`, mime: 'video/mp4' });
+  if (r.audio_state === 'ready') sources.push({ kind: 'audio', url: `/api/media/${id}/audio`, mime: 'audio/mp4' });
+  const missingAudio = r.has_audio !== false && (r.audio_state === 'none' || r.audio_state === 'failed');
+  const missingProxy = r.proxy_state === 'none' || r.proxy_state === 'failed';
+  const need = r.direct_play
+    ? 0
+    : (missingAudio ? assetReserve(r.duration_s, r.runtime_min, 'audio') : 0) +
+      (missingProxy ? assetReserve(r.duration_s, r.runtime_min, proxyResolution) : 0);
   return {
-    id: r.media_id,
+    id,
     durationSeconds: r.duration_s,
     fps,
     directPlay: !!r.direct_play,
@@ -96,11 +118,10 @@ function mediaStatus(r: TorrentRow): MediaStatus | null {
       progress: r.proxy_progress ?? 0,
       bytes: r.proxy_bytes ?? 0,
     },
-    error: r.media_error,
+    errors: r.media_error ?? {},
     previewBytes: (r.audio_bytes ?? 0) + (r.proxy_bytes ?? 0) + (r.reserve_bytes ?? 0),
-    previewNeedBytes: 0,
-    // The streaming endpoints arrive with the media service (phase 4); until then nothing plays.
-    sources: [],
+    previewNeedBytes: need,
+    sources,
   };
 }
 

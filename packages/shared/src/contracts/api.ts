@@ -252,8 +252,12 @@ export type MediaStatus = {
   analysis: AssetState;
   audio: AssetState;
   proxy: { state: AssetState; resolution: '480p' | '720p' | null; progress: number; bytes: Bytes };
-  /** The latest failure, or why a preview was not made. Cleared when that asset is requested again. */
-  error: { asset: 'analysis' | 'audio' | 'proxy'; code: MediaErrorCode } | null;
+  /**
+   * Per asset: why the analysis failed, or why a preview asset failed or was not made. Separate
+   * entries, so a later preview failure does not hide why there is no waveform. An entry is cleared
+   * when that asset is requested again.
+   */
+  errors: Partial<Record<'analysis' | 'audio' | 'proxy', MediaErrorCode>>;
   /** Preview audio and video on disk plus what is still reserved for them: what removing the film frees besides the film. */
   previewBytes: Bytes;
   /** What POST /api/media/:id/proxy would reserve right now; 0 when no preview asset is missing. */

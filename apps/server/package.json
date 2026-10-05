@@ -5,7 +5,8 @@
   "type": "module",
   "files": [
     "dist",
-    "migrations"
+    "migrations",
+    "media-scripts"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",

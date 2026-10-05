@@ -129,7 +129,7 @@ API 回給前端的 `TorrentStatus` 是算出來的，不是存起來的：
 | `direct_play` | 布林 | ffprobe 之後才確定。規則在 [08-media-pipeline.md](08-media-pipeline.md)：MP4 裡的 H.264（8-bit 4:2:0）加 AAC 或 MP3；或 WebM 裡的 VP8、VP9、AV1 加 Opus 或 Vorbis |
 | `reserve_bytes` | 位元組 | 還沒做完的預覽資產佔的預留量。每次狀態變動時重算：進行中或等待中的資產各算它的估計值，其餘算 0 |
 | `analysis_bytes`、`audio_bytes`、`proxy_bytes` | 位元組 | 實際大小，檔案完成時寫入。`analysis_bytes` 是 `probe.json`、`peaks.bin`、`ref.npz`、`speech.json` 的總和 |
-| `error` | `{asset, code}` | 最近一次失敗，或沒有做預覽影片的原因（`PREVIEW_NO_SPACE`）。那個資產重新被要求時清掉。代碼的清單是 `packages/shared/src/contracts/api.ts` 的 `MediaErrorCode` |
+| `error` | `{analysis?, audio?, proxy?}`，每種資產一格錯誤代碼 | 那個資產的失敗，或沒有做預覽影片的原因（`PREVIEW_NO_SPACE`）。那個資產重新被要求時清掉。代碼的清單是 `packages/shared/src/contracts/api.ts` 的 `MediaErrorCode` |
 
 資產在最後一次嘗試也失敗時（見 [08-media-pipeline.md](08-media-pipeline.md) 的「工作的共通規矩」），它的預留量才釋出；之後要再做，得重新通過 admission。
 
