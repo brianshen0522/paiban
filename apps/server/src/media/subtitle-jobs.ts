@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, open, readdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import { extname, join } from 'node:path';
 import type { AlignResult, Lang, SyncDoc } from '@paiban/shared';
+import { type HeardPairs, localPairs, readTranscript } from '../asr/align.js';
 import { many, one, type Pool } from '../db/pool.js';
 import { removeOwnSubtitleOutput, removeStaging, removeWorkDir } from '../storage/remove.js';
 import { computeAlignment, ffsubsyncCandidates, runFfsubsyncEngines } from '../subtitles/align.js';
@@ -237,22 +238,34 @@ export async function ingestJob(d: JobDeps, candidateId: string): Promise<void> 
 
 /* ================================================================ alignment */
 
-/** ffsubsync's candidates and the core's, for one cue list (docs/08, "步驟"). */
+/**
+ * ffsubsync's candidates, the core's, and recognised speech's (docs/08, "步驟", "語音辨識"), for
+ * one cue list. `given` are pairs the api already made with the language model; otherwise a
+ * subtitle in the spoken language is paired by text here. Ranking never asks a language model:
+ * thirty candidates would cost thirty requests.
+ */
 async function align(
   d: JobDeps,
   mediaId: string,
   speech: Parameters<typeof computeAlignment>[0],
-  relDir: string,
-  opts: { allowSplit: boolean; before?: SyncDoc },
+  sub: { relDir: string; language: string },
+  opts: { allowSplit: boolean; before?: SyncDoc; given?: HeardPairs | null },
   work: string,
   isCancelled: () => boolean,
 ): Promise<AlignResult> {
-  const cues = await readCues(d.config.dataDir, relDir);
+  const cues = await readCues(d.config.dataDir, sub.relDir);
   await mkdir(work, { recursive: true });
   const refNpz = join(d.config.dataDir, 'media', mediaId, 'ref.npz');
   const outputs = await runFfsubsyncEngines(refNpz, cues, opts.allowSplit, work, isCancelled);
   const extra = ffsubsyncCandidates(speech, cues, outputs);
-  return computeAlignment(speech, cues, opts, extra);
+  const heard =
+    opts.given && opts.given.via !== 'none'
+      ? opts.given
+      : (localPairs(cues, await readTranscript(d.config.dataDir, mediaId), sub.language) ?? opts.given ?? null);
+  // A failed request to the model is still worth reporting when nothing else was found.
+  const withError =
+    heard && opts.given?.llmError && heard.via === 'none' ? { ...heard, llmError: opts.given.llmError } : heard;
+  return computeAlignment(speech, cues, { ...opts, heard: withError }, extra);
 }
 
 /** Polls `check` every two seconds while `fn` runs; the flag tells the job to stop (docs/08, "執行中每 2 秒確認一次"). */
@@ -279,11 +292,11 @@ async function whileWanted<T>(
 /** One candidate of a ranking run (`subtitle.rank`). A failure is that candidate's result, not the run's. */
 export async function rankJob(d: JobDeps, candidateId: string): Promise<void> {
   const { pool, config } = d;
-  const claimed = await one<{ torrent_id: string; rel_dir: string }>(
+  const claimed = await one<{ torrent_id: string; rel_dir: string; language: string }>(
     pool,
     `update subtitle_candidates c set align_state = 'running' from torrents t
       where c.id = $1 and c.align_state = 'queued' and c.fetch_state = 'ready' and t.id = c.torrent_id and t.want <> 'remove'
-      returning c.torrent_id, c.rel_dir`,
+      returning c.torrent_id, c.rel_dir, c.language`,
     [candidateId],
   );
   if (!claimed) return;
@@ -303,7 +316,16 @@ export async function rankJob(d: JobDeps, candidateId: string): Promise<void> {
             where c.id = $1 and c.align_state = 'running' and t.want <> 'remove'`,
           [candidateId],
         )),
-      (isCancelled) => align(d, sp.mediaId, sp.speech, claimed.rel_dir, { allowSplit: true }, work, isCancelled),
+      (isCancelled) =>
+        align(
+          d,
+          sp.mediaId,
+          sp.speech,
+          { relDir: claimed.rel_dir, language: claimed.language },
+          { allowSplit: true },
+          work,
+          isCancelled,
+        ),
     );
     await pool.query(
       `update subtitle_candidates set align_state = 'done', align_score = $2, align_result = $3 where id = $1 and align_state = 'running'`,
@@ -328,7 +350,7 @@ export async function rankJob(d: JobDeps, candidateId: string): Promise<void> {
  */
 export async function alignJob(d: JobDeps, taskId: string): Promise<void> {
   const { pool, config } = d;
-  const t = await one<{ input: { subtitleId?: string; allowSplit?: boolean } }>(
+  const t = await one<{ input: { subtitleId?: string; allowSplit?: boolean; heard?: HeardPairs | null } }>(
     pool,
     `update tasks set state = 'running', started_at = now() where id = $1 and kind = 'align' and state = 'queued' returning input`,
     [taskId],
@@ -338,9 +360,9 @@ export async function alignJob(d: JobDeps, taskId: string): Promise<void> {
   const work = workDir(config.dataDir, `align-${taskId}`);
   let code = 'ALIGN_FAILED';
   try {
-    const s = await one<{ torrent_id: string; rel_dir: string; doc: SyncDoc }>(
+    const s = await one<{ torrent_id: string; rel_dir: string; doc: SyncDoc; language: string }>(
       pool,
-      `select s.torrent_id, s.rel_dir, s.doc from subtitles s join torrents t on t.id = s.torrent_id
+      `select s.torrent_id, s.rel_dir, s.doc, s.language from subtitles s join torrents t on t.id = s.torrent_id
         where s.id = $1 and t.want <> 'remove'`,
       [t.input.subtitleId],
     );
@@ -360,8 +382,8 @@ export async function alignJob(d: JobDeps, taskId: string): Promise<void> {
           d,
           sp.mediaId,
           sp.speech,
-          s.rel_dir,
-          { allowSplit: t.input.allowSplit !== false, before: s.doc },
+          { relDir: s.rel_dir, language: s.language },
+          { allowSplit: t.input.allowSplit !== false, before: s.doc, given: t.input.heard ?? null },
           work,
           isCancelled,
         ),

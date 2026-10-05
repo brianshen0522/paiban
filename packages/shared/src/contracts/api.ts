@@ -374,10 +374,35 @@ export type AlignResult = {
   segments: Segment[];
   scoreBefore: number;
   score: number;
-  method: 'ffsubsync-linear' | 'ffsubsync-split' | 'core';
+  method: 'ffsubsync-linear' | 'ffsubsync-split' | 'core' | 'asr' | 'asr-llm';
   /** Two independent engines put every line within 0.15 s of each other. */
   agree: boolean;
+  /**
+   * What speech recognition contributed (docs/08, "語音辨識"); null when the film has none.
+   * `pairs`: recognised lines matched with subtitle lines, by text (`via: 'text'`, same language)
+   * or by the language model (`'llm'`). `support`: how many of them the chosen alignment agrees
+   * with. `via: 'none'` with `llmError` set: the model was asked and failed.
+   */
+  heard: {
+    language: string;
+    pairs: number;
+    support: number;
+    via: 'text' | 'llm' | 'none';
+    llmError: LlmErrorCode | null;
+  } | null;
 };
+
+/** A tiny fixed pairing question sent to the configured model (docs/13-settings.md, "測試連線"). */
+export type AlignModelCheck = { ok: boolean; code: 'OK' | 'WRONG_ANSWER' | LlmErrorCode; ms: number };
+
+export type LlmErrorCode =
+  | 'NOT_CONFIGURED'
+  | 'AUTH'
+  | 'RATE_LIMITED'
+  | 'REFUSED'
+  | 'BAD_RESPONSE'
+  | 'UNREACHABLE'
+  | 'TIMEOUT';
 
 /* ------------------------------------------------------------------ exports */
 
@@ -815,6 +840,8 @@ export interface Endpoints {
   'DELETE /api/admin/secrets/:name': { ok: null };
   /** Always 200: a source that cannot be reached is a result, not an error of this endpoint. */
   'POST /api/admin/sources/:id/test': { ok: SourceCheck };
+  /** Always 200, like the source tests: a model that does not answer is a result. */
+  'POST /api/admin/align/test': { ok: AlignModelCheck };
   'GET /api/admin/system': { ok: { services: ServiceStatus[]; tasks: Task[]; disk: DiskInfo } };
   /** Answers with the task that was retried, unchanged. The new task shows up in GET /api/admin/system after the `admin` event. */
   'POST /api/admin/tasks/:id/retry': { ok: Task };

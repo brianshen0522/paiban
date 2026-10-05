@@ -2,6 +2,8 @@ import { spawn } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { type AlignResult, type Cue, type SpeechData, SyncCore, type SyncDoc } from '@paiban/shared';
+import type { HeardPairs } from '../asr/align.js';
+import { fitPairs, pickWithPairs } from '../asr/fit.js';
 import { parseSrt } from './text.js';
 
 /**
@@ -27,12 +29,14 @@ const tidy = (segments: SyncCore.Segment[]): SyncCore.Segment[] =>
 /**
  * The answer for one cue list. `extra` are candidates from other engines (ffsubsync, or anything
  * added later); the core's own search is always added. `before` is the document whose score the
- * result is compared with (the identity for a candidate that was never touched).
+ * result is compared with (the identity for a candidate that was never touched). `heard` are the
+ * pairs speech recognition found (docs/08, "語音辨識"): they add their own candidate and referee
+ * the choice; without them this is pickAlignment over the other engines, as before.
  */
 export function computeAlignment(
   speech: SpeechData,
   cues: readonly Cue[],
-  opts: { allowSplit: boolean; before?: Pick<SyncDoc, 'segments' | 'edits'> },
+  opts: { allowSplit: boolean; before?: Pick<SyncDoc, 'segments' | 'edits'>; heard?: HeardPairs | null },
   extra: readonly Candidate[] = [],
 ): AlignResult {
   const sp = SyncCore.makeSpeech(speech);
@@ -40,7 +44,12 @@ export function computeAlignment(
     method: 'core',
     segments: SyncCore.autoAlign(sp, cues, { allowSplit: opts.allowSplit, radius: MAX_OFFSET_SECONDS }).segments,
   };
-  const pick = SyncCore.pickAlignment(sp, cues, [...extra, core]);
+  const candidates = [...extra, core];
+  const heard = opts.heard ?? null;
+  const pairs = heard?.pairs ?? [];
+  const fit = pairs.length ? fitPairs(cues, pairs, sp, opts.allowSplit) : null;
+  if (fit) candidates.unshift({ method: heard?.via === 'llm' ? 'asr-llm' : 'asr', segments: fit.segments });
+  const pick = pickWithPairs(sp, cues, candidates, pairs);
   const before = SyncCore.totalScore(sp, SyncCore.applyDoc(cues, opts.before ?? SyncCore.identityDoc()));
   return {
     segments: tidy(pick.best.segments),
@@ -48,6 +57,15 @@ export function computeAlignment(
     score: SyncCore.round3(pick.best.score),
     method: pick.best.method as AlignResult['method'],
     agree: pick.agree,
+    heard: heard
+      ? {
+          language: heard.language,
+          pairs: pairs.length,
+          support: pick.support,
+          via: heard.via,
+          llmError: heard.llmError,
+        }
+      : null,
   };
 }
 

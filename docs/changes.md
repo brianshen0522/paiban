@@ -16,6 +16,18 @@
 
 ---
 
+## 2026-10-06 自動對齊加上語音辨識和語言模型
+
+- 原本：自動對齊只看人聲偵測（ffsubsync 兩種、對齊核心），在配樂多的真實影片上會選錯（階段 0 的 Tears of Steel 五種情境全錯）。
+- 改成（Brian 在對話裡指定的做法：Whisper 或通義千問的 ASR，分批、不跑整部片，再用語言模型對齊不同語言的字幕）：
+  - 分析之後多一步語音辨識（faster-whisper `base`，平均分布的 30 秒窗，最多 6 分鐘），`media_files.asr_state`、`asr_language`，結果 `asr.json`。遷移 `0002_asr.sql`。
+  - 辨識結果和字幕配對：同語言用文字比對；不同語言用語言模型（Claude 或 OpenAI 相容的服務，如通義千問），在 `api` 裡呼叫。配對擬合成一個新候選 `asr` / `asr-llm`，並且當裁判：反駁配對的候選出局。
+  - 新設定 `align.asr`、`align.llm.{provider, model, baseUrl}`，新金鑰 `llmKey`。`MediaStatus.asr`、`MediaErrorCode` 的 `ASR_FAILED`、`AlignResult` 的 `heard` 和兩個新方法名稱。
+  - 映像檔多了 `/opt/asr`（約 300 MB）。
+- 原因：Brian 的要求；實測 Tears of Steel 五種情境從最多錯 79 秒變成全部 0.03 秒以內。
+- 改了哪些檔案：docs/03-data-model.md、docs/04-api.md、docs/08-media-pipeline.md、docs/12-auth.md、docs/13-settings.md、db/schema.sql、packages/shared/src/contracts/api.ts
+- Brian 是否已確認：做法是他指定的；細節（窗的數量、`base` 模型、排名不用語言模型、語言模型在 api 裡呼叫）還沒確認
+
 ## 2026-10-06 防跨站檢查也接受「送到哪個主機就從哪個主機來」的請求
 
 - 原本：`docs/12-auth.md`、`docs/04-api.md` 要求寫入請求的 `Origin` 和 `PUBLIC_URL` 同源。

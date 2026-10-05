@@ -125,6 +125,8 @@
 
 這個用戶端在階段 2 做 YTS 時就要寫好，`api` 和 `media` 共用同一份。
 
+**自動對齊用的語言模型**（[08-media-pipeline.md](08-media-pipeline.md) 的「語言模型」）是例外，不走上面的用戶端：Claude 由 Anthropic 官方 SDK 連 Anthropic 的 API；OpenAI 相容的服務連管理員設定的網址，**允許內部位址**（管理員自己的模型伺服器常在區網裡）。只有管理員能設定這個網址，送出的內容是固定格式的題目，回應只取出配對的編號（不在題目中的編號丟掉），錯誤只留代碼，不會把對方的回應顯示給任何人。這個請求只從 `api` 發出（只有它讀得到金鑰），不跟轉址，回應超過 1 MB 就中斷。
+
 ### 開發和測試時的放寬
 
 假的 YTS 和假的字幕來源跑在內部位址、用 `http://`，上面的規則會把它們全部擋掉。所以有一個明確的開關：
@@ -158,7 +160,7 @@ ffmpeg、ffprobe、ffsubsync、解壓工具都用陣列參數啟動（`spawn(cmd
 | 金鑰 | 放哪裡 | 誰拿得到 |
 | --- | --- | --- |
 | `SECRET_KEY`、資料庫密碼、第一個管理員的密碼 | 環境變數（`.env`） | `SECRET_KEY` 只給 `api` |
-| TMDB 金鑰、SubDL 金鑰、射手網 token | `secrets` 資料表，用 `SECRET_KEY` 以 AES-256-GCM 加密（每筆一個隨機的 12 位元組 nonce，名稱當作附加驗證資料） | 只有 `api` 解得開 |
+| TMDB 金鑰、SubDL 金鑰、射手網 token、語言模型的金鑰 | `secrets` 資料表，用 `SECRET_KEY` 以 AES-256-GCM 加密（每筆一個隨機的 12 位元組 nonce，名稱當作附加驗證資料） | 只有 `api` 解得開 |
 
 - API 只回報金鑰「有沒有設定」。沒有任何端點會回傳內容。
 - `.env` 不進版本控制。repo 裡只有 `.env.example`，裡面不能有真的值。
@@ -232,7 +234,7 @@ ffmpeg、ffprobe、ffsubsync、解壓工具都用陣列參數啟動（`spawn(cmd
 
 - [ ] 沒登入時，除了 `/api/health`、登入、邀請、重設相關的端點，其他都回 401
 - [ ] 成員呼叫任何 `/api/admin/…` 都回 403
-- [ ] 成員呼叫不是自己持有的下載、字幕、影片、匯出的端點都回 403；管理員對不是自己持有的片也一樣（匯出檔的下載與刪除、`scope=all` 的清單除外）
+- [ ] 成員呼叫不是自己持有的下載、字幕、影片的端點都回 403（看不到的匯出回 404，和 [04-api.md](04-api.md) 一致：不透露它存在）；管理員對不是自己持有的片也一樣（匯出檔的下載與刪除、`scope=all` 的清單除外）
 - [ ] `NODE_ENV=production` 時設了 `ALLOW_LOCAL_SOURCES`、`SOURCE_OVERRIDES` 或 `TORRENT_TEST_PEERS`，三個程式都拒絕啟動
 - [ ] 少了 `X-Requested-With` 的寫入請求被拒絕
 - [ ] 停用帳號後，他原本的 session 立刻失效

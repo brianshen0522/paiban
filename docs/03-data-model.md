@@ -128,8 +128,9 @@ API 回給前端的 `TorrentStatus` 是算出來的，不是存起來的：
 | `proxy_state` | `none`，或 `pending` → `running` → `ready` / `failed` | `proxy.mp4`。能直接播、或自動轉檔關掉時是 `none` |
 | `direct_play` | 布林 | ffprobe 之後才確定。規則在 [08-media-pipeline.md](08-media-pipeline.md)：MP4 裡的 H.264（8-bit 4:2:0）加 AAC 或 MP3；或 WebM 裡的 VP8、VP9、AV1 加 Opus 或 Vorbis |
 | `reserve_bytes` | 位元組 | 還沒做完的預覽資產佔的預留量。每次狀態變動時重算：進行中或等待中的資產各算它的估計值，其餘算 0 |
-| `analysis_bytes`、`audio_bytes`、`proxy_bytes` | 位元組 | 實際大小，檔案完成時寫入。`analysis_bytes` 是 `probe.json`、`peaks.bin`、`ref.npz`、`speech.json` 的總和 |
-| `error` | `{analysis?, audio?, proxy?}`，每種資產一格錯誤代碼 | 那個資產的失敗，或沒有做預覽影片的原因（`PREVIEW_NO_SPACE`）。那個資產重新被要求時清掉。代碼的清單是 `packages/shared/src/contracts/api.ts` 的 `MediaErrorCode` |
+| `asr_state`、`asr_language` | `none`，或 `pending` → `running` → `ready` / `failed`；聽到的語言 | 語音辨識（`asr.json`），分析完成後才開始。`none` 是辨識關掉了或片子沒有聲音。失敗不重試，「重新分析」會再排一次 |
+| `analysis_bytes`、`audio_bytes`、`proxy_bytes` | 位元組 | 實際大小，檔案完成時寫入。`analysis_bytes` 是 `probe.json`、`peaks.bin`、`ref.npz`、`speech.json`、`asr.json` 的總和 |
+| `error` | `{analysis?, audio?, proxy?, asr?}`，每種資產一格錯誤代碼 | 那個資產的失敗，或沒有做預覽影片的原因（`PREVIEW_NO_SPACE`）。那個資產重新被要求時清掉。代碼的清單是 `packages/shared/src/contracts/api.ts` 的 `MediaErrorCode` |
 
 資產在最後一次嘗試也失敗時（見 [08-media-pipeline.md](08-media-pipeline.md) 的「工作的共通規矩」），它的預留量才釋出；之後要再做，得重新通過 admission。
 
@@ -191,7 +192,7 @@ API 回給前端的 `TorrentStatus` 是算出來的，不是存起來的：
 ## 設定與金鑰
 
 - `settings`：一項一列，`value` 是 JSON。鍵的清單和驗證規則在 [13-settings.md](13-settings.md)。
-- `secrets`：三把金鑰（`tmdbKey`、`subdlKey`、`assrtToken`），用 `SECRET_KEY` 以 AES-256-GCM 加密。API 只回報「有沒有設定」，永遠不回傳內容。
+- `secrets`：四把金鑰（`tmdbKey`、`subdlKey`、`assrtToken`、`llmKey`），用 `SECRET_KEY` 以 AES-256-GCM 加密。API 只回報「有沒有設定」，永遠不回傳內容。
 
 ## 活動
 

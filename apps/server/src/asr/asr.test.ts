@@ -337,3 +337,62 @@ describe('language model clients against a local stand-in', () => {
     });
   });
 });
+
+describe('in the alignment job', () => {
+  it('lets matching words overrule a cut the speech detection made up', async () => {
+    const { computeAlignment } = await import('../subtitles/align.js');
+    const heard = hear();
+    const pairs = textPairs(film.late, heard);
+    const wrong = {
+      method: 'ffsubsync-split',
+      segments: [
+        { from: 0, scale: 1, offset: -2.37 },
+        { from: 120, scale: 1, offset: -32.37 },
+      ],
+    };
+    const r = computeAlignment(
+      film.speech,
+      film.late,
+      { allowSplit: true, heard: { language: 'en', pairs, via: 'text', llmError: null } },
+      [wrong],
+    );
+    expect(r.segments).toHaveLength(1);
+    expect(Math.abs(r.segments[0].offset + 2.37)).toBeLessThan(0.15);
+    expect(r.heard).toMatchObject({ language: 'en', via: 'text', pairs: pairs.length });
+    expect(r.heard?.support).toBeGreaterThanOrEqual(pairs.length - 1);
+  });
+
+  it('reports no recognition as null and keeps the old choice', async () => {
+    const { computeAlignment } = await import('../subtitles/align.js');
+    const r = computeAlignment(film.speech, film.late, { allowSplit: false });
+    expect(r.heard).toBeNull();
+    expect(r.method).toBe('core');
+  });
+
+  it('pairs Chinese heard in Simplified with a Traditional subtitle', async () => {
+    const { sameLanguagePairs, sameLanguage } = await import('./align.js');
+    expect(sameLanguage('zh-Hant', 'zh')).toBe(true);
+    expect(sameLanguage('en', 'zh')).toBe(false);
+    const cues: Cue[] = [
+      { id: 1, start: 10, end: 12, text: '我們沒有時間了，快點走' },
+      { id: 2, start: 20, end: 22, text: '這裡發生了什麼事情' },
+      { id: 3, start: 30, end: 32, text: '你為什麼不早點告訴我' },
+      { id: 4, start: 40, end: 42, text: '別擔心，一切都會沒事的' },
+    ];
+    const pairs = sameLanguagePairs(cues, {
+      language: 'zh',
+      model: 'test',
+      windows: [[0, 60]],
+      segments: [
+        { start: 12.5, end: 14, text: '我们没有时间了快点走' },
+        { start: 22.5, end: 24, text: '这里发生了什么事情' },
+        { start: 32.5, end: 34, text: '你为什么不早点告诉我' },
+      ],
+    });
+    expect(pairs).toEqual([
+      { cue: 0, y: 12.5 },
+      { cue: 1, y: 22.5 },
+      { cue: 2, y: 32.5 },
+    ]);
+  });
+});
