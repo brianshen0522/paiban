@@ -11,6 +11,8 @@
 export const SITE_NAME = '拍板';
 /** Latin form of the site name, used where only ASCII fits: the outgoing User-Agent. */
 export const SITE_NAME_ASCII = 'Paiban';
+/** Reported in Me.app.version, the heartbeat and the outgoing User-Agent. */
+export const APP_VERSION = '0.1.0';
 
 export const SEARCH_PAGE_SIZE = 24;
 export const CHECKPOINT_COUNT = 8;

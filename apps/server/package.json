@@ -12,12 +12,19 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@fastify/cookie": "11.1.2",
+    "@node-rs/argon2": "2.2.1",
     "@paiban/shared": "workspace:*",
     "fastify": "5.12.5",
-    "pino": "10.4.0"
+    "pg": "8.23.1",
+    "pino": "10.4.0",
+    "webtorrent": "3.0.21",
+    "zod": "4.6.5"
   },
   "devDependencies": {
+    "@paiban/fakes": "workspace:*",
     "@types/node": "24",
+    "@types/pg": "8.23.1",
     "typescript": "7.0.2",
     "vitest": "5.0.3"
   }

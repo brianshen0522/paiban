@@ -1,0 +1,25 @@
+{
+  "name": "@paiban/fakes",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Stand-ins for development and tests (docs/15-testing.md): a fake YTS and a local seeder. Never in the production image.",
+  "exports": {
+    "./yts": "./src/yts.ts",
+    "./seed": "./src/seed.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "yts": "node src/yts-cli.ts",
+    "seed": "node src/seed-cli.ts"
+  },
+  "dependencies": {
+    "webtorrent": "3.0.21"
+  },
+  "devDependencies": {
+    "@types/node": "24",
+    "typescript": "7.0.2",
+    "vitest": "5.0.3"
+  }
+}

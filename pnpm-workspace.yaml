@@ -1,8 +1,17 @@
 packages:
   - apps/*
   - packages/*
+  - tools/*
 minimumReleaseAgeExclude:
   - data-urls@8.0.0
   - jsdom@30.1.2
   - tr46@7.0.0
   - whatwg-url@17.2.0
+# Native add-ons WebTorrent needs (uTP, WebRTC, fast WebSocket helpers). Their install scripts pick
+# or fetch the prebuilt binary for the platform; docs/16-risks.md covers ARM.
+allowBuilds:
+  bufferutil: true
+  ip-set: true
+  node-datachannel: true
+  utf-8-validate: true
+  utp-native: true

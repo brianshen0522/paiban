@@ -1,0 +1,22 @@
+# PostgreSQL for the server's database tests (pnpm test). Bound to localhost only; the password is a
+# test value, not a secret.
+#
+#   docker compose -f deploy/docker-compose.test.yml up -d --wait
+name: paiban-test
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: paiban
+      POSTGRES_PASSWORD: paiban-test-not-real
+      POSTGRES_DB: postgres
+    ports:
+      - "127.0.0.1:55432:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paiban"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
