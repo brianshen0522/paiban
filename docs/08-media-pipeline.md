@@ -334,7 +334,7 @@ ffmpeg -v error -nostdin -y -progress pipe:1 -nostats -i "$SRC" -map 0:V:0 -map 
 | OpenAI 相容 | `POST <baseUrl>/chat/completions`，`response_format: json_object`、`temperature: 0`。通義千問（DashScope 的相容模式）、本機的 Ollama、vLLM 都是這種。回答裡的 `<think>` 和 code fence 會去掉再解析 |
 
 - **在 `api` 裡呼叫**，因為只有 `api` 有 `SECRET_KEY`、能讀出金鑰（`llmKey`）。`POST /api/subtitles/:id/auto-align` 在排入工作前先配對（最多 45 秒），配好的對放進 `tasks.input.heard`，`media` 接著算。逾時或失敗時照樣排入，結果的 `heard.llmError` 說原因（`NOT_CONFIGURED`、`AUTH`、`RATE_LIMITED`、`REFUSED`、`BAD_RESPONSE`、`UNREACHABLE`、`TIMEOUT`）。
-- 每個聆聽窗一個請求，最多三個同時：那個窗的辨識結果，加上時間上可能對得到的字幕句子（最多 300 句）。題目明說字幕的時間不可靠、看意思和順序；只回有把握的配對、不配語助詞和歌聲、每句最多用一次、保持順序。回答裡不在題目中的編號一律丟掉。部分窗失敗照樣用其他窗的配對。
+- 每個聆聽窗一個請求，同時送出的數量：Claude 六個，OpenAI 相容的服務三個（常是一台機器上的模型）。每個請求是那個窗的辨識結果，加上時間上可能對得到的字幕句子（最多 300 句）。題目明說字幕的時間不可靠、看意思和順序；只回有把握的配對、不配語助詞和歌聲、每句最多用一次、保持順序。回答裡不在題目中的編號一律丟掉。部分窗失敗照樣用其他窗的配對。
 - 送出去的只有台詞文字和秒數，不送影片、聲音、片名或使用者資料。
 - 金鑰被拒（`AUTH`）就不再送剩下的窗。
 
