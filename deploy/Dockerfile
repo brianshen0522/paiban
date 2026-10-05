@@ -35,9 +35,19 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 RUN uv venv /opt/ffs --python /usr/bin/python3 \
  && uv pip install --python /opt/ffs/bin/python --no-cache ffsubsync==0.5.1 \
  && /opt/ffs/bin/ffsubsync --version
+# Speech recognition for subtitle alignment (docs/08-media-pipeline.md, "語音辨識"). The model is
+# downloaded at build time so the running service never reaches out for it.
+RUN uv venv /opt/asr --python /usr/bin/python3 \
+ && uv pip install --python /opt/asr/bin/python --no-cache faster-whisper==1.2.1 \
+ && /opt/asr/bin/python -c "from faster_whisper import WhisperModel; WhisperModel('base', device='cpu', compute_type='int8', download_root='/opt/asr/models')" \
+ && chmod -R a+rX /opt/asr
 ENV NODE_ENV=production \
     FFSUBSYNC=/opt/ffs/bin/ffsubsync \
-    FFS_PYTHON=/opt/ffs/bin/python
+    FFS_PYTHON=/opt/ffs/bin/python \
+    ASR_PYTHON=/opt/asr/bin/python \
+    ASR_MODELS=/opt/asr/models \
+    ASR_MODEL=base \
+    HF_HUB_OFFLINE=1
 WORKDIR /app
 COPY --from=build /out/server ./
 # The compose file sets the numeric user; nothing in the image needs root at run time.
