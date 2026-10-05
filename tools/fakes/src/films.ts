@@ -278,6 +278,28 @@ export function catalogue(baseUrl: string, local: LocalVersion[] = []): YtsMovie
         date_uploaded_unix: uploaded,
       };
     });
+    // Seeded files that match none of the film's versions (SEED_EXTRA_FILM) are listed after them.
+    for (const l of local) {
+      if (l.ytsId !== f.id || f.v.some(([q, , c, b]) => q === l.quality && c === l.videoCodec && b === l.bitDepth))
+        continue;
+      const gb = Math.round((l.sizeBytes / 1024 ** 3) * 100) / 100;
+      torrents.push({
+        url: `${baseUrl}/torrent/download/${l.hash.toUpperCase()}`,
+        hash: l.hash.toUpperCase(),
+        quality: l.quality,
+        type: l.type,
+        is_repack: '0',
+        video_codec: l.videoCodec,
+        bit_depth: String(l.bitDepth),
+        audio_channels: l.audio,
+        seeds: 1,
+        peers: 0,
+        size: `${gb} GB`,
+        size_bytes: l.sizeBytes,
+        date_uploaded: new Date(uploaded * 1000).toISOString().slice(0, 19).replace('T', ' '),
+        date_uploaded_unix: uploaded,
+      });
+    }
     return {
       id: f.id,
       url: `${baseUrl}/movies/${f.slug}`,
