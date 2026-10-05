@@ -6,6 +6,7 @@ import '@fontsource/ibm-plex-mono/latin-500.css';
 import '@fontsource/oswald/latin-500.css';
 import '@fontsource/oswald/latin-600.css';
 import './styles/app.css';
+import './styles/workspace.css';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';

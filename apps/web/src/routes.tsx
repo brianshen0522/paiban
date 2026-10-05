@@ -12,6 +12,7 @@ import { DownloadSettingsPage } from './pages/admin/DownloadSettingsPage';
 import { OverviewPage } from './pages/admin/OverviewPage';
 import { SourcesPage } from './pages/admin/SourcesPage';
 import { StorageAdminPage } from './pages/admin/StorageAdminPage';
+import { SystemPage } from './pages/admin/SystemPage';
 import { UsersPage } from './pages/admin/UsersPage';
 import { DownloadsPage } from './pages/DownloadsPage';
 import { LibraryPage } from './pages/LibraryPage';
@@ -23,6 +24,7 @@ import { ResetPage } from './pages/ResetPage';
 import { SearchPage } from './pages/SearchPage';
 import { ForbiddenPage, NotFoundPage } from './pages/StatusPages';
 import { StoragePage } from './pages/StoragePage';
+import { WorkspacePage } from './pages/workspace/WorkspacePage';
 
 /** Signed-in area: not signed in goes to /login and comes back afterwards (docs/11-pages.md, "路徑"). */
 function RequireAuth() {
@@ -79,6 +81,10 @@ export const routes: RouteObject[] = [
       { path: 'movies/:ytsId', element: <MoviePage /> },
       { path: 'downloads', element: <DownloadsPage /> },
       { path: 'library', element: <LibraryPage /> },
+      { path: 'library/:torrentId', element: <Navigate to="subtitles" replace /> },
+      { path: 'library/:torrentId/subtitles', element: <WorkspacePage tab="subtitles" /> },
+      { path: 'library/:torrentId/sync/:subtitleId?', element: <WorkspacePage tab="sync" /> },
+      { path: 'library/:torrentId/export', element: <WorkspacePage tab="export" /> },
       { path: 'storage', element: <StoragePage /> },
       { path: 'profile', element: <ProfilePage /> },
       {
@@ -91,6 +97,7 @@ export const routes: RouteObject[] = [
           { path: 'storage', element: <StorageAdminPage /> },
           { path: 'sources', element: <SourcesPage /> },
           { path: 'downloads', element: <DownloadSettingsPage /> },
+          { path: 'system', element: <SystemPage /> },
         ],
       },
       { path: '*', element: <NotFoundPage /> },

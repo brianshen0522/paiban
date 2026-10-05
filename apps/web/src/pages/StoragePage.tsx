@@ -7,7 +7,8 @@ import { UsageBar, UsageLegend } from '../components/Usage';
 import { t } from '../copy/zh-TW';
 import { del } from '../lib/api';
 import { bytes } from '../lib/format';
-import { keys, useMe, useStorage } from '../lib/queries';
+import { keys, useExports, useMe, useStorage } from '../lib/queries';
+import { ExportRow } from './workspace/ExportTab';
 
 /** docs/10-storage.md, "介面上的呈現" (the page everyone sees). */
 export function StoragePage() {
@@ -80,7 +81,51 @@ export function StoragePage() {
           </div>
         )}
       </section>
+      <MyExports />
     </>
+  );
+}
+
+/** "我建立的匯出檔": after a film is removed, this is the only place its exports can be downloaded. */
+function MyExports() {
+  const q = useExports();
+  return (
+    <section className="card">
+      <h2>{t.storage.myExports}</h2>
+      {q.isError ? (
+        <Banner tone="bad">
+          <span>{t.common.unknownError}</span>
+          <button type="button" onClick={() => q.refetch()}>
+            {t.common.retry}
+          </button>
+        </Banner>
+      ) : !q.data ? (
+        <p className="sub">{t.common.loading}</p>
+      ) : q.data.length === 0 ? (
+        <p className="sub">{t.storage.myExportsEmpty}</p>
+      ) : (
+        <>
+          <div className="tw">
+            <table>
+              <thead>
+                <tr>
+                  <th>{t.exportTab.cols2.file}</th>
+                  <th className="num">{t.exportTab.cols2.size}</th>
+                  <th>{t.exportTab.cols2.state}</th>
+                  <th className="act">{t.exportTab.cols2.action}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {q.data.map((e) => (
+                  <ExportRow key={e.id} e={e} showFilm />
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="sub">{t.storage.myExportsNote}</p>
+        </>
+      )}
+    </section>
   );
 }
 

@@ -201,7 +201,7 @@ function VersionRow({ movie, v, preferred }: { movie: MovieDetail; v: Version; p
       );
   } else if (local.mine) {
     const open = (
-      <Link className="btn" to="/library">
+      <Link className="btn" to={`/library/${local.torrentId}/subtitles`}>
         {t.common.open}
       </Link>
     );

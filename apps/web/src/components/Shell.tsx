@@ -15,7 +15,7 @@ import { meterLevel } from './Usage';
 export function notificationTarget(n: Notification): string {
   if (!n.link) return n.kind.startsWith('export.') ? '/storage' : '/library';
   if (n.link.page === 'downloads') return '/downloads';
-  return n.link.torrentId ? `/library#${n.link.torrentId}` : '/library';
+  return n.link.torrentId ? `/library/${n.link.torrentId}/${n.link.tab ?? 'subtitles'}` : '/library';
 }
 
 export function notificationText(n: Notification): string {
@@ -74,7 +74,8 @@ export function Shell({ me }: { me: Me }) {
 
   const onNotification = useCallback(
     (n: Notification) => {
-      if (n.kind === 'download.completed')
+      // Finished downloads and exports also pop up while the person has the site open (docs/11, "通知").
+      if (n.kind === 'download.completed' || n.kind === 'export.completed')
         toast(notificationText(n), { label: t.common.open, run: () => navigate(notificationTarget(n)) });
     },
     [toast, navigate],
@@ -133,6 +134,7 @@ export function Shell({ me }: { me: Me }) {
     { to: '/admin/storage', label: t.shell.admin.storage },
     { to: '/admin/sources', label: t.shell.admin.sources },
     { to: '/admin/downloads', label: t.shell.admin.downloads },
+    { to: '/admin/system', label: t.shell.admin.system },
     { to: '/admin/audit', label: t.shell.admin.audit },
   ];
 

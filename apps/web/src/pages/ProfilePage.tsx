@@ -140,7 +140,6 @@ function PrefsCard({ prefs }: { prefs: UserPrefs }) {
           </select>
         )}
       </Field>
-      <p className="sub">{t.profile.prefsLater}</p>
       {failed && <Banner tone="bad">{t.common.unknownError}</Banner>}
     </section>
   );

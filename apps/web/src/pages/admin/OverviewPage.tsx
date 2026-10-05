@@ -4,18 +4,19 @@ import { Link } from 'react-router';
 import { Banner, Chip, PageHead, Skeleton } from '../../components/Bits';
 import { t } from '../../copy/zh-TW';
 import { get } from '../../lib/api';
-import { bytes, relative } from '../../lib/format';
+import { bytes, percent, relative } from '../../lib/format';
 import { actionText, targetText, when } from './AuditPage';
+import { taskKind } from './SystemPage';
 
 type Problem = AdminOverview['problems'][number];
 const o = t.overview;
 
-/** Where each problem's button goes. The system page arrives with the media service; until then no button. */
-const PAGE: Record<Problem['page'], string | null> = {
+/** Where each problem's button goes. */
+const PAGE: Record<Problem['page'], string> = {
   storage: '/admin/storage',
   downloads: '/downloads?all=1',
   sources: '/admin/sources',
-  system: null,
+  system: '/admin/system',
 };
 
 function sentence(p: Problem): string {
@@ -119,11 +120,15 @@ export function OverviewPage() {
           <b>{d.users.active}</b>
           <span>{o.tiles.usersNote(d.users.disabled, d.users.openInvites)}</span>
         </Link>
-        <div className="tile">
+        <Link className="tile" to="/admin/system">
           <small>{o.tiles.tasks}</small>
           <b>{d.tasks.running}</b>
-          <span>{o.tiles.noTasks}</span>
-        </div>
+          <span>
+            {d.tasks.current
+              ? o.tiles.current(taskKind(d.tasks.current.kind), percent(d.tasks.current.progress))
+              : o.tiles.noTasks}
+          </span>
+        </Link>
       </div>
 
       <section className="card">
