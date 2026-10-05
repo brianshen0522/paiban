@@ -158,7 +158,7 @@ ffmpeg、ffprobe、ffsubsync、解壓工具都用陣列參數啟動（`spawn(cmd
 | 金鑰 | 放哪裡 | 誰拿得到 |
 | --- | --- | --- |
 | `SECRET_KEY`、資料庫密碼、第一個管理員的密碼 | 環境變數（`.env`） | `SECRET_KEY` 只給 `api` |
-| TMDB 金鑰、SubDL 金鑰、射手網 token | `secrets` 資料表，用 `SECRET_KEY` 以 AES-256-GCM 加密（每筆一個隨機的 12 位元組 nonce，名稱當作附加驗證資料） | 只有 `api` 解得開 |
+| TMDB 金鑰、SubDL 金鑰、射手網 token、語言模型的金鑰 | `secrets` 資料表，用 `SECRET_KEY` 以 AES-256-GCM 加密（每筆一個隨機的 12 位元組 nonce，名稱當作附加驗證資料） | 只有 `api` 解得開 |
 
 - API 只回報金鑰「有沒有設定」。沒有任何端點會回傳內容。
 - `.env` 不進版本控制。repo 裡只有 `.env.example`，裡面不能有真的值。
