@@ -100,7 +100,7 @@ pnpm test                                            # 各套件的 Vitest
 pnpm build                                           # 建置 shared、server、web
 
 pnpm db:test                                         # 測試用的 PostgreSQL(port 55432);pnpm test 之前先起來
-pnpm dev                                             # 本機開發:資料庫、假的 YTS、本機做種、api、torrent、網頁
+pnpm dev                                             # 本機開發:資料庫、假的 YTS、假的字幕來源(8091)、本機做種、api、torrent、media、網頁
                                                      # 打開 http://localhost:5173,用 admin / paiban-dev-not-real 登入,
                                                      # 在「來源設定」把 YTS 網址設成 http://127.0.0.1:8090
 
@@ -108,6 +108,7 @@ mkdir -p deploy/data                                 # 第一次:先建資料夾
 docker compose -f deploy/docker-compose.yml build    # 建置映像檔(paiban-server、paiban-proxy)
 docker compose -f deploy/docker-compose.yml up -d    # 起五個容器;網址是 deploy/.env 的 PUBLIC_URL
 scripts/phase0/reference-in-image.sh                 # 在映像檔裡跑全部參考測試與 pipeline 比對
+pnpm test:image [檔案…]                              # 在映像檔裡跑伺服器測試(需要 ffmpeg、ffsubsync、bsdtar 的那些在主機上會略過)
 ```
 
 階段 0 的手動檢查（不進自動化測試，會連外部網路）在 `scripts/phase0/`，每支檔案開頭有用法：`check-sources.mjs`（真實的字幕來源）、`real-swarm.mjs`（真實的 BitTorrent 下載，Blender 開放電影）、`real-film.sh`（真實電影的對齊）、`make-archives.sh` / `check-archives.sh`（壓縮檔）、`playback/`（瀏覽器播放測試頁）。
