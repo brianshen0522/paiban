@@ -57,11 +57,11 @@ flowchart LR
 | `media.analyze` | 探測檔案、決定要不要預覽檔、波形、人聲偵測 | media | 1 | `analyze` |
 | `media.preview` | 一部片的預覽資產：先做 `audio.m4a`，再做 `proxy.mp4` | media | 1 | `preview` |
 | `export.mux` | 封裝 MKV | media | 1 | `export` |
-| `subtitle.search` | 向一個來源查一部片的字幕 | api | 3 | |
-| `subtitle.resolve` | 向來源問出一條候選字幕現在的下載網址 | api | 2 | |
-| `subtitle.fetch` | 下載一條候選字幕、解壓縮、轉成 UTF-8 的句子清單 | media | 2 | |
-| `subtitle.ingest` | 處理使用者上傳的檔案 | media | 2 | |
-| `subtitle.align` | 使用者按下「自動對齊」：對齊一條已加入的字幕。有人在等 | media | 2 | `align` |
+| `subtitle.search` | 向一個來源查一部片的字幕 | api | 每個來源 1 | |
+| `subtitle.resolve` | 向來源問出一條候選字幕現在的下載網址，並把檔案下載到 `/data/tmp/uploads/<候選 id>/` | api | 每個來源 1 | |
+| `subtitle.fetch` | 把下載好（或上傳）的檔案解壓縮、轉成 UTF-8 的句子清單 | media | 1 | |
+| `subtitle.ingest` | 同上；上傳的檔案和下載的檔案走同一個工作 | media | （同上） | |
+| `subtitle.align` | 使用者按下「自動對齊」：對齊一條已加入的字幕。有人在等 | media | 1 | `align` |
 | `subtitle.rank` | 排名用：在背景對齊一條候選字幕 | media | 1 | `rank`（一次排名一列） |
 | `storage.rescan` | 重新計算磁碟用量 | media | 1 | `rescan` |
 
@@ -70,7 +70,8 @@ flowchart LR
 - **轉檔一次只跑一個。** `media.preview` 是最吃 CPU 的工作（一部片可能要幾十分鐘到幾小時），同時只做一部，避免在 NAS 上把 CPU 佔滿。
 - **封裝有自己的位置。** `export.mux` 不重新編碼，幾乎只受磁碟速度限制，通常不到一分鐘。它不排在轉檔後面，使用者按下匯出不該等別的片轉完。
 - **前景和背景的對齊分開。** `subtitle.align` 是有人按了按鈕在等的；`subtitle.rank` 是一次排三十條的背景工作。分成兩個佇列，前景才不會被背景塞住。
-- **對外的查詢也是工作。** `subtitle.search` 和 `subtitle.resolve` 由 `api` 自己處理（只有它拿得到金鑰）。做成工作而不是在請求裡直接呼叫，是為了讓 `api` 重啟時不會留下永遠停在「查詢中」的來源。
+- **對外的查詢也是工作。** `subtitle.search` 和 `subtitle.resolve` 由 `api` 自己處理（只有它拿得到金鑰）。做成工作而不是在請求裡直接呼叫，是為了讓 `api` 重啟時不會留下永遠停在「查詢中」的來源。它們和 `media` 的工作一樣沒有另外的佇列：`state = 'running'` 的 `subtitle_searches` 列、`fetch_state = 'fetching'` 而還沒有暫存檔的候選就是待辦，每個來源各一條線依序處理，`api` 重啟時從資料表接著做。
+- **字幕檔由 `api` 下載，`media` 處理。** 射手網的下載網址是臨時的，不能存進資料表，而沒有佇列可以把它交給 `media`；所以 `api` 問到網址後直接下載，放進和上傳相同的暫存資料夾（`/data/tmp/uploads/<候選 id>/`，檔案加一份 `manifest.json`），`media` 再從那裡解壓縮、轉成句子清單。`media` 從此不需要連外。
 
 `tasks` 資料表是給人看的：管理員的「系統狀態」頁讀它，失敗的可以從那裡重試。只有上表最右欄有寫的工作才有 `tasks` 的列；其餘的很短，它們的狀態已經在候選清單和來源狀態上看得到。pg-boss 自己的資料表不拿來顯示。
 

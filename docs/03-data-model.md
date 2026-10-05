@@ -138,7 +138,7 @@ API 回給前端的 `TorrentStatus` 是算出來的，不是存起來的：
 ### 候選：`subtitle_searches` 和 `subtitle_candidates`
 
 - 每部片每個來源一列 `subtitle_searches`，記錄最近一次搜尋的狀態和筆數。
-- 搜尋結果寫進 `subtitle_candidates`。同一個來源重新搜尋時，**還沒抓過檔案的**（`new`）和**抓失敗的**（`failed`）舊結果被新結果取代；已經抓好檔案的保留（那是使用者按「排名」或「加入」的結果）。
+- 搜尋結果寫進 `subtitle_candidates`。同一個來源重新搜尋時，**還沒抓過檔案的**（`new`）和**抓失敗的**（`failed`）舊結果被新結果取代；已經抓好檔案的保留（那是使用者按「排名」或「加入」的結果）。只取代這次搜尋涵蓋的語言（繁體中文涵蓋所有中文的猜測，簡體中文涵蓋 `zh-Hans` 和 `zh`，English 只有 `en`），所以只查英文時不會把之前找到、還沒抓的中文候選清掉。來源這次失敗時什麼都不取代。
 - 上傳的檔案也是候選，`provider = 'upload'`，`provider_ref` 是檔案的 sha256，`release_name` 是檔名。**檔案一收到就建立這一列**（`fetch_state = 'fetching'`），處理完變成 `ready` 或 `failed`；這樣讀不了的檔案會以「失敗」的樣子留在清單上並說明原因，而不是無聲無息地消失。一個壓縮檔裡有幾個字幕檔，就產生幾條候選。同一個檔案再上傳一次不會多一列：已經 `ready` 的原樣回傳，`failed` 的重新處理。
 
 `fetch_state`：`new` → `fetching` → `ready` / `failed`。`ready` 表示檔案已下載、解壓縮、轉成 UTF-8 的句子清單，`language` 也改成依內容判斷的結果。`failed` 時 `fetch_error` 是原因：
@@ -165,7 +165,7 @@ API 回給前端的 `TorrentStatus` 是算出來的，不是存起來的：
 - 資料夾裡有 `original.<ext>`（原始位元組）和 `cues.json`（句子清單，之後所有地方都用這一份）。加入時做了簡轉繁的話，`cues.json` 是轉換後的，轉換前的另存成 `cues.original.json`，`converted_s2t = true`。
 - `format` 是原始檔的格式；`.ssa` 記成 `ass`。
 - `doc` 是同步文件（型別 `SyncDoc`，定義在 `packages/shared/src/sync-core/core.ts`）。候選如果已經對齊過，初始的 `doc` 就用那次的結果；否則是「不動」。
-- `doc_rev` 從 0 開始，每次儲存加 1。儲存時要帶上原本的 `rev`，不一致就拒絕（`REVISION_CONFLICT`）。
+- `doc_rev` 從 0 開始，每次儲存加 1。「確認」不改文件，所以不加 1（存一份歷史、發 `subtitle` 事件，事件裡的 `rev` 是同一個）。儲存時要帶上原本的 `rev`，不一致就拒絕（`REVISION_CONFLICT`）。
 - `status`：`draft` 或 `confirmed`。**會改變時間或文字的儲存（送來的 `segments` 或 `edits` 和資料庫裡的不一樣）會把它變回 `draft`**；只動到對齊點或檢查點狀態的儲存不會。只有「確認」會把它變成 `confirmed`。
 - `score`：最後一次儲存時算出的對齊分數（伺服器算，不採用前端送來的數字）。
 - `updated_by`：最後一次儲存的人。版本衝突時用它告訴對方是誰改的。

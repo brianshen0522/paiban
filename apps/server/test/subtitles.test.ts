@@ -349,7 +349,8 @@ describe('uploads (docs/07, "上傳")', () => {
       .rows[0];
     expect(row.cue_count).toBe(26);
     expect((await readdir(join(t.deps.config.dataDir, row.rel_dir))).sort()).toEqual(['cues.json', 'original.srt']);
-    expect(await readdir(join(t.deps.config.dataDir, 'tmp', 'uploads'))).toEqual([]);
+    // The staged upload goes once the job that used it has ended.
+    await until(async () => (await readdir(join(t.deps.config.dataDir, 'tmp', 'uploads'))).length === 0);
     // The same file again: no second row.
     await upload(t.app, sample.tid, 'again.srt', await readFile(fixture('late.zh-TW.big5.srt')));
     await media.reconcile();

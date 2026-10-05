@@ -16,6 +16,25 @@
 
 ---
 
+## 2026-10-06 字幕來源：沒有佇列、下載移到 api、三種壓縮檔都用 bsdtar
+
+- 原本：
+  - `docs/07-subtitle-providers.md`、`docs/02-architecture.md` 用佇列把工作交給別人：`subtitle.resolve` 把臨時的下載網址放進 `subtitle.fetch` 的工作內容，由 `media` 下載並處理。
+  - zip 用 Node 的函式庫，7z 和 rar 用映像檔裡的工具。SRT、VTT 用解析函式庫。
+  - 同一個來源重新搜尋時，所有還沒抓的候選都被取代（`docs/agent-notes.md` 記下的問題：只查英文會清掉中文的候選）。
+  - 確認時 `doc_rev` 要不要加 1 沒寫。
+- 改成：
+  - 和 `media` 服務一樣沒有佇列，資料表就是待辦：`running` 的 `subtitle_searches` 是待做的查詢，`fetching` 而還沒有暫存資料夾的候選是待下載的。`api` 每個來源一條線，重啟時從資料表接著做。
+  - **下載由 `api` 做**：問到網址就下載，放進和上傳相同的 `/data/tmp/uploads/<候選 id>/`（加 `manifest.json`），`media` 只負責處理（解壓縮、轉碼、解析、判斷語言）。上傳和下載走同一個處理工作。`media` 不再需要連外。
+  - zip、7z、RAR5 都用 `bsdtar`：先列出項目檢查規則，再只把字幕檔一個一個讀到程式裡、邊讀邊算大小，由程式自己寫檔。`bsdtar` 不寫磁碟。
+  - SRT、VTT 用自己寫的小解析器（規則簡單，有測試），不加相依套件。
+  - 重新搜尋只取代這次搜尋涵蓋的語言裡、還沒抓過或抓失敗的候選；來源失敗時什麼都不取代。
+  - 確認不加 `doc_rev`（文件沒變）。
+  - 自動對齊在這個階段就用了兩種方法（ffsubsync 加對齊核心），排名也是；計算放在 `computeAlignment(speech, cues, opts, extraCandidates)`，之後別的方法（例如語音辨識）只要多給候選。
+- 原因：射手網的下載網址是臨時的，不能存進資料表，而沒有佇列就沒有地方暫放；由拿得到金鑰的 `api` 直接下載最單純。`bsdtar` 階段 0 已經驗證過三種格式，一套做法、一套檢查比兩套好；讓它只輸出到 stdout，路徑和符號連結就沒有落地的機會。語言的取代範圍是交叉比對時發現的缺陷。
+- 改了哪些檔案：docs/02-architecture.md、docs/03-data-model.md、docs/07-subtitle-providers.md、docs/10-storage.md、docs/15-testing.md
+- Brian 是否已確認：否（交接層級）
+
 ## 2026-10-06 media 服務：不用 pg-boss，錯誤每種資產一格，測試在映像檔裡跑
 
 - 原本：`docs/02-architecture.md` 用 pg-boss 當工作佇列；`media_files.error` 和 `MediaStatus.error` 只有一格。

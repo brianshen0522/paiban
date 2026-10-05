@@ -25,7 +25,7 @@
   - 回應裡出現的任何別人的金鑰（例如 JustSubtitles 的 `url` 有時帶 `?api_key=…`）在**解析的那一刻**就丟掉：取 `url` 時只保留路徑。不存、不記、不使用。這要有單元測試。
 - **一個來源失敗不影響其他來源。** 每個來源的結果和錯誤各自寫進 `subtitle_searches`，各自發事件。
 - **快取**在 `provider_cache`，有效時間是設定 `providers.cacheHours`（預設 24 小時，1 到 168）。存的是**解析之後**的結果（`FoundSubtitle` 的清單），不是來源的原始回應；原始回應可能夾帶別人的金鑰，解析後的不會。使用者按「重新搜尋」或「重試」時略過快取（`refresh: true`）。
-- **各來源的請求排隊**（D41）：對同一個來源，不論是哪個程式發的請求（`api` 的查詢、`media` 的下載），兩個請求之間至少隔一段時間：JustSubtitles（含 SubDL）和 YIFY Subtitles 是 1 秒，射手網是 3.4 秒（每分鐘 18 次以內）。因為請求來自兩個程式，這個隊排在資料庫裡：發請求前呼叫 `select provider_take_slot('<來源>', <毫秒>)`，它回傳「你可以送出的時間」，等到那個時間再送（`db/schema.sql`，有測試）。TMDB 和 YTS 不排這個隊。
+- **各來源的請求排隊**（D41）：對同一個來源，不論是哪個程式發的請求（目前查詢和下載都由 `api` 發，但規則不依賴這件事），兩個請求之間至少隔一段時間：JustSubtitles（含 SubDL）和 YIFY Subtitles 是 1 秒，射手網是 3.4 秒（每分鐘 18 次以內）。因為請求來自兩個程式，這個隊排在資料庫裡：發請求前呼叫 `select provider_take_slot('<來源>', <毫秒>)`，它回傳「你可以送出的時間」，等到那個時間再送（`db/schema.sql`，有測試）。TMDB 和 YTS 不排這個隊。
 
 ### 介面
 
@@ -62,13 +62,15 @@ type FoundSubtitle = {
 | 步驟 | 佇列 | 誰 | 做什麼 |
 | --- | --- | --- | --- |
 | 查詢 | `subtitle.search` | api | 一個來源、一部片一個工作。呼叫 `search`，把結果寫進 `subtitle_candidates` 和 `subtitle_searches`，`NOTIFY`（`candidates`） |
-| 問下載網址 | `subtitle.resolve` | api | 一條候選一個工作。呼叫 `resolveDownload`，把網址放進下一個工作的內容裡，排入 `subtitle.fetch`。網址不存進我們自己的資料表，也不寫進 log（工作的內容在佇列的表裡，工作結束後由佇列清掉）。問不到就把候選標成失敗（`DOWNLOAD_FAILED`），並 `NOTIFY paiban_media` 讓排名的進度跟著更新 |
-| 下載與處理 | `subtitle.fetch` | media | 下載、解壓縮、轉成句子清單（見「下載與處理」）。做完 `NOTIFY paiban_media`；在等排名的候選（`align_state = 'queued'`）由對帳排入 `subtitle.rank` |
-| 上傳的檔案 | `subtitle.ingest` | media | 和上一步相同，只是檔案已經在 `/data/tmp/uploads` |
+| 問下載網址並下載 | `subtitle.resolve` | api | 一條候選一個工作。呼叫 `resolveDownload`，馬上下載，把檔案和一份 `manifest.json`（每個檔案原本的檔名）先寫進 `/data/tmp/uploads/<候選 id>.part/`，確認候選還在抓、那部片沒有在被刪除，再改名成 `/data/tmp/uploads/<候選 id>/`，`NOTIFY paiban_media`。網址只在記憶體裡，不存進資料表，也不寫進 log。問不到或抓不到就把候選標成失敗（`DOWNLOAD_FAILED`），並 `NOTIFY paiban_media` 讓排名的進度跟著更新 |
+| 處理 | `subtitle.fetch` | media | 解壓縮、轉成句子清單（見「下載與處理」）。做完 `NOTIFY paiban_events`（`candidates`）；在等排名的候選（`align_state = 'queued'`）接著由 `subtitle.rank` 對齊 |
+| 上傳的檔案 | `subtitle.ingest` | media | 和上一步是同一個工作：上傳的檔案一樣放在 `/data/tmp/uploads/<候選 id>/` |
 
 查詢做成工作而不是在請求裡直接呼叫，有兩個好處：端點可以立刻回應；`api` 重啟時工作會被重新派送，不會留下永遠停在「查詢中」的來源。
 
-這四種短工作不走「等待中 → 進行中」的認領（[08-media-pipeline.md](08-media-pipeline.md) 的「先認領」是給有 `tasks` 的工作用的）：它們的狀態只有「正在做」一種。其餘的規矩照樣要守，尤其是 [03-data-model.md](03-data-model.md)「刪除一個下載時發生的事」的那四條：不替正在被刪除的片開工、寫檔之前再確認一次、最後那一筆更新的條件包含那個下載的 `want` 不是 `remove`。防止重複靠兩件事：排入時用那一列的 id 當佇列的去重鍵；工作一開始先確認那一列還需要它（來源還是 `running`、候選還是 `fetching`），不需要就直接結束。真的被派送了兩次也沒有害處：結果在工作目錄裡準備，最後那一筆帶條件的更新只有一個會成功，另一個把自己準備的東西丟掉。
+和 `media` 一樣，這些工作沒有另外的佇列，資料表本身就是待辦（2026-10-06 的變更，見 [changes.md](changes.md)）：`state = 'running'` 的 `subtitle_searches` 列是待做的查詢；`fetch_state = 'fetching'`、還沒有暫存資料夾的候選是待下載的；有暫存資料夾的是待 `media` 處理的。`api` 對每個來源各有一條線，依序處理那個來源的查詢和下載，所以一個慢的來源不會擋住其他來源；`api` 啟動時從資料表接著做。下載由 `api` 做而不是 `media`，是因為射手網的下載網址是臨時的，不能存進資料表，又沒有佇列的工作內容可以暫放。
+
+這四種短工作不走「等待中 → 進行中」的認領（[08-media-pipeline.md](08-media-pipeline.md) 的「先認領」是給有 `tasks` 的工作用的）：它們的狀態只有「正在做」一種。其餘的規矩照樣要守，尤其是 [03-data-model.md](03-data-model.md)「刪除一個下載時發生的事」的那四條：不替正在被刪除的片開工、寫檔之前再確認一次、最後那一筆更新的條件包含那個下載的 `want` 不是 `remove`。防止重複靠兩件事：同一條線一次只做一件；工作一開始先確認那一列還需要它（來源還是 `running`、候選還是 `fetching`），不需要就直接結束。真的做了兩次也沒有害處：結果在工作目錄裡準備，最後那一筆帶條件的更新只有一個會成功（查詢的那一筆比對開始的時間，所以被新的搜尋取代的舊查詢寫不進去），另一個把自己準備的東西丟掉。
 
 查詢的工作不自動重試：失敗就把那個來源記成 `error`，由使用者按「重試」。唯一的例外是射手網的額度限制（見它那一節）：那個查詢的工作把自己延後到可以重試的時間再做一次，只此一次。
 
@@ -328,16 +330,16 @@ GET https://api.assrt.net/v1/sub/detail?id=<id>
 ## 上傳
 
 - 接受 `.srt`、`.ass`、`.ssa`、`.vtt`、`.zip`、`.rar`、`.7z`，上限 20 MB。（介面上的句子照原型只列 `.srt`、`.ass`、`.vtt`；`.ssa` 也收，只是不特別寫出來。）
-- `api` 把檔案存到 `/data/tmp/uploads/<uuid>`，算出它的 sha256，**當場建立一條候選**（`provider = 'upload'`、`provider_ref` 是 sha256、`release_name` 是檔名、`fetch_state = 'fetching'`），排入 `subtitle.ingest`，立刻回傳候選清單。使用者馬上看得到一列「處理中」。
+- `api` 把檔案先存到 `/data/tmp/uploads/<隨機名稱>.part/`，算出它的 sha256，**當場建立一條候選**（`provider = 'upload'`、`provider_ref` 是 sha256、`release_name` 是檔名、`fetch_state = 'fetching'`），再把資料夾改名成 `/data/tmp/uploads/<候選 id>/`，`NOTIFY paiban_media`，立刻回傳候選清單。使用者馬上看得到一列「處理中」。
 - 後續處理和從來源下載的檔案完全一樣。壓縮檔裡有好幾個字幕檔時，原本那條候選變成其中一個，其餘的各新增一條。
 - 處理成功，那一列變成可以「加入」。處理失敗，那一列顯示原因（`fetchError`）和「移除」（`DELETE /api/candidates/:id`）。這樣讀不了的檔案不會無聲無息地消失。
 - 同一個檔案再上傳一次：不會多一列。已經處理好的原樣回傳；上次失敗的重新處理一次。
 
-## 下載與處理（`subtitle.fetch` / `subtitle.ingest`）
+## 下載與處理（`subtitle.resolve` 下載；`subtitle.fetch` / `subtitle.ingest` 處理）
 
 不論檔案從哪來，都走同一條路。參考實作在 `reference/subtitles/text.mjs`，測試素材在 `fixtures/`。
 
-1. **下載**（上傳的跳過）：先取號排隊，再做主機檢查、大小上限、逾時。抓不到就是 `DOWNLOAD_FAILED`。
+1. **下載**（上傳的跳過；由 `api` 做，見「誰做哪一步」）：先取號排隊，再做主機檢查、大小上限、逾時。抓不到就是 `DOWNLOAD_FAILED`。
 2. **判斷是不是壓縮檔**：看檔頭，不看副檔名。
 3. **解壓縮**到 `/data/tmp/work/<job>/`，有這些限制，違反任何一條就整包拒絕（`ARCHIVE_INVALID`）：
    - 最多 200 個項目；解開後總共不超過 50 MB；單一檔案不超過 10 MB
@@ -345,9 +347,9 @@ GET https://api.assrt.net/v1/sub/detail?id=<id>
    - 打不開、格式壞掉也是 `ARCHIVE_INVALID`
    - 只取 `.srt`、`.ass`、`.ssa`、`.vtt`；其他（`.sub`/`.idx`、`.txt`、`.nfo`、`__MACOSX/`）忽略
    - 打得開但一個字幕檔都沒有：`NO_SUBTITLE`
-   - zip 用 Node 的函式庫；7z 和 rar 用映像檔裡的工具。**rar 的解壓工具還沒驗證**，見 [16-risks.md](16-risks.md)
+   - 三種格式都用映像檔裡的 `bsdtar`（libarchive 3.7.4，階段 0 驗證過能解 zip、7z、RAR5；RAR4 沒有樣本）。它本身不替我們設任何限制，所以：先用 `bsdtar -tf` / `-tvf` 列出項目，依上面的規則檢查（宣告的大小也算）；通過後只取字幕檔，一個一個用 `bsdtar -x -O` 讀到程式裡，邊讀邊算實際的位元組數（標頭可以造假），由程式自己用固定的檔名寫進工作目錄。`bsdtar` 從頭到尾不寫磁碟，壓縮檔裡的路徑和符號連結沒有機會落地
 4. **轉成文字**：依序看 BOM → 嚴格的 UTF-8 → 試 Big5、GB18030、Shift_JIS、EUC-KR、Windows-1252，取解出來最像語言的那個。記下原本的編碼。
-5. **解析成句子**：SRT、VTT 用解析函式庫；ASS 只取 `Dialogue`，去掉繪圖指令和樣式標記，`\N` 變成換行（D34）。
+5. **解析成句子**：SRT、VTT 用我們自己的小解析器（格式簡單：時間行 `-->`、可有可無的編號、VTT 的 `NOTE`/`STYLE` 區塊和時間後面的設定略過；測試涵蓋）；ASS 只取 `Dialogue`，去掉繪圖指令和樣式標記，`\N` 變成換行（D34）。
 6. **正規化**：
    - 換行統一成 `\n`，去掉每句頭尾空白，丟掉沒有文字的句子
    - 負的時間夾到 0；結束時間不晚於開始時間的，結束時間設成開始後 1 秒
@@ -365,7 +367,7 @@ GET https://api.assrt.net/v1/sub/detail?id=<id>
 
 `POST /api/candidates/:id/add`，在 `api` 裡做：
 
-1. 候選還沒抓（`new`）：排入 `subtitle.resolve`。還在抓（`fetching`）：等。**最多等 30 秒**；等不到回 `CANDIDATE_UNAVAILABLE`（`reason: 'TIMEOUT'`），背景的工作照常繼續，使用者晚一點再按一次就好。抓失敗（`failed`）：回 `CANDIDATE_UNAVAILABLE`，`reason` 是 `fetch_error`。
+1. 候選還沒抓（`new`）：改成 `fetching`，交給 `api` 的下載（`subtitle.resolve`）。還在抓（`fetching`）：等。**最多等 30 秒**；等不到回 `CANDIDATE_UNAVAILABLE`（`reason: 'TIMEOUT'`），背景的工作照常繼續，使用者晚一點再按一次就好。抓失敗（`failed`）：回 `CANDIDATE_UNAVAILABLE`，`reason` 是 `fetch_error`。
 2. 讀出候選的句子清單。**繁簡轉換在這裡做**，不在抓檔時做：要不要轉是加入的人的偏好。內容是簡體而且要轉的話，用 `opencc-js` 的 `cn` → `twp`（字和用語都換成台灣的說法）轉出新的清單。
 3. 算最後那份清單的 sha256。同一部片已經有相同的就回 `SUBTITLE_DUPLICATE`。**先算再寫檔**，這樣一般的重複在磁碟上什麼都還沒建立。
 4. 建立 `/data/subtitles/<新 id>/`：`original.<ext>`（從候選複製，原封不動）、`cues.json`（最後的清單）。有轉換的話，轉換前的清單另存成 `cues.original.json`，`converted_s2t = true`。
@@ -393,7 +395,7 @@ GET https://api.assrt.net/v1/sub/detail?id=<id>
 
 1. 取所選語言的候選，依上面的順序最多取 30 條。選了繁體中文時，這部片所有中文的候選（`zh-Hant`、`zh-Hans`、`zh`）都算在內：來源標的繁簡不可靠，而且簡體可以在加入時轉成繁體。
 2. 建立一列 `tasks`（種類 `rank`，`input` 記下這次要排的候選 id）。這部片已經有一次排名在跑的話，不建立新的，直接回現況。
-3. 每一條候選的 `align_state` 設成 `queued`。還沒抓的排入 `subtitle.resolve`（之後接 `subtitle.fetch`）。然後 `NOTIFY paiban_media`：檔案抓好而且 `align_state` 是 `queued` 的候選，由 `media` 的對帳排入 `subtitle.rank`。`api` 不直接排這個佇列。
+3. 每一條候選的 `align_state` 設成 `queued`。還沒抓的改成 `fetching`，交給 `api` 的下載（之後由 `media` 處理）。然後 `NOTIFY paiban_media`：檔案抓好而且 `align_state` 是 `queued` 的候選，由 `media` 做 `subtitle.rank`。`api` 不直接做這一步。
 4. `subtitle.rank` 的工作對一條候選做一次完整的自動對齊（[08-media-pipeline.md](08-media-pipeline.md)），把分數寫回 `align_score`、結果寫回 `align_result`，`align_state = 'done'`（或 `failed`）。抓檔失敗的候選，`align_state` 也記成 `failed`。
 5. 每完成一條就 `NOTIFY`（`candidates`），清單上的分數一條一條出現；同時更新那一列 `tasks` 的進度（完成數 / 總數）。
 6. 這次要排的候選裡，還存在的都有了結果（`done` 或 `failed`），`tasks` 那一列就是 `done`。個別候選失敗不算整次排名失敗；途中被移除或被新的搜尋結果取代的候選不算在內。結算由 `media` 做（[08-media-pipeline.md](08-media-pipeline.md) 的「對帳」）。
