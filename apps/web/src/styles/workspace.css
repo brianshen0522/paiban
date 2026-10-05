@@ -38,6 +38,11 @@ button[aria-pressed="true"] {
 #view .ws-form {
   gap: 12px;
 }
+/* Narrow screens: short cells keep their words together; the table scrolls in its own box. */
+#view .ws-panel td:not(.rel),
+#view .ws-panel th {
+  white-space: nowrap;
+}
 #view .ws-form .field input {
   max-width: 560px;
   width: 100%;
