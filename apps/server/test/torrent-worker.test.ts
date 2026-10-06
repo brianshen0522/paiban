@@ -193,6 +193,24 @@ describe('the torrent service', { timeout: 90_000 }, () => {
     expect((await db.pool.query('select data from torrent_live')).rows[0].data).toBeNull();
   });
 
+  it('applies the speed limit before a download starts, not after its first pass', async () => {
+    // It used to be set at the end of a pass: a small file could arrive whole, unthrottled, first.
+    const calls: string[] = [];
+    const { add, throttle } = engine;
+    engine.add = (...args) => {
+      calls.push('add');
+      return add.apply(engine, args);
+    };
+    engine.throttle = (down, up) => {
+      calls.push(`throttle:${down}`);
+      throttle.call(engine, down, up);
+    };
+    await setSetting(db.pool, 'downloads.downloadLimitKB', 100);
+    await start(mei);
+    await until(async () => calls.includes('add'));
+    expect(calls.slice(0, calls.indexOf('add'))).toContain('throttle:102400');
+  });
+
   it('continues after a clean restart of the service', async () => {
     await setSetting(db.pool, 'downloads.downloadLimitKB', 100);
     await start(mei);

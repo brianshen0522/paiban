@@ -173,6 +173,14 @@ export class TorrentWorker {
     if (this.stopping) return;
     const settings = await readSettings(this.pool);
 
+    // 0. speed limits, before anything starts: a download scheduled below would otherwise run
+    //    unthrottled until the end of the pass (seen as a whole small file arriving at once).
+    const key = `${settings.downloads.downloadLimitKB}/${settings.downloads.uploadLimitKB}`;
+    if (key !== this.throttleKey) {
+      this.engine.throttle(settings.downloads.downloadLimitKB * 1024, settings.downloads.uploadLimitKB * 1024);
+      this.throttleKey = key;
+    }
+
     // 1. removals
     for (const r of await many<Row>(this.pool, `${ROW} where t.want = 'remove'`)) await this.remove(r);
 
@@ -206,13 +214,6 @@ export class TorrentWorker {
 
     // 6. live view for the detail pages someone has open (docs/11-pages.md, "下載細節")
     await this.live();
-
-    // 7. speed limits
-    const key = `${settings.downloads.downloadLimitKB}/${settings.downloads.uploadLimitKB}`;
-    if (key !== this.throttleKey) {
-      this.engine.throttle(settings.downloads.downloadLimitKB * 1024, settings.downloads.uploadLimitKB * 1024);
-      this.throttleKey = key;
-    }
   }
 
   private async schedule(maxActive: number, maxPerUser: number, trackers: string[]): Promise<void> {
