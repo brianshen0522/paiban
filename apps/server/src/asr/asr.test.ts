@@ -325,7 +325,28 @@ describe('language model clients against a local stand-in', () => {
     expect(await m(req)).toEqual([{ heard: 0, line: 4 }]);
     expect(last?.url).toBe('/v1/chat/completions');
     expect(last?.headers.authorization).toBe('Bearer test-key-not-real');
-    expect(last?.body).toMatchObject({ model: 'qwen-test', response_format: { type: 'json_object' } });
+    expect(last?.body).toMatchObject({
+      model: 'qwen-test',
+      response_format: { type: 'json_object' },
+      reasoning_effort: 'none',
+    });
+  });
+
+  it('OpenAI-compatible: asks again without switching thinking off when the server rejects that', async () => {
+    const bodies: Record<string, unknown>[] = [];
+    reply = () => {
+      bodies.push(last?.body ?? {});
+      return bodies.length === 1
+        ? { status: 400, body: { error: 'unknown field reasoning_effort' } }
+        : { status: 200, body: { choices: [{ message: { content: '{"matches":[]}' } }] } };
+    };
+    const m = openAiCompatibleMatcher(base, null, 'm');
+    expect(await m(req)).toEqual([]);
+    expect(bodies.map((b) => 'reasoning_effort' in b)).toEqual([true, false]);
+    // From then on it is not sent at all.
+    await m(req);
+    expect(bodies).toHaveLength(3);
+    expect('reasoning_effort' in (bodies[2] ?? {})).toBe(false);
   });
 
   it('OpenAI-compatible: no key, no authorization header; a refused key is AUTH', async () => {

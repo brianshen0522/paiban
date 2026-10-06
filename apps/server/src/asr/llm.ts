@@ -158,28 +158,39 @@ export function openAiCompatibleMatcher(
   timeoutMs = 120_000,
 ): Matcher {
   const url = `${baseUrl.replace(/\/+$/, '')}/chat/completions`;
+  // Reasoning models (Qwen 3, DeepSeek R1…) think before answering by default, which only costs
+  // time here. `reasoning_effort: "none"` switches that off on Ollama and others; a server that
+  // rejects the field gets the request again without it, and is asked without it from then on.
+  let noThinking = true;
+  const send = (req: MatchRequest, signal?: AbortSignal) =>
+    fetch(url, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}),
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0,
+        response_format: { type: 'json_object' },
+        ...(noThinking ? { reasoning_effort: 'none' } : {}),
+        messages: [
+          { role: 'system', content: SYSTEM },
+          { role: 'user', content: renderRequest(req) },
+        ],
+      }),
+      signal: AbortSignal.any([AbortSignal.timeout(timeoutMs), ...(signal ? [signal] : [])]),
+      // An API answers where it was asked; a redirect is not followed with the key attached.
+      redirect: 'manual',
+    });
   return async (req, signal) => {
     let res: Response;
     try {
-      res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}),
-        },
-        body: JSON.stringify({
-          model,
-          temperature: 0,
-          response_format: { type: 'json_object' },
-          messages: [
-            { role: 'system', content: SYSTEM },
-            { role: 'user', content: renderRequest(req) },
-          ],
-        }),
-        signal: AbortSignal.any([AbortSignal.timeout(timeoutMs), ...(signal ? [signal] : [])]),
-        // An API answers where it was asked; a redirect is not followed with the key attached.
-        redirect: 'manual',
-      });
+      res = await send(req, signal);
+      if (res.status === 400 && noThinking) {
+        noThinking = false;
+        res = await send(req, signal);
+      }
     } catch (err) {
       if (err instanceof DOMException && err.name === 'TimeoutError')
         throw new LlmError('TIMEOUT', `no answer within ${Math.round(timeoutMs / 1000)} s`);
