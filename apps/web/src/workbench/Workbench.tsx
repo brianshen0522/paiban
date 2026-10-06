@@ -32,6 +32,7 @@ import { drawOverview, drawTimeline, LANE_H, LANE_Y, type Palette, readPalette, 
 import { keyAction, targetKind } from './keys';
 import {
   applyAlignment,
+  deleteLines,
   displayText,
   editLine,
   emptyHistory,
@@ -389,6 +390,10 @@ function Bench({ ws, detail }: { ws: Workspace; detail: SubtitleDetail }) {
   /* ---------------------------------------------------------------- the second subtitle */
 
   const others = ws.subtitles.filter((s) => s.id !== sub.id);
+  // The subtitle to align by: confirmed ones first, they are the ones known to be right.
+  const refChoices = [...others].sort((a, b) => Number(b.status === 'confirmed') - Number(a.status === 'confirmed'));
+  const [refId, setRefId] = useState<string | null>(refChoices[0]?.id ?? null);
+  const refPicked = refChoices.find((s) => s.id === refId) ?? refChoices[0] ?? null;
   const preferredSecond = others.find((s) => s.language === 'en' && sub.language !== 'en') ?? others[0] ?? null;
   const [secondOn, setSecondOn] = useState(() => !!me?.user.prefs.secondLine && !!preferredSecond);
   const [secondId, setSecondId] = useState<string | null>(preferredSecond?.id ?? null);
@@ -513,15 +518,19 @@ function Bench({ ws, detail }: { ws: Workspace; detail: SubtitleDetail }) {
     say(t.bench.msg.nudge(d < 0, Math.round(Math.abs(d) * 1000), signed(next.segments[seg]?.offset ?? 0)));
   });
 
-  const auto = useLatest(async () => {
+  /** Aligns by the film's sound, or, given another subtitle of the film, by that one (docs/08). */
+  const auto = useLatest(async (referenceId?: string) => {
     if (aligning) return;
-    if (!speech) {
+    if (!referenceId && !speech) {
       say(t.bench.msg.alignNoSpeech);
       return;
     }
     setAligning(true);
     try {
-      const r = await post<AlignResult>(`/api/subtitles/${sub.id}/auto-align`, { allowSplit });
+      const r = await post<AlignResult>(
+        `/api/subtitles/${sub.id}/auto-align`,
+        referenceId ? { allowSplit, referenceId } : { allowSplit },
+      );
       const before = scoreOf(docRef.current);
       const next = applyAlignment(docRef.current, r.segments);
       commit(next, { reason: 'auto-align' });
@@ -555,19 +564,40 @@ function Bench({ ws, detail }: { ws: Workspace; detail: SubtitleDetail }) {
             : t.bench.msg.heardNothing(lang);
         if (heard.llmError) text += t.bench.msg.llmFailed(t.bench.msg.llmErrors[heard.llmError] ?? heard.llmError);
       }
-      say(text);
+      const ref = r.reference;
+      if (ref) {
+        const name = langName(ws.subtitles.find((x) => x.id === ref.subtitleId)?.language ?? '');
+        text += ref.via === 'text' ? t.bench.msg.refPaired(name, ref.pairs, ref.support) : t.bench.msg.refTiming(name);
+      }
+      // Lines the reference has nothing for: offered, never deleted without the person saying so.
+      const extra = r.extraLines ?? [];
+      if (extra.length) {
+        const nums = extra.map((id) => cues.findIndex((c) => c.id === id) + 1).filter((x) => x > 0);
+        text += t.bench.msg.refExtra(nums.join('、'));
+        say(text, [
+          {
+            label: t.bench.msg.refDelete(nums.length),
+            run: () => {
+              commit(deleteLines(docRef.current, cues, extra));
+              say(t.bench.msg.refDeleted(nums.length));
+            },
+          },
+        ]);
+      } else say(text);
     } catch (e) {
       const f = asFailure(e);
       say(
         f.code === 'MEDIA_NOT_READY'
           ? t.bench.msg.alignNoSpeech
-          : f.code === 'RATE_LIMITED'
-            ? t.bench.msg.alignTooOften(
-                f.details && 'retryAfterSeconds' in f.details ? Math.ceil(f.details.retryAfterSeconds / 60) : 1,
-              )
-            : f.code === 'NETWORK'
-              ? t.common.offline
-              : t.bench.msg.alignFailed,
+          : f.code === 'VALIDATION' && referenceId
+            ? t.bench.msg.refInvalid
+            : f.code === 'RATE_LIMITED'
+              ? t.bench.msg.alignTooOften(
+                  f.details && 'retryAfterSeconds' in f.details ? Math.ceil(f.details.retryAfterSeconds / 60) : 1,
+                )
+              : f.code === 'NETWORK'
+                ? t.common.offline
+                : t.bench.msg.alignFailed,
       );
     } finally {
       setAligning(false);
@@ -1435,6 +1465,26 @@ function Bench({ ws, detail }: { ws: Workspace; detail: SubtitleDetail }) {
             </button>
           </div>
           <p>{noSpeechReason ?? t.bench.auto.note}</p>
+          {refPicked && (
+            <>
+              <div className="ctl">
+                <label className="chk grow ref-pick">
+                  {t.bench.auto.byRef}
+                  <select value={refPicked.id} onChange={(e) => setRefId(e.target.value)}>
+                    {refChoices.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {t.bench.auto.refOption(langName(s.language), s.releaseName, s.status === 'confirmed')}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button type="button" disabled={aligning || disabled} onClick={() => void auto(refPicked.id)}>
+                  {t.bench.auto.runByRef}
+                </button>
+              </div>
+              <p>{refPicked.status === 'confirmed' ? t.bench.auto.refNote : t.bench.auto.refDraftNote}</p>
+            </>
+          )}
         </div>
 
         <div className="tool">

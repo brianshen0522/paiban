@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { type KeyInput, keyAction } from './keys';
 import {
   applyAlignment,
+  deleteLines,
   editLine,
   emptyHistory,
   merge,
@@ -95,6 +96,12 @@ describe('workbench document', () => {
     expect(d.edits['5']?.text).toBeUndefined();
     d = editLine(d, cues, 4, 'del', 0);
     expect(SyncCore.applyDoc(cues, d)[4]?.deleted).toBe(true);
+  });
+
+  it('deletes the lines another subtitle found nothing for, by cue id, in one step', () => {
+    const d = deleteLines(editLine(doc(), cues, 0, 'del', 0), cues, [cues[0]?.id ?? 0, cues[2]?.id ?? 0, 999]);
+    const m = SyncCore.applyDoc(cues, d);
+    expect(m.filter((c) => c.deleted).map((c) => c.id)).toEqual([cues[0]?.id, cues[2]?.id]);
   });
 
   it('tells timing changes from checkpoint marks', () => {

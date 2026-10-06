@@ -202,6 +202,15 @@ function changeEdit(doc: SyncDoc, cues: ReadonlyArray<Cue>, i: number, fn: (e: C
   };
 }
 
+/**
+ * Marks the lines with these cue ids deleted, in one step: the lines an alignment to another
+ * subtitle found nothing for (credits and the like), once the person says to delete them.
+ */
+export function deleteLines(doc: SyncDoc, cues: ReadonlyArray<Cue>, ids: ReadonlyArray<number>): SyncDoc {
+  const want = new Set(ids);
+  return cues.reduce((d, c, i) => (want.has(c.id) ? changeEdit(d, cues, i, (e) => ({ ...e, deleted: true })) : d), doc);
+}
+
 /** Line editing: ±50 ms, "set to now" for start and end, delete / restore. Stored as deltas. */
 export function editLine(doc: SyncDoc, cues: ReadonlyArray<Cue>, i: number, op: LineOp, now: number): SyncDoc {
   const cue = cues[i];

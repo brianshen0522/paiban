@@ -826,6 +826,12 @@ export const t = {
       allowSplit: '允許分段',
       snap: '吸附到人聲',
       note: '自動對齊會試所有常見影格率和整片位移；吸附只在目前位置前後 1.5 秒內微調。',
+      byRef: '依另一條字幕',
+      refOption: (lang: string, release: string, confirmed: boolean) =>
+        `${lang}${confirmed ? '（已確認）' : '（草稿）'}・${release}`,
+      runByRef: '依這條對齊',
+      refNote: '用這條字幕現在的時間當成電影：不必分析聲音，開頭的製作資訊、一句拆成兩句或兩句併成一句都不影響。',
+      refDraftNote: '這條字幕還沒確認同步；它對不準，依它對齊的結果也會跟著不準。',
     },
     offset: {
       title: '位移與速率',
@@ -895,6 +901,9 @@ export const t = {
       core: '內建的人聲比對',
       asr: '語音辨識',
       'asr-llm': '語音辨識加語言模型',
+      reference: '依另一條字幕的時間',
+      'reference-text': '依另一條字幕的時間和文字',
+      'reference-llm': '依另一條字幕和語言模型',
     } as Record<string, string>,
     msg: {
       ready: '準備好了。按「播放」聽聽看字幕差多少，或直接按「自動對齊」。',
@@ -920,6 +929,13 @@ export const t = {
         UNREACHABLE: '連不上服務',
         TIMEOUT: '等太久沒有回應',
       } as Record<string, string>,
+      refPaired: (lang: string, pairs: number, support: number) =>
+        `和${lang}字幕的文字配出 ${pairs} 對，這次的結果符合其中 ${support} 對。`,
+      refTiming: (lang: string) => `兩條字幕語言不同，只依${lang}字幕每句出現的時間對齊。`,
+      refExtra: (lines: string) => `第 ${lines} 句在另一條字幕裡找不到對應，看起來是片頭片尾的製作資訊。`,
+      refDelete: (n: number) => `刪除這 ${n} 句`,
+      refDeleted: (n: number) => `已刪除 ${n} 句。按「復原」可以拿回來。`,
+      refInvalid: '選的字幕不是這部電影的另一條字幕，或已經被移除。請重新整理後再選。',
       alignFailed: '自動對齊沒有成功。可以再試一次，或用對齊點手動對。',
       alignTooOften: (minutes: number) =>
         `自動對齊按得太頻繁了，請 ${minutes} 分鐘後再試。這段時間可以用吸附、位移或對齊點手動調。`,
