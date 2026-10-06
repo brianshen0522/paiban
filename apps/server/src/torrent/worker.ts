@@ -4,6 +4,7 @@ import { SIZE_SLACK_BYTES } from '@paiban/shared';
 import type { Logger } from 'pino';
 import type { Config } from '../config.js';
 import { many, one, type Pool, tx } from '../db/pool.js';
+import type { CountryLookup } from '../geo/geoip.js';
 import { readSettings } from '../settings/settings.js';
 import type { DiskProbe } from '../storage/disk.js';
 import { folderBytes } from '../storage/measure.js';
@@ -11,6 +12,7 @@ import { removeDownloadFiles, removeExportTracks, removePoster } from '../storag
 import { admit, predictDirectPlay } from '../storage/usage.js';
 import { versionLabel } from '../torrents/view.js';
 import type { Engine, EngineTorrent } from './engine.js';
+import { buildLive, HISTORY_POINTS } from './live.js';
 import { mainVideo, pathsAreSafe, pickToStart, stalled } from './schedule.js';
 
 /**
@@ -59,6 +61,10 @@ export type WorkerDeps = {
   engine: Engine;
   disk: DiskProbe;
   now?: () => number;
+  /** IP → country for the detail page's map; without one every peer is "unknown". */
+  geo?: CountryLookup;
+  /** This server's country, from its time zone. */
+  home?: string;
 };
 
 export class TorrentWorker {
@@ -73,6 +79,10 @@ export class TorrentWorker {
   private chain: Promise<void> = Promise.resolve();
   private stopping = false;
   private throttleKey = '';
+  private readonly geo: CountryLookup;
+  private readonly home: string;
+  /** Recent speeds per running download, for the detail page's chart. */
+  private readonly history = new Map<string, { downBps: number; upBps: number }[]>();
   lastIncomingAt: string | null = null;
 
   constructor(d: WorkerDeps) {
@@ -82,6 +92,8 @@ export class TorrentWorker {
     this.engine = d.engine;
     this.disk = d.disk;
     this.now = d.now ?? Date.now;
+    this.geo = d.geo ?? { country: () => null, size: 0 };
+    this.home = d.home ?? 'TW';
   }
 
   private torrentDir(hash: string): string {
@@ -108,6 +120,42 @@ export class TorrentWorker {
         [r.id, trusted ? 'metadata' : 'verifying'],
       );
       await this.attach(r, trusted, (await readSettings(this.pool)).downloads.trackers);
+    }
+  }
+
+  /**
+   * Keeps two minutes of speeds for every running download, and writes a snapshot for each one a
+   * detail page is watching (torrent_live.wanted_until in the future). Nothing is written for
+   * downloads nobody is looking at.
+   */
+  private async live(): Promise<void> {
+    const running = new Map<string, EngineTorrent>([
+      ...[...this.active.values()].map((a) => [a.id, a.t] as const),
+      ...this.seeding,
+    ]);
+    for (const [id, t] of running) {
+      const h = this.history.get(id) ?? [];
+      h.push({ downBps: t.downloadSpeed, upBps: t.uploadSpeed });
+      if (h.length > HISTORY_POINTS) h.splice(0, h.length - HISTORY_POINTS);
+      this.history.set(id, h);
+    }
+    for (const id of [...this.history.keys()]) if (!running.has(id)) this.history.delete(id);
+    const watched = await many<{ torrent_id: string }>(
+      this.pool,
+      'select torrent_id from torrent_live where wanted_until > now()',
+    );
+    for (const { torrent_id: id } of watched) {
+      const t = running.get(id);
+      const data = t
+        ? buildLive(
+            t.snapshot(),
+            { downBps: t.downloadSpeed, upBps: t.uploadSpeed },
+            this.history.get(id) ?? [],
+            this.geo,
+            this.home,
+          )
+        : null;
+      await this.pool.query('update torrent_live set data = $2, updated_at = now() where torrent_id = $1', [id, data]);
     }
   }
 
@@ -152,7 +200,10 @@ export class TorrentWorker {
     for (const a of [...this.active.values()]) await this.progress(a, settings.downloads.stallMinutes);
     for (const [id, t] of this.seeding) await this.seedProgress(id, t, settings.downloads.seedMode);
 
-    // 6. speed limits
+    // 6. live view for the detail pages someone has open (docs/11-pages.md, "下載細節")
+    await this.live();
+
+    // 7. speed limits
     const key = `${settings.downloads.downloadLimitKB}/${settings.downloads.uploadLimitKB}`;
     if (key !== this.throttleKey) {
       this.engine.throttle(settings.downloads.downloadLimitKB * 1024, settings.downloads.uploadLimitKB * 1024);

@@ -3,11 +3,13 @@ import { loadConfig } from './config.js';
 import { waitForSchema } from './db/migrate.js';
 import { createPool } from './db/pool.js';
 import { assertSafeEnvironment } from './env.js';
+import { loadGeoTable } from './geo/geoip.js';
 import { startHeartbeat } from './heartbeat.js';
 import { createLogger } from './log.js';
 import { readSettings } from './settings/settings.js';
 import { diskProbe } from './storage/disk.js';
 import { createEngine } from './torrent/engine.js';
+import { homeCountry } from './torrent/live.js';
 import { TorrentWorker } from './torrent/worker.js';
 
 const log = createLogger('torrent');
@@ -30,7 +32,18 @@ engine.onError((err) => {
   process.exit(1);
 });
 
-const worker = new TorrentWorker({ pool, config, log, engine, disk: diskProbe(config.dataDir) });
+// The IP → country table for the download page's map (built into the image; see deploy/Dockerfile).
+const geo = await loadGeoTable(process.env.GEOIP_CSV);
+log.info({ ranges: geo.size }, geo.size ? 'country table loaded' : 'no country table: peers show without a country');
+const worker = new TorrentWorker({
+  pool,
+  config,
+  log,
+  engine,
+  disk: diskProbe(config.dataDir),
+  geo,
+  home: homeCountry(process.env.TZ),
+});
 await worker.recover();
 const stopHeartbeat = startHeartbeat(pool, 'torrent', () => ({
   port: config.torrentPort,

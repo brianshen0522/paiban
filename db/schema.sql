@@ -186,6 +186,16 @@ create index torrents_movie on torrents (movie_id);
 -- Who has this film in their library. One copy on disk no matter how many holders.
 -- A torrent with no holders can exist only after its last holder's account was removed;
 -- an administrator deletes it by hand.
+-- What a download is doing right now, for its detail page (docs/11-pages.md, "下載細節"). The page
+-- keeps `wanted_until` a few seconds ahead while it is open; the torrent service writes `data`
+-- every pass for rows still wanted. Throwaway state, so the table is unlogged.
+create unlogged table torrent_live (
+  torrent_id   uuid primary key references torrents (id) on delete cascade,
+  wanted_until timestamptz not null,
+  data         jsonb,                                  -- TorrentLive
+  updated_at   timestamptz
+);
+
 create table torrent_holders (
   torrent_id uuid not null references torrents (id) on delete cascade,
   user_id    uuid not null references users (id) on delete cascade,

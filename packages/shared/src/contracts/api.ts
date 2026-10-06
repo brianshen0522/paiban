@@ -240,6 +240,51 @@ export type Torrent = {
   media: MediaStatus | null;
 };
 
+/**
+ * What one download is doing right now, for its detail page (docs/11-pages.md, "下載細節"). Only
+ * made while someone has that page open; refreshed every 2 seconds.
+ */
+export type TorrentLivePeer = {
+  /** Stable while the connection lasts; says nothing about the address. */
+  id: string;
+  /** Partly hidden: "61.220.x.x", "2001:db8:x". */
+  address: string;
+  /** ISO 3166-1 alpha-2; null for a private address or one the table does not know. */
+  country: string | null;
+  /** On the same private network (or this machine). */
+  local: boolean;
+  client: string | null;
+  /** Who opened the connection: them (`in`) or us (`out`). */
+  direction: 'in' | 'out';
+  transport: 'tcp' | 'utp' | 'http';
+  downBps: number;
+  upBps: number;
+  /** Share of the film the peer has, 0 to 1. */
+  has: number;
+};
+
+export type TorrentLive = {
+  at: IsoTime;
+  downBps: number;
+  upBps: number;
+  /** One point every 2 seconds, oldest first, at most the last 2 minutes. */
+  history: { downBps: number; upBps: number }[];
+  /** Null until the torrent's metadata has arrived. Bit strings are base64, most significant bit first. */
+  pieces: {
+    count: number;
+    /** Bytes per piece (the last one may be shorter). */
+    size: number;
+    have: string;
+    /** Being fetched right now. */
+    active: string;
+    /** One byte per piece: how many connected peers have it (at most 255). */
+    availability: string;
+  } | null;
+  peers: TorrentLivePeer[];
+  /** Where this server is, as a country code, from its time zone; the map draws lines to it. */
+  home: string;
+};
+
 export type AssetState = 'none' | 'pending' | 'running' | 'ready' | 'failed';
 
 export type MediaErrorCode =
@@ -765,6 +810,8 @@ export interface Endpoints {
   /* downloads */
   'POST /api/torrents': { body: { ytsId: number; infoHash: string }; ok: { torrent: Torrent; joined: boolean } };
   'GET /api/torrents': { query: { scope?: 'mine' | 'all' }; ok: Torrent[] };
+  /** Null while the first snapshot is being made (it arrives within 2 seconds) or when the download is not running. */
+  'GET /api/torrents/:id/live': { ok: TorrentLive | null };
   'GET /api/torrents/:id': { ok: Torrent };
   'POST /api/torrents/:id/pause': { ok: Torrent };
   'POST /api/torrents/:id/resume': { ok: Torrent };

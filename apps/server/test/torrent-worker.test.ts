@@ -169,6 +169,30 @@ describe('the torrent service', { timeout: 90_000 }, () => {
     expect(await sha(join(dataDir, 'torrents', clipHash, 'clip.mp4'))).toBe(await sha(fixture('clip.mp4')));
   });
 
+  it('shows a running download live while its detail page is open, to holders only', async () => {
+    await setSetting(db.pool, 'downloads.downloadLimitKB', 100);
+    const id = await start(mei);
+    await until(async () => (await row()).progress > 0.05);
+    const live = () => call(t.app, 'GET', `/api/torrents/${id}/live`, { cookie: mei });
+    // Nobody was watching: the first call asks for a snapshot, the next pass makes it.
+    expect((await live()).json()).toBeNull();
+    await until(async () => (await live()).json() !== null, 20_000);
+    const v = (await live()).json();
+    expect(v.home).toBe('TW');
+    expect(v.pieces.count).toBeGreaterThan(10);
+    const have = Buffer.from(v.pieces.have, 'base64');
+    expect(have.length).toBe(Math.ceil(v.pieces.count / 8));
+    expect(have.some((b: number) => b !== 0)).toBe(true);
+    expect(v.peers).toHaveLength(1);
+    expect(v.peers[0]).toMatchObject({ address: '127.0.x.x', local: true, country: null, direction: 'out', has: 1 });
+    expect(v.history.length).toBeGreaterThan(0);
+    expect((await call(t.app, 'GET', `/api/torrents/${id}/live`, { cookie: hao })).statusCode).toBe(403);
+    // Nobody watches any more: after the wanted time runs out, passes write nothing.
+    await db.pool.query(`update torrent_live set wanted_until = now() - interval '1 second', data = null`);
+    await worker.tick();
+    expect((await db.pool.query('select data from torrent_live')).rows[0].data).toBeNull();
+  });
+
   it('continues after a clean restart of the service', async () => {
     await setSetting(db.pool, 'downloads.downloadLimitKB', 100);
     await start(mei);

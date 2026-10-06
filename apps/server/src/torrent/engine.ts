@@ -7,6 +7,34 @@ import WebTorrent from 'webtorrent';
  */
 export type EngineFile = { path: string; length: number };
 
+/** One open connection, as the download page shows it (docs/11-pages.md, "下載細節"). */
+export type EnginePeer = {
+  address: string;
+  port: number;
+  /** 'tcpIncoming', 'tcpOutgoing', 'utpIncoming', 'utpOutgoing', 'webSeed'. */
+  type: string;
+  /** Remote peer id as hex, and the client name it sent in the extended handshake, when it did. */
+  peerId: string | null;
+  clientVersion: string | null;
+  downBps: number;
+  upBps: number;
+  /** How many of the torrent's pieces the peer has. */
+  pieces: number;
+};
+
+/** What the engine knows about one torrent right now; null before its metadata arrived. */
+export type EngineSnapshot = {
+  pieceCount: number;
+  pieceLength: number;
+  /** Pieces on disk, one bit each, most significant bit first. */
+  have: Buffer;
+  /** Pieces being fetched right now (blocks reserved from some peer). */
+  active: Buffer;
+  /** For each piece, how many connected peers have it (at most 255). */
+  availability: Uint8Array;
+  peers: EnginePeer[];
+};
+
 export type EngineTorrent = {
   readonly infoHash: string;
   readonly ready: boolean;
@@ -15,11 +43,13 @@ export type EngineTorrent = {
   readonly downloaded: number;
   readonly uploaded: number;
   readonly downloadSpeed: number;
+  readonly uploadSpeed: number;
   readonly numPeers: number;
   readonly length: number;
   readonly files: EngineFile[];
   /** Pieces on disk, for fast resume. Null before the metadata arrived. */
   bitfield(): Buffer | null;
+  snapshot(): EngineSnapshot | null;
   on(event: 'infoHash' | 'metadata' | 'ready' | 'done' | 'download', fn: () => void): void;
   on(event: 'error', fn: (err: Error) => void): void;
   on(event: 'warning', fn: (err: Error) => void): void;
@@ -59,13 +89,28 @@ type WtTorrent = {
   downloaded: number;
   uploaded: number;
   downloadSpeed: number;
+  uploadSpeed: number;
   numPeers: number;
   length: number;
+  pieceLength: number;
+  pieces: unknown[];
   files: { path: string; length: number }[];
-  bitfield?: { buffer: Uint8Array };
+  bitfield?: { buffer: Uint8Array; get(i: number): boolean };
+  wires?: WtWire[];
+  _reservations?: (unknown[] | null)[];
   on(event: string, fn: (...args: unknown[]) => void): void;
   addPeer(addr: string): void;
   destroy(opts: { destroyStore: boolean }, cb: (err?: Error) => void): void;
+};
+type WtWire = {
+  remoteAddress?: string;
+  remotePort?: number;
+  type?: string;
+  peerId?: string | null;
+  peerExtendedHandshake?: { v?: unknown };
+  peerPieces?: { get(i: number): boolean };
+  downloadSpeed?: () => number;
+  uploadSpeed?: () => number;
 };
 type WtClient = {
   add(id: string, opts: object): WtTorrent;
@@ -143,6 +188,9 @@ function wrap(t: WtTorrent): EngineTorrent {
     get downloadSpeed() {
       return t.downloadSpeed;
     },
+    get uploadSpeed() {
+      return t.uploadSpeed;
+    },
     get numPeers() {
       return t.numPeers;
     },
@@ -153,6 +201,7 @@ function wrap(t: WtTorrent): EngineTorrent {
       return (t.files ?? []).map((f) => ({ path: f.path, length: f.length }));
     },
     bitfield: () => (t.bitfield ? Buffer.from(t.bitfield.buffer) : null),
+    snapshot: () => snapshotOf(t),
     on(event: string, fn: (...args: never[]) => void) {
       if (event === 'wire')
         t.on('wire', (wire: unknown) => (fn as (type: string) => void)(String((wire as { type?: string }).type ?? '')));
@@ -161,4 +210,50 @@ function wrap(t: WtTorrent): EngineTorrent {
     addPeer: (addr) => t.addPeer(addr),
     stop: () => new Promise((resolve) => t.destroy({ destroyStore: false }, () => resolve())),
   };
+}
+
+const bitBuffer = (n: number) => Buffer.alloc(Math.ceil(n / 8));
+const setBit = (b: Buffer, i: number) => {
+  b[i >> 3] = (b[i >> 3] ?? 0) | (0x80 >> (i & 7));
+};
+
+/** Reads WebTorrent's per-connection and per-piece state; every field is checked, none trusted. */
+function snapshotOf(t: WtTorrent): EngineSnapshot | null {
+  const count = Array.isArray(t.pieces) ? t.pieces.length : 0;
+  if (!t.ready || !t.bitfield || count === 0) return null;
+  const have = bitBuffer(count);
+  const active = bitBuffer(count);
+  const availability = new Uint8Array(count);
+  const wires = (t.wires ?? []).filter((w) => typeof w.remoteAddress === 'string');
+  const reservations = t._reservations ?? [];
+  for (let i = 0; i < count; i++) {
+    if (t.bitfield.get(i)) setBit(have, i);
+    else if ((reservations[i]?.length ?? 0) > 0) setBit(active, i);
+  }
+  const peers: EnginePeer[] = wires.map((w) => {
+    let pieces = 0;
+    for (let i = 0; i < count; i++) {
+      if (w.peerPieces?.get(i)) {
+        pieces++;
+        availability[i] = Math.min(255, (availability[i] ?? 0) + 1);
+      }
+    }
+    const v = w.peerExtendedHandshake?.v;
+    return {
+      address: w.remoteAddress ?? '',
+      port: Number(w.remotePort ?? 0),
+      type: String(w.type ?? ''),
+      peerId: typeof w.peerId === 'string' ? w.peerId : null,
+      clientVersion:
+        typeof v === 'string'
+          ? v
+          : Buffer.isBuffer(v) || v instanceof Uint8Array
+            ? Buffer.from(v).toString('utf8')
+            : null,
+      downBps: Math.max(0, Math.round(w.downloadSpeed?.() ?? 0)),
+      upBps: Math.max(0, Math.round(w.uploadSpeed?.() ?? 0)),
+      pieces,
+    };
+  });
+  return { pieceCount: count, pieceLength: t.pieceLength, have, active, availability, peers };
 }

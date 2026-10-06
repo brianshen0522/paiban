@@ -1,6 +1,6 @@
 import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { Torrent } from '@paiban/shared';
+import type { Torrent, TorrentLive } from '@paiban/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { audit } from '../audit.js';
@@ -157,6 +157,25 @@ export function torrentRoutes(app: FastifyInstance, deps: Deps): void {
     const user = requireUser(req);
     const { id } = parse(IdParams, req.params);
     return toTorrent(await holderTorrent(deps, user, id), user.id);
+  });
+
+  /**
+   * The detail page's live view (docs/11-pages.md, "下載細節"). Each call keeps the snapshot wanted
+   * for ten more seconds; the torrent service writes one on its next pass (every 2 s). A snapshot
+   * older than six seconds is not given out: the download has stopped running.
+   */
+  app.get('/api/torrents/:id/live', async (req): Promise<TorrentLive | null> => {
+    const user = requireUser(req);
+    const { id } = parse(IdParams, req.params);
+    await holderTorrent(deps, user, id);
+    const row = await one<{ data: TorrentLive | null; fresh: boolean }>(
+      pool,
+      `insert into torrent_live (torrent_id, wanted_until) values ($1, now() + interval '10 seconds')
+       on conflict (torrent_id) do update set wanted_until = excluded.wanted_until
+       returning data, coalesce(updated_at > now() - interval '6 seconds', false) as fresh`,
+      [id],
+    );
+    return row?.fresh ? row.data : null;
   });
 
   /** pause/resume only write `want`; the torrent worker makes `state` follow (docs/06). */
