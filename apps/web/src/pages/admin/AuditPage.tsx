@@ -2,6 +2,7 @@ import type { AdminUser, AuditEntry } from '@paiban/shared';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router';
 import { Banner, PageHead, Skeleton } from '../../components/Bits';
+import { FillPage, ScrollList } from '../../components/FillPage';
 import { t } from '../../copy/zh-TW';
 import { get } from '../../lib/api';
 import { bytes } from '../../lib/format';
@@ -23,7 +24,7 @@ export function AuditPage() {
   const items = log.data?.pages.flatMap((p) => p.items) ?? [];
 
   return (
-    <>
+    <FillPage>
       <PageHead title={t.audit.title} lead={t.audit.lead}>
         <label className="sel-l">
           <span>{t.audit.user}</span>
@@ -37,44 +38,46 @@ export function AuditPage() {
           </select>
         </label>
       </PageHead>
-      <section className="card">
-        {log.isError ? (
-          <Banner tone="bad">{t.common.unknownError}</Banner>
-        ) : !log.data ? (
-          <Skeleton lines={5} />
-        ) : items.length === 0 ? (
-          <p className="sub">{userId ? t.audit.emptyFor : t.audit.empty}</p>
-        ) : (
-          <div className="tw">
-            <table className="rtable">
-              <thead>
-                <tr>
-                  <th>{t.audit.cols.at}</th>
-                  <th>{t.audit.cols.user}</th>
-                  <th>{t.audit.cols.action}</th>
-                  <th>{t.audit.cols.target}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {items.map((e) => (
-                  <tr key={e.id}>
-                    <td className="sub mono lead">{when(e.at)}</td>
-                    <td data-label={t.audit.cols.user}>{e.actorName || e.actor?.displayName || '—'}</td>
-                    <td data-label={t.audit.cols.action}>{actionText(e)}</td>
-                    <td data-label={t.audit.cols.target}>{targetText(e)}</td>
+      <ScrollList label={t.audit.title}>
+        <section className="card">
+          {log.isError ? (
+            <Banner tone="bad">{t.common.unknownError}</Banner>
+          ) : !log.data ? (
+            <Skeleton lines={5} />
+          ) : items.length === 0 ? (
+            <p className="sub">{userId ? t.audit.emptyFor : t.audit.empty}</p>
+          ) : (
+            <div className="tw">
+              <table className="rtable">
+                <thead>
+                  <tr>
+                    <th>{t.audit.cols.at}</th>
+                    <th>{t.audit.cols.user}</th>
+                    <th>{t.audit.cols.action}</th>
+                    <th>{t.audit.cols.target}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        {log.hasNextPage && (
-          <button type="button" disabled={log.isFetchingNextPage} onClick={() => log.fetchNextPage()}>
-            {t.audit.older}
-          </button>
-        )}
-      </section>
-    </>
+                </thead>
+                <tbody>
+                  {items.map((e) => (
+                    <tr key={e.id}>
+                      <td className="sub mono lead">{when(e.at)}</td>
+                      <td data-label={t.audit.cols.user}>{e.actorName || e.actor?.displayName || '—'}</td>
+                      <td data-label={t.audit.cols.action}>{actionText(e)}</td>
+                      <td data-label={t.audit.cols.target}>{targetText(e)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {log.hasNextPage && (
+            <button type="button" disabled={log.isFetchingNextPage} onClick={() => log.fetchNextPage()}>
+              {t.audit.older}
+            </button>
+          )}
+        </section>
+      </ScrollList>
+    </FillPage>
   );
 }
 

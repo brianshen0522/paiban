@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { Banner, Chip, ConfirmInline, Empty, PageHead, Skeleton } from '../components/Bits';
+import { FillPage, ScrollList } from '../components/FillPage';
 import { Poster } from '../components/Poster';
 import { useToast } from '../components/Toasts';
 import { t } from '../copy/zh-TW';
@@ -50,7 +51,7 @@ export function LibraryPage() {
   const items = lib.data ?? [];
   const shown = items.filter((i) => matches(filter, i));
   return (
-    <>
+    <FillPage>
       <PageHead title={t.library.title} lead={t.library.lead} />
       {lib.isError ? (
         <Banner tone="bad">
@@ -80,15 +81,17 @@ export function LibraryPage() {
           {shown.length === 0 ? (
             <Empty title={t.library.filterEmpty} hint={t.library.filterEmptyHint} />
           ) : (
-            <div className="libs">
-              {shown.map((item) => (
-                <Card key={item.torrent.id} item={item} />
-              ))}
-            </div>
+            <ScrollList label={t.library.title}>
+              <div className="libs">
+                {shown.map((item) => (
+                  <Card key={item.torrent.id} item={item} />
+                ))}
+              </div>
+            </ScrollList>
           )}
         </>
       )}
-    </>
+    </FillPage>
   );
 }
 

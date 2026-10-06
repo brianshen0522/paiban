@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useOutletContext, useSearchParams } from 'react-router';
 import { Banner, Chip, ConfirmInline, Empty, PageHead, Progress, Skeleton, type Tone } from '../components/Bits';
+import { FillPage, ScrollList } from '../components/FillPage';
 import { Poster } from '../components/Poster';
 import { SpaceShort } from '../components/SpaceShort';
 import { useToast } from '../components/Toasts';
@@ -45,7 +46,7 @@ export function DownloadsPage() {
     .slice(0, 6);
 
   return (
-    <>
+    <FillPage>
       <PageHead title={t.downloads.title}>
         {isAdmin && (
           <label className="chk">
@@ -74,7 +75,7 @@ export function DownloadsPage() {
           </Link>
         </Empty>
       ) : (
-        <>
+        <ScrollList label={t.downloads.title}>
           <section className="card">
             <h2>{t.downloads.active}</h2>
             {active.length === 0 ? (
@@ -99,9 +100,9 @@ export function DownloadsPage() {
               ))}
             </section>
           )}
-        </>
+        </ScrollList>
       )}
-    </>
+    </FillPage>
   );
 }
 

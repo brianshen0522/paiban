@@ -2,6 +2,7 @@ import type { Me, MovieSummary } from '@paiban/shared';
 import { type FormEvent, useEffect, useState } from 'react';
 import { Link, useOutletContext, useSearchParams } from 'react-router';
 import { Banner, Chip, Empty, PageHead } from '../components/Bits';
+import { FillPage, ScrollList } from '../components/FillPage';
 import { Poster } from '../components/Poster';
 import { Rating } from '../components/Rating';
 import { t } from '../copy/zh-TW';
@@ -47,7 +48,7 @@ export function SearchPage() {
   const filtered = ['quality', 'genre', 'minRating', 'sort'].some((k) => params.get(k));
 
   return (
-    <>
+    <FillPage>
       <PageHead title={t.search.title} lead={t.search.lead} />
       <form className="filters" onSubmit={submit} aria-label={t.search.title}>
         <input
@@ -111,38 +112,43 @@ export function SearchPage() {
             <h2>{keyword ? t.search.resultsFor(keyword) : t.search.latest}</h2>
             {res.data && <span className="sub">{t.search.count(res.data.total)}</span>}
           </div>
-          {!res.data ? (
-            <div className="mgrid skel" role="status" aria-busy="true" aria-label={t.common.loading}>
-              {Array.from({ length: 6 }, (_, i) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: static placeholders
-                <div className="mcard" key={i}>
-                  <div className="poster" />
-                  <span className="mt">&nbsp;</span>
-                  <span className="ms">&nbsp;</span>
-                </div>
-              ))}
-            </div>
-          ) : res.data.items.length === 0 ? (
-            <Empty title={keyword ? t.search.noResultsFor(keyword) : t.search.noResults} hint={t.search.noResultsHint}>
-              {(keyword || filtered) && (
-                <button type="button" onClick={() => setParams(new URLSearchParams())}>
-                  {t.search.clear}
-                </button>
-              )}
-            </Empty>
-          ) : (
-            <>
-              <div className={`mgrid${res.isFetching ? ' fetching' : ''}`}>
-                {res.data.items.map((m) => (
-                  <MovieCard key={m.ytsId} m={m} />
+          <ScrollList label={t.search.resultsLabel}>
+            {!res.data ? (
+              <div className="mgrid skel" role="status" aria-busy="true" aria-label={t.common.loading}>
+                {Array.from({ length: 6 }, (_, i) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: static placeholders
+                  <div className="mcard" key={i}>
+                    <div className="poster" />
+                    <span className="mt">&nbsp;</span>
+                    <span className="ms">&nbsp;</span>
+                  </div>
                 ))}
               </div>
-              <Pager page={res.data.page} total={res.data.total} pageSize={res.data.pageSize} onPage={toPage} />
-            </>
-          )}
+            ) : res.data.items.length === 0 ? (
+              <Empty
+                title={keyword ? t.search.noResultsFor(keyword) : t.search.noResults}
+                hint={t.search.noResultsHint}
+              >
+                {(keyword || filtered) && (
+                  <button type="button" onClick={() => setParams(new URLSearchParams())}>
+                    {t.search.clear}
+                  </button>
+                )}
+              </Empty>
+            ) : (
+              <>
+                <div className={`mgrid${res.isFetching ? ' fetching' : ''}`}>
+                  {res.data.items.map((m) => (
+                    <MovieCard key={m.ytsId} m={m} />
+                  ))}
+                </div>
+                <Pager page={res.data.page} total={res.data.total} pageSize={res.data.pageSize} onPage={toPage} />
+              </>
+            )}
+          </ScrollList>
         </>
       )}
-    </>
+    </FillPage>
   );
 }
 

@@ -90,6 +90,7 @@ export const t = {
 
   search: {
     title: '搜尋',
+    resultsLabel: '搜尋結果',
     lead: '片名來自 YTS，請用英文片名或年份搜尋。',
     placeholder: '片名或年份，例如 charade、1963',
     quality: '畫質',
