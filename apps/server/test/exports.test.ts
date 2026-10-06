@@ -329,45 +329,40 @@ describe('when the film is removed', () => {
     await engine?.destroy();
   });
 
-  it('keeps finished exports downloadable and fails waiting ones with SOURCE_MISSING, tracks gone', async () => {
-    const f = await film(db.pool, dataDir, fixture('clip.mp4'), [meiId]);
+  it('deletes every export of the film with it, finished or waiting, and tells only other creators', async () => {
+    // Brian, 2026-10-06: removing the whole film removes its exports too.
+    const f = await film(db.pool, dataDir, fixture('clip.mp4'), [meiId, haoId]);
     const s = await subtitle(db.pool, dataDir, f.tid, 'truth.zh-TW.srt');
     const body = (fileName: string) => ({ fileName, tracks: [{ subtitleId: s.id, isDefault: true }] });
     const done = (await start(mei, f.tid, body('done.mkv'))).json();
-    const waiting = (await start(mei, f.tid, body('waiting.mkv'))).json();
+    const waiting = (await start(hao, f.tid, body('waiting.mkv'))).json();
     const content = Buffer.from('a finished export');
     await finish(done.id, content);
-    expect((await call(t.app, 'DELETE', `/api/torrents/${f.tid}/hold`, { cookie: mei })).statusCode).toBe(200);
-    await worker.tick();
-    expect(await exists(join(dataDir, 'torrents', f.hash))).toBe(false);
-
-    const kept = await exp(done.id);
-    expect(kept).toMatchObject({ state: 'done', torrent_id: null });
-    const file = await call(t.app, 'GET', `/api/exports/${done.id}/file`, { cookie: mei });
-    expect(file.rawPayload.equals(content)).toBe(true);
-
-    const failed = await exp(waiting.id);
-    expect(failed).toMatchObject({
-      state: 'failed',
-      error_code: 'SOURCE_MISSING',
-      reserved_bytes: 0,
-      torrent_id: null,
-    });
-    expect(await exists(join(dataDir, 'exports', waiting.id))).toBe(false);
-    const task = await db.pool.query(`select state, error_code from tasks where input->>'exportId' = $1`, [waiting.id]);
-    expect(task.rows).toEqual([{ state: 'failed', error_code: 'SOURCE_MISSING' }]);
-    const notes = (
-      await db.pool.query(`select kind, data from notifications where user_id = $1 and kind = 'export.failed'`, [meiId])
-    ).rows;
-    expect(notes).toContainEqual({
-      kind: 'export.failed',
-      data: { movieTitle: failed.movie_title, fileName: 'waiting.mkv', errorCode: 'SOURCE_MISSING' },
-    });
-    const list = (await call(t.app, 'GET', '/api/exports', { cookie: mei })).json();
-    expect(list.find((x: { id: string }) => x.id === done.id)).toMatchObject({ torrentId: null, state: 'done' });
-    // The failed one can still be deleted by its creator; nothing to free.
-    expect((await call(t.app, 'DELETE', `/api/exports/${waiting.id}`, { cookie: mei })).json()).toEqual({
+    const reserved = (await exp(waiting.id)).reserved_bytes;
+    expect((await call(t.app, 'DELETE', `/api/torrents/${f.tid}/hold`, { cookie: hao })).json()).toEqual({
+      deleted: false,
       freedBytes: 0,
     });
+    // Hao left: the exports stay while Mei still holds the film.
+    expect(await exp(waiting.id)).toBeTruthy();
+    const res = (await call(t.app, 'DELETE', `/api/torrents/${f.tid}/hold`, { cookie: mei })).json();
+    expect(res.deleted).toBe(true);
+    expect(res.freedBytes).toBeGreaterThanOrEqual(content.length + reserved);
+    expect(await exp(done.id)).toBeUndefined();
+    expect(await exp(waiting.id)).toBeUndefined();
+    expect(await exists(join(dataDir, 'exports', done.id))).toBe(false);
+    expect(await exists(join(dataDir, 'exports', waiting.id))).toBe(false);
+    const task = await db.pool.query(`select state from tasks where input->>'exportId' = $1`, [waiting.id]);
+    expect(task.rows).toEqual([{ state: 'cancelled' }]);
+    await worker.tick();
+    expect(await exists(join(dataDir, 'torrents', f.hash))).toBe(false);
+    expect((await call(t.app, 'GET', `/api/exports/${done.id}/file`, { cookie: mei })).statusCode).toBe(404);
+    // Hao made the waiting one and is told; Mei pressed it and is not.
+    const told = async (id: string) =>
+      (await db.pool.query(`select data from notifications where user_id = $1 and kind = 'item.deleted'`, [id])).rows;
+    expect(await told(haoId)).toContainEqual({
+      data: expect.objectContaining({ itemKind: 'export', fileName: 'waiting.mkv' }),
+    });
+    expect(await told(meiId)).toEqual([]);
   });
 });

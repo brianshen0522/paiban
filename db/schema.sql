@@ -342,7 +342,7 @@ create index subtitle_revisions_subtitle on subtitle_revisions (subtitle_id, rev
 
 -- ------------------------------------------------------------------ exports
 
--- Exported MKV files outlive the film they were made from: torrent_id becomes null.
+-- Deleting a film deletes its exports first (the api does it, docs/03-data-model.md); set null is a safety net.
 create table exports (
   id               uuid primary key default gen_random_uuid(),
   torrent_id       uuid references torrents (id) on delete set null,

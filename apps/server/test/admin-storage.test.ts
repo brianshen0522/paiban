@@ -150,6 +150,34 @@ describe('force deletion (D23)', () => {
     expect(log.target).toMatchObject({ itemKind: 'movie' });
   });
 
+  it('removes the film with all its exports: finished ones at once, a running one asked to stop', async () => {
+    // Brian, 2026-10-06: deleting the whole film deletes its exports too.
+    const id = await torrent('completed', [meiId], { disk: 2 * GB });
+    const ins = async (state: string, file: string, bytes: number) =>
+      (
+        await db.pool.query(
+          `insert into exports (torrent_id, movie_title, version_label, file_name, tracks, state, size_bytes, reserved_bytes, created_by)
+           values ($1, 'F', 'v', $2, '[]', $3, $4, $5, $6) returning id`,
+          [id, file, state, state === 'done' ? bytes : 0, state === 'done' ? 0 : bytes, meiId],
+        )
+      ).rows[0].id as string;
+    const done = await ins('done', 'f.mkv', 500);
+    const running = await ins('running', 'g.mkv', 700);
+    const dir = join(t.deps.config.dataDir, 'exports', done);
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, 'f.mkv'), 'x');
+    const res = await call(t.app, 'DELETE', `/api/admin/storage/items/movie/${id}`, { cookie: boss });
+    expect(res.json()).toEqual({ freedBytes: 2 * GB + 500 + 700 });
+    expect(await exists(dir)).toBe(false);
+    expect((await db.pool.query('select id, cancel_requested from exports')).rows).toEqual([
+      { id: running, cancel_requested: true },
+    ]);
+    const told = (await db.pool.query(`select data from notifications where user_id = $1`, [meiId])).rows.map(
+      (r) => r.data.itemKind,
+    );
+    expect(told.sort()).toEqual(['export', 'export', 'movie']);
+  });
+
   it('does not notify the administrator who pressed it', async () => {
     const id = await torrent('completed', [bossId]);
     await call(t.app, 'DELETE', `/api/admin/storage/items/movie/${id}`, { cookie: boss });

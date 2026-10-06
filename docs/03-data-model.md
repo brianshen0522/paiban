@@ -234,13 +234,15 @@ API 回給前端的 `TorrentStatus` 是算出來的，不是存起來的：
 
 ## 刪除一個下載時發生的事
 
+在那之前，`api` 把 `want` 設成 `remove` 的同一個交易裡，先處理這部片的**所有匯出**（Brian，2026-10-06：刪除整部片連匯出檔一起刪）：排隊中、完成、失敗的直接刪列（`tasks` 標成 `cancelled`），交易之後刪 `/data/exports/<id>`；封裝中的設 `cancel_requested`，由 `media` 停下來之後刪。建立者不是按下刪除的人時，各收到一則 `item.deleted`。所以到了 `torrent` 這裡，通常已經沒有這部片的匯出。
+
 由 `torrent` 執行（它看到 `want = 'remove'`）：
 
 1. 從 WebTorrent 用戶端移除，不保留檔案。
 2. 記下這個下載底下的 `media_files`、`subtitles`、`subtitle_candidates` 的 id。
 3. 刪除 `/data/torrents/<hash>`、`/data/media/<media id>`、每一個 `/data/subtitles/<id>` 和 `/data/subtitles/candidates/<id>`。
 4. 在一個交易裡：
-   - 這部片還沒做完的匯出（`queued`、`running`）標成 `failed`，原因 `SOURCE_MISSING`，預留歸零；它們的 `tasks` 也標成 `failed`；替建立者各寫一則 `export.failed` 的通知。匯出的列不會被連帶刪除（它們比電影活得久），所以要在這裡明確處理。
+   - 萬一還有這部片沒做完、也沒被要求取消的匯出（`queued`、`running`，而且 `cancel_requested` 是 false；正常情況下 `api` 已經處理掉了），標成 `failed`，原因 `SOURCE_MISSING`，預留歸零；它們的 `tasks` 也標成 `failed`；替建立者各寫一則 `export.failed` 的通知。這是保險：匯出的列不會被外鍵連帶刪除。
    - 這個下載底下其他還沒結束的 `tasks`（`queued`、`running`）標成 `cancelled`。
    - 刪除 `torrents` 那一列。外鍵會連帶刪掉持有人、影片、字幕、候選；`exports.torrent_id` 和 `tasks.torrent_id` 變成 null。
 
@@ -261,5 +263,5 @@ API 回給前端的 `TorrentStatus` 是算出來的，不是存起來的：
 
 其他後果：
 
-- 這部片還沒做完的匯出在第 4 步被標成失敗（`SOURCE_MISSING`），預留釋出，不會自動再試。正在封裝的那個工作在下一次檢查時發現自己那一列已經不是 `running`，就終止 ffmpeg、刪掉 `.part` 和 `tracks/`。已經完成的匯出檔不受影響。
+- 這部片的匯出全部跟著刪除（見上面 `api` 的那一步）。正在封裝的那個工作在下一次檢查時發現 `cancel_requested`，就終止 ffmpeg、刪掉 `.part` 和 `tracks/`，再刪掉那一列。
 - 被取消的 `tasks` 留著當紀錄，`torrent_id` 是空的。

@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { audit } from '../audit.js';
 import { type Client, one, pgCode, tx, UNIQUE_VIOLATION } from '../db/pool.js';
 import { publishTorrent, publishUsage } from '../events/publish.js';
+import { dropFilmExports, finishFilmExports } from '../exports/film-exports.js';
 import type { AuthedUser, Deps } from '../http/context.js';
 import { ApiError } from '../http/errors.js';
 import { parse, requireAdmin, requireUser } from '../http/guards.js';
@@ -249,7 +250,7 @@ export function torrentRoutes(app: FastifyInstance, deps: Deps): void {
       const left = await one<{ n: number }>(c, 'select count(*)::int as n from torrent_holders where torrent_id = $1', [
         id,
       ]);
-      if ((left?.n ?? 0) > 0) return { deleted: false, freedBytes: 0 };
+      if ((left?.n ?? 0) > 0) return { deleted: false, freedBytes: 0, exports: null };
       const freed = await one<{ n: number }>(
         c,
         `select case when t.state = 'completed' then t.disk_bytes + coalesce(mf.analysis_bytes + mf.audio_bytes + mf.proxy_bytes + mf.reserve_bytes, 0)
@@ -258,9 +259,12 @@ export function torrentRoutes(app: FastifyInstance, deps: Deps): void {
            from torrents t left join media_files mf on mf.torrent_id = t.id where t.id = $1`,
         [id],
       );
+      // The last holder deletes the whole film, its exports included (Brian, 2026-10-06).
+      const exports = await dropFilmExports(c, id, user, req.ip);
       await c.query(`update torrents set want = 'remove' where id = $1`, [id]);
-      return { deleted: true, freedBytes: freed?.n ?? 0 };
+      return { deleted: true, freedBytes: (freed?.n ?? 0) + exports.freedBytes, exports };
     });
+    if (out.exports) await finishFilmExports(deps, out.exports);
     await audit(
       pool,
       user,
@@ -271,7 +275,7 @@ export function torrentRoutes(app: FastifyInstance, deps: Deps): void {
     await pool.query(`select pg_notify('paiban_torrent', $1)`, [JSON.stringify({ id })]);
     if (out.deleted) deps.events.toAll({ type: 'torrent.removed', id });
     else await publishTorrent(pool, deps.events, id);
-    return out;
+    return { deleted: out.deleted, freedBytes: out.freedBytes };
   });
 }
 

@@ -151,7 +151,10 @@ function MyItem({ item, preview }: { item: StorageItem; preview: number }) {
         ? t.storage.confirmPartial(bytes(item.bytes))
         : others.length
           ? t.storage.confirmShared(others.join('、'))
-          : t.storage.confirmLast(bytes(item.bytes + preview));
+          : t.storage.confirmLast(
+              bytes(item.bytes + preview + (item.filmExports?.bytes ?? 0)),
+              item.filmExports?.count ?? 0,
+            );
   const button =
     item.kind === 'reserved'
       ? t.storage.btnCancelDownload
@@ -169,6 +172,7 @@ function MyItem({ item, preview }: { item: StorageItem; preview: number }) {
       void qc.invalidateQueries({ queryKey: keys.storage });
       void qc.invalidateQueries({ queryKey: ['torrents'] });
       void qc.invalidateQueries({ queryKey: keys.library });
+      void qc.invalidateQueries({ queryKey: keys.exports });
     } finally {
       setBusy(false);
       setConfirm(false);

@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { Queryable } from '../db/pool.js';
 import { many, one } from '../db/pool.js';
+import { filmExportTotals } from '../exports/film-exports.js';
 import { exportsForTorrent } from '../exports/view.js';
 import type { Deps } from '../http/context.js';
 import { ApiError } from '../http/errors.js';
@@ -27,6 +28,7 @@ async function libraryItems(q: Queryable, rows: TorrentRow[], viewerId: string):
     `select torrent_id, count(*)::int as n from exports where torrent_id = any($1::uuid[]) and state = 'done' group by torrent_id`,
     [ids],
   );
+  const fe = await filmExportTotals(q, ids);
   const s = new Map(subs.map((x) => [x.torrent_id, x]));
   const e = new Map(exps.map((x) => [x.torrent_id, x.n]));
   return rows.map((r) => {
@@ -39,6 +41,7 @@ async function libraryItems(q: Queryable, rows: TorrentRow[], viewerId: string):
       torrent: toTorrent(r, viewerId),
       subtitles: { total, confirmed, draft: total - confirmed },
       exports,
+      filmExports: fe.get(r.id) ?? { count: 0, bytes: 0 },
       next,
     };
   });

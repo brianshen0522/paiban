@@ -5,6 +5,7 @@ import { storageFindings } from '../admin/system-routes.js';
 import { audit } from '../audit.js';
 import { many, tx } from '../db/pool.js';
 import { publishUsage } from '../events/publish.js';
+import { filmExportTotals } from '../exports/film-exports.js';
 import type { Deps } from '../http/context.js';
 import { ApiError } from '../http/errors.js';
 import { parse, requireAdmin, requireUser } from '../http/guards.js';
@@ -42,6 +43,10 @@ async function storageItems(deps: Deps, userId: string | null): Promise<StorageI
     [userId],
   );
   const items: StorageItem[] = [];
+  const fe = await filmExportTotals(
+    deps.pool,
+    rows.map((r) => r.torrent_id),
+  );
   for (const r of rows) {
     const version = [
       r.quality,
@@ -59,9 +64,17 @@ async function storageItems(deps: Deps, userId: string | null): Promise<StorageI
       lastUsedAt: r.last_used_at?.toISOString() ?? null,
     };
     const kind = r.state === 'completed' ? 'movie' : r.state === 'failed' ? 'partial' : 'reserved';
-    items.push({ ...base, kind, id: r.torrent_id, previewResolution: null, bytes: r.bytes });
+    const filmExports = fe.get(r.torrent_id) ?? { count: 0, bytes: 0 };
+    items.push({ ...base, kind, id: r.torrent_id, previewResolution: null, bytes: r.bytes, filmExports });
     if (r.media_id && r.preview_bytes > 0)
-      items.push({ ...base, kind: 'preview', id: r.media_id, previewResolution: r.proxy_res, bytes: r.preview_bytes });
+      items.push({
+        ...base,
+        kind: 'preview',
+        id: r.media_id,
+        previewResolution: r.proxy_res,
+        bytes: r.preview_bytes,
+        filmExports: null,
+      });
   }
   // The administrator's list also has every export (the member's own come from GET /api/exports).
   if (userId === null) {
@@ -92,6 +105,7 @@ async function storageItems(deps: Deps, userId: string | null): Promise<StorageI
         bytes: e.bytes,
         holders: e.by_id ? [{ id: e.by_id, displayName: e.by_name ?? '' }] : [],
         lastUsedAt: e.created_at.toISOString(),
+        filmExports: null,
       });
   }
   return items.sort((a, b) => b.bytes - a.bytes);

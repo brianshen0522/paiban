@@ -326,10 +326,15 @@ export type MediaStatus = {
 
 /* ------------------------------------------------------------------ library */
 
+/** A film's exports as they go with it (Brian, 2026-10-06): how many, and the space they hold now. */
+export type FilmExports = { count: number; bytes: Bytes };
+
 export type LibraryItem = {
   torrent: Torrent;
   subtitles: { total: number; confirmed: number; draft: number };
   exports: number;
+  /** Every export of the film, whatever its state: deleted with the film when the last holder removes it. */
+  filmExports: FilmExports;
   /** The step the card's main button leads to. */
   next: 'subtitles' | 'sync' | 'export' | 'exported';
 };
@@ -549,6 +554,8 @@ export type StorageItem = {
   /** For an export: the person who made it. Empty when nobody holds the item any more. */
   holders: UserRef[];
   lastUsedAt: IsoTime | null;
+  /** For a movie, reserved or partial item: the film's exports, deleted with it. Null for the other kinds. */
+  filmExports: FilmExports | null;
 };
 
 /** What the last "recalculate usage" run could not match: a folder with no row, or a row whose files are gone. */

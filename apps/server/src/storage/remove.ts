@@ -58,7 +58,8 @@ export async function removePreviewFiles(dataDir: string, mediaId: string, log: 
 }
 
 /**
- * An export deleted by its creator or an administrator: the export's folder (the MKV, or the
+ * An export deleted by its creator or an administrator, or with its film when the film is deleted
+ * (the last holder removing it, or an administrator forcing it): the export's folder (the MKV, or the
  * subtitle tracks of one still waiting). Also the `api`'s own just-written tracks when the
  * request that wrote them did not get its row in.
  */

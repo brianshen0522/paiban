@@ -61,7 +61,7 @@
 | `POST /api/torrents/:id/pause` | 持有人 | 只有 `queued`、`downloading` 能暫停，其他回 `TORRENT_STATE`。空間繼續保留 |
 | `POST /api/torrents/:id/resume` | 持有人 | 只有 `paused` 能繼續。回到佇列尾端 |
 | `POST /api/torrents/:id/retry` | 持有人 | 只有 `failed` 能重試。重新檢查空間：需求是完整大小加預覽預留，扣掉已經在磁碟上的殘留；不夠回 `STORAGE_LIMIT`。通過後回到佇列尾端，從已下載的部分接續 |
-| `DELETE /api/torrents/:id/hold` | 持有人 | 把自己從持有人移除。還有別人持有：`{deleted: false, freedBytes: 0}`。自己是最後一位：整個下載連同字幕和預覽檔排入刪除，`{deleted: true, freedBytes}`。匯出檔不受影響 |
+| `DELETE /api/torrents/:id/hold` | 持有人 | 把自己從持有人移除。還有別人持有：`{deleted: false, freedBytes: 0}`。自己是最後一位：整部片連同字幕、預覽檔和**這部片的所有匯出檔**排入刪除（Brian，2026-10-06），`{deleted: true, freedBytes}`，`freedBytes` 含匯出檔。別人建立的匯出檔，建立者會收到 `item.deleted` |
 
 **接受下載**（`POST /api/torrents`），依序：
 
@@ -155,7 +155,7 @@
 | `GET /api/admin/storage` | 用量、磁碟資訊、**所有**項目（由大到小）、最近一次重新計算發現的孤兒與遺失（`findings`）、那一次重新計算的工作 |
 | `PUT /api/admin/storage/limit` | 見 [10-storage.md](10-storage.md) 的驗證規則。低於目前用量是允許的 |
 | `POST /api/admin/storage/rescan` | 排入一次重新計算，立刻回傳那個工作。已經有一次在跑就回那一個。做完時發 `admin` 事件（`storage`），頁面再抓一次 `GET /api/admin/storage`。**只更新數字和回報，不刪任何東西** |
-| `DELETE /api/admin/storage/items/:kind/:id` | 強制刪除一個項目，不論誰持有。`movie`、`reserved`、`partial` 用下載的 id；`preview` 用影片的 id（只刪預覽影片和聲音檔）；`export` 用匯出的 id；`orphan` 用那一筆發現的 id（刪掉那個資料夾）。受影響的人會收到通知 |
+| `DELETE /api/admin/storage/items/:kind/:id` | 強制刪除一個項目，不論誰持有。`movie`、`reserved`、`partial` 用下載的 id，連同這部片的所有匯出檔一起刪；`preview` 用影片的 id（只刪預覽影片和聲音檔）；`export` 用匯出的 id；`orphan` 用那一筆發現的 id（刪掉那個資料夾）。受影響的人會收到通知 |
 | `GET /api/admin/settings` | 全部設定，加上唯讀資訊（哪些金鑰已設定、連入埠、磁碟）和各個來源最近的狀況 |
 | `PATCH /api/admin/settings` | 只送要改的部分。任何一項不合法就整個拒絕（`SETTING_INVALID`），`details.fields` 指出是哪一項 |
 | `PUT /api/admin/secrets/:name` | 寫入一把金鑰。之後不會再顯示 |

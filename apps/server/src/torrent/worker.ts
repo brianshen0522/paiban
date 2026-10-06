@@ -548,7 +548,8 @@ export class TorrentWorker {
       }>(
         c,
         `update exports set state = 'failed', error_code = 'SOURCE_MISSING', reserved_bytes = 0, progress = 0
-          where torrent_id = $1 and state in ('queued', 'running') returning id, created_by, movie_title, file_name`,
+          where torrent_id = $1 and state in ('queued', 'running') and not cancel_requested
+          returning id, created_by, movie_title, file_name`,
         [r.id],
       );
       const exportNotes: number[] = [];

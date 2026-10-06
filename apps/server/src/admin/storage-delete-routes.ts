@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { audit } from '../audit.js';
 import { type Client, one, tx } from '../db/pool.js';
 import { publishNotification, publishUsage } from '../events/publish.js';
+import { dropFilmExports, finishFilmExports } from '../exports/film-exports.js';
 import type { AuthedUser, Deps } from '../http/context.js';
 import { ApiError } from '../http/errors.js';
 import { parse, requireAdmin } from '../http/guards.js';
@@ -80,10 +81,13 @@ export function storageDeleteRoutes(app: FastifyInstance, deps: Deps): void {
           throw new ApiError('TORRENT_STATE', `item is ${t.state}, not ${kind}`);
         const version = versionLabel(t);
         const n = await tellHolders(c, id, admin, kind, t.title, version);
+        // The whole film goes, its exports included (Brian, 2026-10-06).
+        const exports = await dropFilmExports(c, id, admin, req.ip);
         await c.query(`update torrents set want = 'remove' where id = $1`, [id]);
         await audit(c, admin, 'admin.storage.delete', { itemKind: kind, movieTitle: t.title }, req.ip);
-        return { freed: t.freed, notes: n };
+        return { freed: t.freed + exports.freedBytes, notes: n, exports };
       });
+      await finishFilmExports(deps, out.exports);
       freedBytes = out.freed;
       notes = out.notes;
       removedTorrent = id;

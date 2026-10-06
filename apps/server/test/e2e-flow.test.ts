@@ -600,7 +600,7 @@ describe.skipIf(!TOOLS)('the whole flow, offline', { timeout: 240_000 }, () => {
     }
   });
 
-  it('removing the film deletes it with its analysis and subtitles, and leaves the export downloadable', async () => {
+  it('removing the film deletes it with its analysis, subtitles and exports', async () => {
     const before = await filesOnDisk();
     expect(before).toEqual(
       expect.arrayContaining([
@@ -614,30 +614,19 @@ describe.skipIf(!TOOLS)('the whole flow, offline', { timeout: 240_000 }, () => {
     const res = await call(t.app, 'DELETE', `/api/torrents/${torrentId}/hold`, { cookie: mei });
     expect(res.statusCode).toBe(200);
     expect(res.json().deleted).toBe(true);
-    expect(res.json().freedBytes).toBeGreaterThanOrEqual(seeder.seeded[0]?.length ?? 0);
+    // The film and the export it made (Brian, 2026-10-06: the whole film goes, exports included).
+    expect(res.json().freedBytes).toBeGreaterThanOrEqual((seeder.seeded[0]?.length ?? 0) + mkv.length);
     await until(
       'film removed',
       async () => (await db.pool.query('select 1 from torrents where id = $1', [torrentId])).rowCount === 0,
     );
-    // Only the export is left; the film, its analysis, subtitles and candidates went with it.
-    expect(await filesOnDisk()).toEqual([`exports/${exportId}/${FILE_NAME}`]);
+    // Nothing is left: the film, its analysis, subtitles, candidates and export all went.
+    expect(await filesOnDisk()).toEqual([]);
     for (const table of ['media_files', 'subtitles', 'subtitle_candidates', 'movies'])
       expect((await db.pool.query(`select count(*)::int as n from ${table}`)).rows[0].n, table).toBe(0);
     expect(await get('/api/library')).toEqual([]);
-    // docs/10-storage.md: "最後一位持有人移除電影：匯出檔還在、還能下載".
-    const e = (await get('/api/exports')).find((x: { id: string }) => x.id === exportId);
-    expect(e).toMatchObject({ state: 'done', torrentId: null });
-    const again = await call(t.app, 'GET', `/api/exports/${exportId}/file`, { cookie: mei });
-    expect(again.statusCode).toBe(200);
-    expect(sha(again.rawPayload)).toBe(sha(mkv));
-  });
-
-  it('deleting the export frees its size and leaves nothing on disk', async () => {
-    const res = await call(t.app, 'DELETE', `/api/exports/${exportId}`, { cookie: mei });
-    expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ freedBytes: mkv.length });
-    expect(await filesOnDisk()).toEqual([]);
     expect(await get('/api/exports')).toEqual([]);
+    expect((await call(t.app, 'GET', `/api/exports/${exportId}/file`, { cookie: mei })).statusCode).toBe(404);
     const usage = (await get('/api/storage')).usage;
     expect(usage.usedBytes).toBe(0);
     expect(Object.values(usage.categories).every((n) => n === 0)).toBe(true);

@@ -173,11 +173,14 @@ function AdminItemRow({ item, hasPreview }: { item: StorageItem; hasPreview: boo
   const [error, setError] = useState<string | null>(null);
   const names = item.holders.map((h) => h.displayName).join('、') || t.forceDelete.nobody;
   const size = bytes(item.bytes);
+  // A film goes with its exports (Brian, 2026-10-06).
+  const filmSize = bytes(item.bytes + (item.filmExports?.bytes ?? 0));
+  const exportsN = item.filmExports?.count ?? 0;
   const text =
     item.kind === 'movie'
       ? item.holders.length
-        ? t.forceDelete.movieHeld(item.holders.length, size, hasPreview)
-        : t.forceDelete.movieNobody(size, hasPreview)
+        ? t.forceDelete.movieHeld(item.holders.length, filmSize, hasPreview, exportsN)
+        : t.forceDelete.movieNobody(filmSize, hasPreview, exportsN)
       : item.kind === 'reserved'
         ? t.forceDelete.reserved(names)
         : item.kind === 'partial'

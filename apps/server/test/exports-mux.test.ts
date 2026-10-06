@@ -283,7 +283,7 @@ describe.skipIf(!TOOLS)('the mux job', { timeout: 120_000 }, () => {
     }
   });
 
-  it('fails with SOURCE_MISSING and leaves nothing when the film is removed while muxing', async () => {
+  it('cancels and deletes an export being written when its film is removed, leaving nothing', async () => {
     const restore = await fakeFfmpeg(slow);
     try {
       const { f, id, fileName } = await exportOf();
@@ -294,8 +294,8 @@ describe.skipIf(!TOOLS)('the mux job', { timeout: 120_000 }, () => {
       await until(async () => !(await exists(join(dataDir, 'exports', id))), 10_000);
       await sleep(2500); // a last check from the job finds nothing to undo
       expect(await exists(join(dataDir, 'exports', id))).toBe(false);
-      expect(await exp(id)).toMatchObject({ state: 'failed', error_code: 'SOURCE_MISSING', reserved_bytes: 0 });
-      expect(await taskOf(id)).toEqual([{ state: 'failed', error_code: 'SOURCE_MISSING', attempts: 0 }]);
+      await until(async () => !(await exp(id)), 10_000);
+      expect(await muxesRunning(id)).toBe(0);
     } finally {
       restore();
     }

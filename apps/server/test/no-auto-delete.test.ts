@@ -61,8 +61,10 @@ describe('deleting files', () => {
       removePoster: ['torrent/worker.ts'],
       removePreviewFiles: ['admin/storage-delete-routes.ts'],
       // An export deleted by its creator or an administrator (or the api's own tracks of a request
-      // whose row did not get in), and the administrator's force deletion.
-      removeExportFiles: ['admin/storage-delete-routes.ts', 'exports/routes.ts'],
+      // whose row did not get in), and the administrator's force deletion. film-exports.ts: a
+      // film's exports, deleted with it when its last holder or an administrator deletes the film
+      // (called only from DELETE /api/torrents/:id/hold and the administrator's force delete).
+      removeExportFiles: ['admin/storage-delete-routes.ts', 'exports/film-exports.ts', 'exports/routes.ts'],
       removeOrphanFolder: ['admin/storage-delete-routes.ts'],
       // A holder removing a candidate or a subtitle.
       removeCandidateFiles: ['subtitles/routes.ts'],

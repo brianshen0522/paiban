@@ -113,10 +113,11 @@ function Card({ item }: { item: LibraryItem }) {
     setBusy(true);
     setFailed(false);
     try {
-      await del(`/api/torrents/${x.id}/hold`);
-      toast(t.library.removed);
+      const r = await del<{ deleted: boolean }>(`/api/torrents/${x.id}/hold`);
+      toast(r.deleted ? t.library.removedWhole : t.library.removed);
       void qc.invalidateQueries({ queryKey: keys.library });
       void qc.invalidateQueries({ queryKey: keys.storage });
+      void qc.invalidateQueries({ queryKey: keys.exports });
     } catch {
       setFailed(true);
     } finally {
@@ -166,9 +167,15 @@ function Card({ item }: { item: LibraryItem }) {
             text={
               others.length
                 ? t.library.confirmShared(others.join('、'))
-                : t.library.confirmLast(bytes(x.diskBytes), preview > 0 ? bytes(preview) : null)
+                : t.library.confirmLast(
+                    bytes(x.diskBytes),
+                    preview > 0 ? bytes(preview) : null,
+                    item.filmExports.count,
+                    bytes(item.filmExports.bytes),
+                    bytes(x.diskBytes + preview + item.filmExports.bytes),
+                  )
             }
-            confirmLabel={t.library.removeButton}
+            confirmLabel={others.length ? t.library.removeButton : t.library.removeWholeButton}
             busy={busy}
             onConfirm={remove}
             onCancel={() => setConfirm(false)}
@@ -181,7 +188,7 @@ function Card({ item }: { item: LibraryItem }) {
           {t.library.next[item.next]}
         </Link>
         <button type="button" aria-expanded={confirm} onClick={() => setConfirm(true)}>
-          {t.library.remove}
+          {others.length ? t.library.remove : t.library.removeWhole}
         </button>
       </div>
     </article>

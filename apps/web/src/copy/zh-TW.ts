@@ -347,13 +347,16 @@ export const t = {
     previewRunning: (pct: number) => `預覽檔轉檔中 ${pct}%，可以先用只有聲音的模式對字幕。`,
     sharedWith: (names: string) => `與 ${names} 共用，不重複佔空間。`,
     remove: '從片庫移除',
-    confirmLast: (film: string, preview: string | null) =>
-      preview
-        ? `你是最後一位持有人。移除會刪除影片 ${film} 和預覽檔 ${preview}，字幕也會一起刪掉。匯出的 MKV 不受影響。`
-        : `你是最後一位持有人。移除會刪除影片 ${film}，字幕也會一起刪掉。匯出的 MKV 不受影響。`,
+    removeWhole: '刪除整部片',
+    confirmLast: (film: string, preview: string | null, exportsN: number, exportsSize: string, total: string) =>
+      `你是最後一位持有人，會刪除整部片：影片 ${film}${preview ? `、預覽檔 ${preview}` : ''}、所有字幕${
+        exportsN ? `，以及 ${exportsN} 個匯出的 MKV（${exportsSize}）` : ''
+      }，共釋放 ${total}。刪除後無法復原。`,
     confirmShared: (names: string) => `從你的片庫移除？${names} 還持有這部片，檔案不會刪除，也不會釋放空間。`,
     removeButton: '移除',
+    removeWholeButton: '刪除',
     removed: '已從片庫移除。',
+    removedWhole: '已刪除整部片，連同字幕和匯出檔。',
   },
 
   storage: {
@@ -385,7 +388,8 @@ export const t = {
     onlyYou: '只有你',
     confirmUnfinished: '取消並刪除已下載的部分？',
     confirmShared: (names: string) => `從你的片庫移除？${names} 還持有，不會釋放空間。`,
-    confirmLast: (size: string) => `刪除後釋放 ${size}，字幕也會一起刪掉。`,
+    confirmLast: (size: string, exportsN: number) =>
+      `刪除後釋放 ${size}，字幕${exportsN ? `和 ${exportsN} 個匯出的 MKV` : ''}也會一起刪掉。`,
     confirmPartial: (size: string) => `移除這筆紀錄並刪除殘留的 ${size}？`,
     btnCancelDownload: '取消下載',
     btnLeave: '從片庫移除',
@@ -393,7 +397,7 @@ export const t = {
     btnRemove: '移除',
     myExports: '我建立的匯出檔',
     myExportsEmpty: '你還沒有建立任何匯出檔。',
-    myExportsNote: '電影被移除之後，匯出檔只剩這裡可以下載。',
+    myExportsNote: '刪除整部片時，它的匯出檔會一起刪掉；要留的話先下載到自己的電腦。',
     confirmExport: (size: string) => `刪除後釋放 ${size}。`,
   },
 
@@ -1358,10 +1362,10 @@ export const t = {
 
   forceDelete: {
     button: '刪除',
-    movieHeld: (n: number, size: string, preview: boolean) =>
-      `會從 ${n} 位持有人的片庫移除，連同字幕${preview ? '和預覽檔' : ''}一起刪掉，釋放 ${size}。匯出的 MKV 不受影響。`,
-    movieNobody: (size: string, preview: boolean) =>
-      `目前沒有人持有。連同字幕${preview ? '和預覽檔' : ''}一起刪掉，釋放 ${size}。匯出的 MKV 不受影響。`,
+    movieHeld: (n: number, size: string, preview: boolean, exportsN: number) =>
+      `會從 ${n} 位持有人的片庫移除，連同字幕${preview ? '、預覽檔' : ''}${exportsN ? `和 ${exportsN} 個匯出的 MKV` : ''}一起刪掉，釋放 ${size}。`,
+    movieNobody: (size: string, preview: boolean, exportsN: number) =>
+      `目前沒有人持有。連同字幕${preview ? '、預覽檔' : ''}${exportsN ? `和 ${exportsN} 個匯出的 MKV` : ''}一起刪掉，釋放 ${size}。`,
     reserved: (who: string) => `取消 ${who} 的下載並刪除已下載的部分。`,
     partial: (size: string) => `刪除殘留的 ${size}。`,
     preview: '刪除預覽檔。之後有人要同步這部片時，要在工作台再按一次「轉預覽檔」。',
