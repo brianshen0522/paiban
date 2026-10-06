@@ -50,7 +50,10 @@ first = datetime.date.today().replace(day=1)
 for month in (first, (first - datetime.timedelta(days=1)).replace(day=1)):
     url = "https://download.db-ip.com/free/dbip-country-lite-%s.csv.gz" % month.strftime("%Y-%m")
     try:
-        urllib.request.urlretrieve(url, "/opt/geo/dbip-country-lite.csv.gz")
+        # Says honestly what is asking (the app's own name); DB-IP refuses Python's default agent.
+        req = urllib.request.Request(url, headers={"User-Agent": "Paiban/0.1.0 (self-hosted; image build)"})
+        with urllib.request.urlopen(req, timeout=120) as res, open("/opt/geo/dbip-country-lite.csv.gz", "wb") as out:
+            out.write(res.read())
         print("geo:", url)
         break
     except Exception as err:
