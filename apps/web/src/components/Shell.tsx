@@ -7,6 +7,7 @@ import { post } from '../lib/api';
 import { useServerEvents } from '../lib/events';
 import { bytes } from '../lib/format';
 import { keys, useNotifications, useStorage, useTorrents } from '../lib/queries';
+import { SuggestInput } from './SuggestInput';
 import { ThemeToggle } from './ThemeToggle';
 import { useToast } from './Toasts';
 import { meterLevel } from './Usage';
@@ -149,12 +150,11 @@ export function Shell({ me }: { me: Me }) {
           {SITE_NAME}
         </Link>
         <form className="gsearch" onSubmit={search} aria-label={t.shell.searchButton}>
-          <input
-            type="search"
+          <SuggestInput
             value={q}
-            onChange={(e) => setQ(e.target.value)}
+            onChange={setQ}
             placeholder={t.shell.searchPlaceholder}
-            aria-label={t.shell.searchPlaceholder}
+            label={t.shell.searchPlaceholder}
           />
           <button type="submit">{t.shell.searchButton}</button>
         </form>

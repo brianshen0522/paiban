@@ -134,6 +134,20 @@ export type Session = {
 
 export type SortKey = 'added' | 'rating' | 'year' | 'seeds';
 
+/**
+ * A film TMDB knows, offered while someone types (Brian, 2026-10-06): YTS only understands English
+ * titles, TMDB also Chinese ones. Picking one looks up its IMDb code and that code on YTS.
+ */
+export type TmdbSuggestion = {
+  tmdbId: number;
+  /** The zh-TW title, or the original one when TMDB has no Chinese title. */
+  title: string;
+  originalTitle: string;
+  year: number | null;
+  /** Through this server (D30); null when TMDB has no poster. */
+  posterUrl: string | null;
+};
+
 export type MovieSummary = {
   ytsId: number;
   imdbCode: string;
@@ -844,6 +858,11 @@ export interface Endpoints {
   };
   'GET /api/yts/movies/:ytsId': { ok: MovieDetail };
   'GET /api/yts/movies/:ytsId/poster': { ok: 'image/*' };
+  /** Up to 8 films as you type; `available` is false when no TMDB key is set (nothing is asked). */
+  'GET /api/tmdb/suggest': { query: { q: string }; ok: { items: TmdbSuggestion[]; available: boolean } };
+  /** The film on YTS for a TMDB film, by its IMDb code; `ytsId` null when YTS does not have it. */
+  'GET /api/tmdb/:tmdbId/yts': { ok: { ytsId: number | null; imdbCode: string | null } };
+  'GET /api/tmdb/poster/:file': { ok: 'image/*' };
 
   /* downloads */
   'POST /api/torrents': { body: { ytsId: number; infoHash: string }; ok: { torrent: Torrent; joined: boolean } };

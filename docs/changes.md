@@ -16,6 +16,14 @@
 
 ---
 
+## 2026-10-06 搜尋框用 TMDB 建議電影（中文片名也找得到）
+
+- 原本：搜尋只問 YTS，YTS 只認得英文片名，用中文譯名找不到片。
+- 改成：打字時列出 TMDB 的電影建議；點了用 IMDb 編號找 YTS 上的同一部片並打開。新端點 `GET /api/tmdb/suggest`、`GET /api/tmdb/:tmdbId/yts`、`GET /api/tmdb/poster/:file`，合約多 `TmdbSuggestion`。
+- 原因：Brian 在對話裡要求。
+- 改了哪些檔案：packages/shared/src/contracts/api.ts、docs/04-api.md、docs/05-yts.md、docs/11-pages.md
+- Brian 是否已確認：是（他提出的）
+
 ## 2026-10-06 節點地圖：自動偵測伺服器所在國家並置中
 
 - 原本：伺服器的位置由 `TZ` 推得（不認得的當作台灣），地圖固定以本初子午線為中心。

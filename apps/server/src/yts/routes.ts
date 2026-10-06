@@ -36,7 +36,7 @@ export async function ytsClient(deps: Deps): Promise<YtsClient> {
 }
 
 /** Runs a YTS call and keeps the source's health row current (docs/07, "來源狀況"). */
-async function tracked<T>(deps: Deps, fn: () => Promise<T>): Promise<T> {
+export async function tracked<T>(deps: Deps, fn: () => Promise<T>): Promise<T> {
   try {
     const out = await fn();
     await recordSourceHealth(deps.pool, 'yts', 'ok', 'OK', {});

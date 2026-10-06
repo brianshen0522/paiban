@@ -1,7 +1,7 @@
 import { type FakeSources, startFakeSources } from '@paiban/fakes/subtitles';
 import { type FakeYts, startFakeYts } from '@paiban/fakes/yts';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { parseFind } from '../src/tmdb/tmdb.js';
+import { parseFind, parseSearch } from '../src/tmdb/tmdb.js';
 import { call, createUser, GB, login, setLimit, setSetting, type TestApp, testApp, testDb } from './helpers.js';
 
 /**
@@ -125,5 +125,79 @@ describe('search and the film page', () => {
     await call(t.app, 'GET', '/api/yts/movies/2', { cookie: mei });
     const row = (await db.pool.query(`select tmdb_id, title_zh from movies where yts_id = 2`)).rows[0];
     expect(row).toEqual({ tmdb_id: 900_002, title_zh: '謎中謎' });
+  });
+});
+
+describe('suggestions as you type (Brian, 2026-10-06: Chinese titles find nothing on YTS)', () => {
+  const suggest = (q: string) => call(t.app, 'GET', `/api/tmdb/suggest?q=${encodeURIComponent(q)}`, { cookie: mei });
+
+  it('reads TMDB search answers: no adult films, a year from the date, safe poster files only', () => {
+    const hits = parseSearch({
+      results: [
+        { id: 1, title: '謎中謎', original_title: 'Charade', release_date: '1963-12-05', poster_path: '/a-B_1.jpg' },
+        { id: 2, title: 'X', original_title: 'X', release_date: '', poster_path: '/../etc', adult: false },
+        { id: 3, title: 'Adult', original_title: 'Adult', adult: true },
+      ],
+    });
+    expect(hits).toEqual([
+      { tmdbId: 1, title: '謎中謎', originalTitle: 'Charade', year: 1963, posterPath: '/a-B_1.jpg' },
+      { tmdbId: 2, title: 'X', originalTitle: 'X', year: null, posterPath: null },
+    ]);
+  });
+
+  it('without a key: says suggestions are not available, never asking TMDB', async () => {
+    const res = await suggest('謎中謎');
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ items: [], available: false });
+    expect(fake.requests.filter((r) => r.source === 'tmdb')).toEqual([]);
+  });
+
+  it('finds a film by its Chinese title, with year and a poster through this server, cached', async () => {
+    await setKey();
+    const res = (await suggest('謎中謎')).json();
+    expect(res.available).toBe(true);
+    expect(res.items[0]).toEqual({
+      tmdbId: 900_002,
+      title: '謎中謎',
+      originalTitle: 'Charade',
+      year: 1963,
+      posterUrl: '/api/tmdb/poster/fake-charade.png',
+    });
+    await suggest('  謎中謎 ');
+    expect(fake.requests.filter((r) => r.source === 'tmdb' && r.path.startsWith('/3/search/movie'))).toHaveLength(1);
+    const img = await call(t.app, 'GET', '/api/tmdb/poster/fake-charade.png', { cookie: mei });
+    expect(img.statusCode).toBe(200);
+    expect(img.headers['content-type']).toBe('image/png');
+    expect(fake.requests.some((r) => r.source === 'tmdb-img' && r.path === '/t/p/w92/fake-charade.png')).toBe(true);
+  });
+
+  it('turns a picked film into the YTS film with the same IMDb code', async () => {
+    await setKey();
+    expect((await call(t.app, 'GET', '/api/tmdb/900002/yts', { cookie: mei })).json()).toEqual({
+      ytsId: 2,
+      imdbCode: 'tt9000002',
+    });
+  });
+
+  it('says plainly when YTS does not have the film, or TMDB does not know it', async () => {
+    await setKey();
+    expect((await suggest('大國民')).json().items[0]).toMatchObject({ tmdbId: 15, originalTitle: 'Citizen Kane' });
+    expect((await call(t.app, 'GET', '/api/tmdb/15/yts', { cookie: mei })).json()).toEqual({
+      ytsId: null,
+      imdbCode: 'tt0033467',
+    });
+    expect((await call(t.app, 'GET', '/api/tmdb/424242/yts', { cookie: mei })).json()).toEqual({
+      ytsId: null,
+      imdbCode: null,
+    });
+  });
+
+  it('refuses empty or odd input, odd poster names, and people who are not signed in', async () => {
+    await setKey();
+    expect((await suggest('   ')).statusCode).toBe(422);
+    expect((await suggest('x'.repeat(101))).statusCode).toBe(422);
+    expect((await call(t.app, 'GET', '/api/tmdb/poster/..%2Fsecret.png', { cookie: mei })).statusCode).toBe(422);
+    expect((await call(t.app, 'GET', '/api/tmdb/poster/x.svg', { cookie: mei })).statusCode).toBe(422);
+    expect((await call(t.app, 'GET', '/api/tmdb/suggest?q=charade')).statusCode).toBe(401);
   });
 });

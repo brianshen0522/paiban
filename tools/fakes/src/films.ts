@@ -357,6 +357,21 @@ export type TmdbFake = {
   voteCount: number;
   posterPath: string;
   color: string;
+  year: number;
+};
+
+/** A film TMDB knows and the fake YTS does not: picking it from the suggestions finds nothing. */
+export const TMDB_ONLY: TmdbFake = {
+  imdb: 'tt0033467',
+  tmdbId: 15,
+  title: '大國民',
+  originalTitle: 'Citizen Kane',
+  overview: '報業大亨臨終前說了一個詞，記者走訪他身邊的人，想知道那是什麼意思。',
+  voteAverage: 8,
+  voteCount: 5800,
+  posterPath: '/fake-citizen-kane.png',
+  color: '#3a3a3a',
+  year: 1941,
 };
 
 export function tmdbCatalogue(): TmdbFake[] {
@@ -372,6 +387,7 @@ export function tmdbCatalogue(): TmdbFake[] {
       voteCount: 500 + f.id * 37,
       posterPath: `/fake-${f.slug}.png`,
       color,
+      year: f.year,
     };
   });
 }

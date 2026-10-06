@@ -48,6 +48,9 @@
 | `GET /api/yts/movies` | 登入 | 轉呼叫 YTS 的 `list_movies`。沒有 `q` 時就是「最新上架」。每頁 24 部。結果快取 10 分鐘。還沒設定 YTS 的網址回 `YTS_NOT_CONFIGURED`，連不上回 `YTS_UNREACHABLE`，回應看不懂回 `YTS_BAD_RESPONSE`。每一部標上呼叫者有沒有（`mine`） |
 | `GET /api/yts/movies/:ytsId` | 登入 | 電影資料加上每個版本。每個版本附上：能不能直接播、要預留多少預覽空間、總共需要多少、現在放不放得下、系統裡是不是已經有人下載。同時回目前的用量。YTS 連不上而這部片有先前存下來的資料時照常回傳，`stale` 是 true，`fetchedAt` 是那份資料的時間；沒有存過才回 `YTS_UNREACHABLE` |
 | `GET /api/yts/movies/:ytsId/poster` | 登入 | 由伺服器向 YTS 取海報再回傳。片庫裡的電影從 `/data/posters` 讀。取不到回 404，前端改畫佔位海報 |
+| `GET /api/tmdb/suggest?q=` | 登入 | 打字時的建議（Brian，2026-10-06）：向 TMDB 搜尋電影（`language=zh-TW`，中文和原文片名都比對），最多 8 部，`{items: TmdbSuggestion[], available}`。沒有 TMDB 金鑰、或 TMDB 出錯時 `available: false`、清單是空的（不擋搜尋）。`q` 1 到 100 字。結果快取一天 |
+| `GET /api/tmdb/:tmdbId/yts` | 登入 | 點了建議之後：向 TMDB 要這部片的 IMDb 編號（`/3/movie/<id>/external_ids`，快取一個月），再用這個編號查 YTS（`query_term` 認得 IMDb 編號，結果快取一小時）。`{ytsId, imdbCode}`；YTS 沒有這部片時 `ytsId` 是 null，TMDB 也不知道 IMDb 編號時兩個都是 null |
+| `GET /api/tmdb/poster/:file` | 登入 | 建議清單的小海報，由伺服器向 `image.tmdb.org/t/p/w92/…` 取（D30）。檔名只接受 TMDB 海報路徑的樣子（`[\w-]+.jpg` 之類），其他回 `VALIDATION` |
 
 細節在 [05-yts.md](05-yts.md)。
 

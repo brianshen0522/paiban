@@ -193,3 +193,7 @@ YTS 只負責「有哪些片、有哪些版本可以下載」。人看到的電�
 - 沒有 TMDB 金鑰、或金鑰被拒時，全部退回 YTS 的資料；金鑰被拒會在來源設定的 TMDB 卡片顯示。
 - IMDb 編號還是保留：YTS 和 YIFY Subtitles 只認得它。
 
+### 用中文片名找片（Brian，2026-10-06）
+
+YTS 只認得英文片名，打「謎中謎」什麼都找不到。所以搜尋框打字時（停 0.25 秒後），伺服器向 TMDB 的 `GET /3/search/movie?query=…&language=zh-TW&include_adult=false` 要建議，最多 8 部，列在搜尋框下面：小海報、中文片名、原文片名和年份。點一部（或用方向鍵選再按 Enter）：伺服器用 `GET /3/movie/<tmdbId>/external_ids` 取它的 IMDb 編號，再用這個編號當 YTS 的 `query_term`（YTS 的搜尋認得 IMDb 編號），找到就直接打開那部片的頁面；YTS 沒有就在那一列寫「YTS 上沒有這部片。」。沒有選任何建議時按 Enter，照舊用打的字搜尋 YTS。頂端列和搜尋頁的搜尋框都有。沒有 TMDB 金鑰時不顯示建議、也不連 TMDB。快取：建議一天，IMDb 編號一個月，「YTS 有沒有」一小時。
+

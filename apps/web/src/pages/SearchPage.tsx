@@ -5,6 +5,7 @@ import { Banner, Chip, Empty, PageHead } from '../components/Bits';
 import { FillPage, ScrollList } from '../components/FillPage';
 import { Poster } from '../components/Poster';
 import { Rating } from '../components/Rating';
+import { SuggestInput } from '../components/SuggestInput';
 import { t } from '../copy/zh-TW';
 import { ApiFailure } from '../lib/api';
 import { useSearch } from '../lib/queries';
@@ -51,13 +52,7 @@ export function SearchPage() {
     <FillPage>
       <PageHead title={t.search.title} lead={t.search.lead} />
       <form className="filters" onSubmit={submit} aria-label={t.search.title}>
-        <input
-          type="search"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder={t.search.placeholder}
-          aria-label={t.search.placeholder}
-        />
+        <SuggestInput value={q} onChange={setQ} placeholder={t.search.placeholder} label={t.search.placeholder} />
         <label className="sel-l">
           <span>{t.search.quality}</span>
           <select value={params.get('quality') ?? ''} onChange={(e) => update('quality', e.target.value)}>

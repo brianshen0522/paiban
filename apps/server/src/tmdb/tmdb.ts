@@ -50,10 +50,27 @@ export class TmdbError extends Error {
 
 /** GET /3/find/<imdb>?external_source=imdb_id&language=zh-TW, as parsed JSON. */
 export async function tmdbFind(outbound: OutboundPolicy, imdb: string, key: string): Promise<unknown> {
+  const body = await tmdbGet(
+    outbound,
+    `/3/find/${encodeURIComponent(imdb)}`,
+    { external_source: 'imdb_id', language: 'zh-TW' },
+    key,
+  );
+  if (body === null) throw new TmdbError('UNREACHABLE', 'TMDB answered 404 to a find');
+  return body;
+}
+
+/** One GET to TMDB's API, as parsed JSON. A v3 key goes in the query, a v4 token in a header. */
+export async function tmdbGet(
+  outbound: OutboundPolicy,
+  path: string,
+  query: Record<string, string>,
+  key: string,
+): Promise<unknown> {
   const v4 = isV4Token(key);
-  const url = `https://${TMDB_HOST}/3/find/${encodeURIComponent(imdb)}?external_source=imdb_id&language=zh-TW${
-    v4 ? '' : `&api_key=${encodeURIComponent(key)}`
-  }`;
+  const params = new URLSearchParams(query);
+  if (!v4) params.set('api_key', key);
+  const url = `https://${TMDB_HOST}${path}?${params}`;
   let res: Awaited<ReturnType<typeof outboundFetch>>;
   try {
     res = await outboundFetch(outbound, url, {
@@ -67,6 +84,7 @@ export async function tmdbFind(outbound: OutboundPolicy, imdb: string, key: stri
     throw err;
   }
   if (res.status === 401) throw new TmdbError('INVALID_KEY', 'TMDB refused the key');
+  if (res.status === 404) return null;
   if (res.status !== 200) throw new TmdbError('UNREACHABLE', `TMDB answered ${res.status}`);
   try {
     return JSON.parse(res.body.toString('utf8'));
@@ -213,3 +231,124 @@ export async function filmsFor(
 
 export const tmdbPosterUrl = (posterPath: string) => `https://${TMDB_IMAGE_HOST}/t/p/w342${posterPath}`;
 export const tmdbPageUrl = (tmdbId: number) => `https://www.themoviedb.org/movie/${tmdbId}`;
+
+/* ------------------------------------------------------------------ suggestions as you type */
+
+/** A suggestion as kept in the cache: the poster as TMDB's path, turned into our URL on the way out. */
+export type TmdbHit = {
+  tmdbId: number;
+  title: string;
+  originalTitle: string;
+  year: number | null;
+  posterPath: string | null;
+};
+
+const SearchAnswer = z.object({
+  results: z.array(
+    z.object({
+      id: z.number(),
+      title: z.string().nullish(),
+      original_title: z.string().nullish(),
+      release_date: z.string().nullish(),
+      poster_path: z.string().nullish(),
+      adult: z.boolean().nullish(),
+    }),
+  ),
+});
+
+/** At most this many suggestions under the search box. */
+export const SUGGEST_LIMIT = 8;
+const SUGGEST_HOURS = 24;
+const IMDB_DAYS = 30;
+/** TMDB's poster paths look like "/kqjL17yufvn9OVLyXYpvtyrFfak.jpg". */
+export const POSTER_FILE = /^[\w-]{1,64}\.(jpg|jpeg|png|webp)$/;
+
+/** TMDB's /3/search/movie answer, as suggestions: no adult films, nothing without a title. */
+export function parseSearch(body: unknown): TmdbHit[] {
+  const parsed = SearchAnswer.safeParse(body);
+  if (!parsed.success) throw new TmdbError('BAD_RESPONSE', 'TMDB answered a search in an unexpected shape');
+  return parsed.data.results
+    .filter((r) => !r.adult && (r.title || r.original_title))
+    .slice(0, SUGGEST_LIMIT)
+    .map((r) => {
+      const year = /^(\d{4})-/.exec(r.release_date ?? '')?.[1];
+      const file = r.poster_path?.replace(/^\//, '') ?? '';
+      return {
+        tmdbId: r.id,
+        title: (r.title || r.original_title) ?? '',
+        originalTitle: (r.original_title || r.title) ?? '',
+        year: year ? Number(year) : null,
+        posterPath: POSTER_FILE.test(file) ? `/${file}` : null,
+      };
+    });
+}
+
+async function cached<T>(pool: Pool, key: string): Promise<{ value: T } | null> {
+  const row = (
+    await many<{ payload: { value: T } }>(
+      pool,
+      `select payload from provider_cache where provider = 'tmdb' and cache_key = $1 and expires_at > now()`,
+      [key],
+    )
+  )[0];
+  return row ? row.payload : null;
+}
+
+async function keep(pool: Pool, key: string, value: unknown, hours: number): Promise<void> {
+  await pool.query(
+    `insert into provider_cache (provider, cache_key, payload, expires_at)
+     values ('tmdb', $1, $2, now() + make_interval(hours => $3))
+     on conflict (provider, cache_key) do update set payload = excluded.payload, fetched_at = now(), expires_at = excluded.expires_at`,
+    [key, { value }, hours],
+  );
+}
+
+/** Films whose Chinese or original title matches what was typed; a day in the cache. Null without a key. */
+export async function tmdbSuggest(env: TmdbEnv, typed: string): Promise<TmdbHit[] | null> {
+  const key = await env.key();
+  if (!key) return null;
+  const q = typed.trim().toLowerCase();
+  const ck = `suggest:${q}`;
+  const hit = await cached<TmdbHit[]>(env.pool, ck);
+  if (hit) return hit.value;
+  let hits: TmdbHit[];
+  try {
+    hits = parseSearch(
+      await tmdbGet(
+        env.outbound,
+        '/3/search/movie',
+        { query: q, language: 'zh-TW', include_adult: 'false', page: '1' },
+        key,
+      ),
+    );
+  } catch (err) {
+    if (err instanceof TmdbError) {
+      await recordSourceHealth(env.pool, 'tmdb', err.code === 'INVALID_KEY' ? 'warn' : 'down', err.code, {});
+      env.log.warn({ code: err.code }, 'TMDB search failed');
+    }
+    throw err;
+  }
+  await keep(env.pool, ck, hits, SUGGEST_HOURS);
+  return hits;
+}
+
+const ExternalIds = z.object({ imdb_id: z.string().nullish() });
+
+/** The IMDb code of a TMDB film (what YTS knows films by), or null when TMDB has none. A month in the cache. */
+export async function tmdbImdbCode(env: TmdbEnv, tmdbId: number): Promise<string | null> {
+  const key = await env.key();
+  if (!key) return null;
+  const ck = `imdb:${tmdbId}`;
+  const hit = await cached<string | null>(env.pool, ck);
+  if (hit) return hit.value;
+  const body = await tmdbGet(env.outbound, `/3/movie/${tmdbId}/external_ids`, {}, key);
+  const parsed = body === null ? null : ExternalIds.safeParse(body);
+  if (parsed && !parsed.success)
+    throw new TmdbError('BAD_RESPONSE', 'TMDB answered external ids in an unexpected shape');
+  const imdb = parsed?.data.imdb_id ?? null;
+  const code = imdb && /^tt\d{7,10}$/.test(imdb) ? imdb : null;
+  await keep(env.pool, ck, code, code ? IMDB_DAYS * 24 : SUGGEST_HOURS);
+  return code;
+}
+
+export const tmdbSmallPosterUrl = (file: string) => `https://${TMDB_IMAGE_HOST}/t/p/w92/${file}`;

@@ -3,7 +3,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { deflateSync } from 'node:zlib';
-import { tmdbCatalogue } from './films.ts';
+import { TMDB_ONLY, tmdbCatalogue } from './films.ts';
 
 /**
  * The fake subtitle sources (docs/15-testing.md, "假的字幕來源"): one HTTP server that answers for
@@ -102,7 +102,7 @@ export async function startFakeSources(
   const jsMissing = recorded('justsubtitles.subtitles.missing.sample.json');
   const jsSearch = JSON.parse(recorded('justsubtitles.search.sample.json'));
   const tmdbFind = recorded('tmdb.find.sample.json');
-  const tmdbFilms = tmdbCatalogue();
+  const tmdbFilms = [...tmdbCatalogue(), TMDB_ONLY];
   const yifyMovie = recorded('yify.movie-page.sample.html');
   const yifySub = recorded('yify.subtitle-page.sample.html');
   const assrtSearch = recorded('assrt.search.sample.json');
@@ -155,6 +155,45 @@ export async function startFakeSources(
         const key = url.searchParams.get('api_key');
         if (!auth && !key) return send(401, '{"status_code":7,"status_message":"Invalid API key"}');
         if ((key ?? auth ?? '').includes('rejected')) return send(401, '{"status_code":7}');
+        // GET /3/search/movie: the shape of TMDB's answer, matching the Chinese or the original title.
+        if (path === '/3/search/movie') {
+          const q = (url.searchParams.get('query') ?? '').trim().toLowerCase();
+          const hits = q
+            ? tmdbFilms.filter((f) => f.title.toLowerCase().includes(q) || f.originalTitle.toLowerCase().includes(q))
+            : [];
+          return send(
+            200,
+            JSON.stringify({
+              page: 1,
+              results: hits.map((f) => ({
+                adult: false,
+                id: f.tmdbId,
+                title: f.title,
+                original_title: f.originalTitle,
+                original_language: 'en',
+                overview: f.overview,
+                poster_path: f.posterPath,
+                release_date: `${f.year}-01-01`,
+                popularity: f.voteCount / 100,
+                vote_average: f.voteAverage,
+                vote_count: f.voteCount,
+              })),
+              total_pages: 1,
+              total_results: hits.length,
+            }),
+          );
+        }
+        // GET /3/movie/<id>/external_ids
+        const ext = /^\/3\/movie\/(\d+)\/external_ids$/.exec(path);
+        if (ext) {
+          const film = tmdbFilms.find((f) => f.tmdbId === Number(ext[1]));
+          return film
+            ? send(200, JSON.stringify({ id: film.tmdbId, imdb_id: film.imdb, wikidata_id: null }))
+            : send(
+                404,
+                '{"success":false,"status_code":34,"status_message":"The resource you requested could not be found."}',
+              );
+        }
         const m = /^\/3\/find\/(tt\d+)$/.exec(path);
         const film = tmdbFilms.find((f) => f.imdb === m?.[1]);
         // A film answered as Inception keeps Inception's TMDB id (the subtitle sources know only

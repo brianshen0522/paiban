@@ -88,6 +88,14 @@ export const t = {
     toSearch: '前往搜尋',
   },
 
+  suggest: {
+    heading: 'TMDB 上的電影：點一部，找 YTS 上的版本',
+    listLabel: '符合的電影',
+    finding: '正在找 YTS 上的版本…',
+    missing: 'YTS 上沒有這部片。',
+    failed: '查不到，稍後再試一次。',
+    enterHint: (q: string) => (q ? `按 Enter 直接用「${q}」搜尋 YTS（只認得英文片名）` : ''),
+  },
   search: {
     title: '搜尋',
     resultsLabel: '搜尋結果',

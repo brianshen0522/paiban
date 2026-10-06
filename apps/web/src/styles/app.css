@@ -1136,6 +1136,93 @@ fieldset.field > legend {
   font-size: 9.5px;
 }
 
+/* suggestions as you type (TMDB films; Brian, 2026-10-06) */
+.suggest {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.suggest > input {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+}
+.suggest-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: max(100%, min(420px, calc(100vw - 32px)));
+  z-index: 40;
+  background: var(--panel);
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(8, 12, 28, 0.22);
+  padding: 6px;
+  max-height: min(70vh, 520px);
+  overflow-y: auto;
+}
+.suggest-list {
+  display: grid;
+  gap: 2px;
+}
+.suggest-list > div {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.suggest-list > div.on {
+  background: var(--accent-wash);
+}
+.suggest-pop img,
+.suggest-noimg {
+  width: 32px;
+  height: 48px;
+  border-radius: 4px;
+  object-fit: cover;
+  background: var(--panel-2);
+  display: block;
+}
+.suggest-text {
+  display: grid;
+  min-width: 0;
+}
+.suggest-text b {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.suggest-text small {
+  color: var(--ink-3);
+  font-size: 12px;
+}
+.suggest-text small.suggest-note {
+  color: var(--accent-ink);
+}
+.suggest-text small.suggest-note.bad {
+  color: var(--bad);
+}
+.suggest-head,
+.suggest-foot {
+  margin: 0;
+  padding: 4px 8px 6px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.suggest-foot:empty {
+  display: none;
+}
+.suggest-foot {
+  border-top: 1px solid var(--line);
+  margin-top: 4px;
+  padding-top: 8px;
+}
+
 /* search */
 #view .filters {
   display: flex;
@@ -1143,7 +1230,7 @@ fieldset.field > legend {
   gap: 8px 12px;
   align-items: center;
 }
-#view .filters input[type="search"] {
+#view .filters .suggest {
   flex: 1 1 260px;
   min-width: 0;
 }
