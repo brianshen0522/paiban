@@ -46,9 +46,7 @@ export function clientName(peerIdHex: string | null, version: string | null): st
   const digits = m[2].replace(/[^0-9]/g, '');
   // WebTorrent writes two digits per part ("0201" = 2.1); most others one ("4630" = 4.6.3).
   const parts =
-    m[1] === 'WW' || m[1] === 'WD'
-      ? (digits.match(/\d{2}/g) ?? []).map((d) => String(Number(d)))
-      : digits.split('');
+    m[1] === 'WW' || m[1] === 'WD' ? (digits.match(/\d{2}/g) ?? []).map((d) => String(Number(d))) : digits.split('');
   while (parts.length > 1 && parts[parts.length - 1] === '0') parts.pop();
   while (parts.length > 1 && parts[0] === '0') parts.shift();
   const number = parts.join('.');
