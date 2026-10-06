@@ -171,7 +171,14 @@ export function Shell({ me }: { me: Me }) {
               />
             </span>
             <span className="mono">
-              {usage ? `${bytes(usage.usedBytes)} / ${bytes(usage.limitBytes)}` : t.shell.usageUnknown}
+              {usage ? (
+                <>
+                  {bytes(usage.usedBytes)}
+                  <span className="meter-limit"> / {bytes(usage.limitBytes)}</span>
+                </>
+              ) : (
+                t.shell.usageUnknown
+              )}
             </span>
           </Link>
           <ThemeToggle />

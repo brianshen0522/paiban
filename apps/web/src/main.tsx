@@ -5,6 +5,11 @@ import '@fontsource/ibm-plex-mono/latin-400.css';
 import '@fontsource/ibm-plex-mono/latin-500.css';
 import '@fontsource/oswald/latin-500.css';
 import '@fontsource/oswald/latin-600.css';
+// Chinese for systems without PingFang or JhengHei (Linux, Android): bundled, split by character
+// range, so a page fetches only the slices it uses. Mac and Windows use their own font first.
+import '@fontsource/noto-sans-tc/400.css';
+import '@fontsource/noto-sans-tc/500.css';
+import '@fontsource/noto-sans-tc/600.css';
 import './styles/app.css';
 import './styles/workspace.css';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';

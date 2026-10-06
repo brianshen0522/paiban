@@ -12,6 +12,7 @@
   "dependencies": {
     "@fontsource/ibm-plex-mono": "5.3.0",
     "@fontsource/ibm-plex-sans": "5.3.0",
+    "@fontsource/noto-sans-tc": "5.3.0",
     "@fontsource/oswald": "5.3.0",
     "@paiban/shared": "workspace:*",
     "@tanstack/react-query": "5.104.1",

@@ -2,14 +2,14 @@
    prototype/platform/src/app.css; the dark palette applies when the system prefers it or when the
    person picks it (data-theme on <html>, set from the theme picker). */
 :root {
-  --bg: #eef0f4;
+  --bg: #f2f3f7;
   --panel: #ffffff;
-  --panel-2: #f5f6f9;
-  --line: #d9dce5;
-  --line-strong: #b4b9cb;
-  --ink: #171a26;
-  --ink-2: #4a5167;
-  --ink-3: #747b92;
+  --panel-2: #f5f6fa;
+  --line: #e2e5ec;
+  --line-strong: #c7ccd8;
+  --ink: #161926;
+  --ink-2: #474e64;
+  --ink-3: #656c83;
   --accent-fill: #f4b619;
   --accent-ink: #7d5200;
   --on-accent: #231a00;
@@ -37,18 +37,22 @@
   --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
   --font-poster: "Oswald", "PingFang TC", "Microsoft JhengHei", "Noto Sans TC", sans-serif;
   --r: 8px;
+  --ctl-h: 34px;
+  --shadow: 0 1px 2px rgba(20, 24, 40, 0.05), 0 1px 1px rgba(20, 24, 40, 0.03);
+  --ring: 0 0 0 3px color-mix(in srgb, var(--accent-fill) 32%, transparent);
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg: #10121a;
-    --panel: #181b26;
-    --panel-2: #1f2330;
-    --line: #2c3144;
-    --line-strong: #444b68;
+    --bg: #0e1016;
+    --panel: #161922;
+    --panel-2: #1d212d;
+    --line: #262b39;
+    --line-strong: #394057;
     --ink: #e9ebf3;
-    --ink-2: #aeb4c8;
-    --ink-3: #7d849c;
+    --ink-2: #b0b6c9;
+    --ink-3: #8189a1;
+    --shadow: none;
     --accent-ink: #ffcf52;
     --accent-wash: #3a2f10;
     --speech: #3cc4ae;
@@ -69,14 +73,15 @@
   }
 }
 :root[data-theme="dark"] {
-  --bg: #10121a;
-  --panel: #181b26;
-  --panel-2: #1f2330;
-  --line: #2c3144;
-  --line-strong: #444b68;
+  --bg: #0e1016;
+  --panel: #161922;
+  --panel-2: #1d212d;
+  --line: #262b39;
+  --line-strong: #394057;
   --ink: #e9ebf3;
-  --ink-2: #aeb4c8;
-  --ink-3: #7d849c;
+  --ink-2: #b0b6c9;
+  --ink-3: #8189a1;
+  --shadow: none;
   --accent-ink: #ffcf52;
   --accent-wash: #3a2f10;
   --speech: #3cc4ae;
@@ -170,19 +175,26 @@ a.btn {
   background: var(--panel);
   border: 1px solid var(--line-strong);
   border-radius: var(--r);
-  padding: 5px 11px;
+  padding: 0 12px;
+  min-height: var(--ctl-h);
   cursor: pointer;
   white-space: nowrap;
   text-decoration: none;
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  line-height: 1.5;
+  line-height: 1.4;
+  font-weight: 500;
   color: var(--ink);
+  transition:
+    background-color 0.12s,
+    border-color 0.12s,
+    color 0.12s;
 }
 button:hover,
 a.btn:hover {
   background: var(--panel-2);
+  border-color: color-mix(in srgb, var(--ink-3) 55%, var(--line-strong));
 }
 button:active {
   transform: translateY(1px);
@@ -191,6 +203,11 @@ button:disabled {
   opacity: 0.55;
   cursor: default;
   transform: none;
+}
+button.primary,
+button.danger,
+.auth button[type="submit"] {
+  justify-content: center;
 }
 button.primary {
   background: var(--accent-fill);
@@ -202,9 +219,22 @@ button.primary:hover:not(:disabled) {
   background: var(--accent-fill);
   filter: brightness(1.06);
 }
-button.strong {
-  border-color: var(--accent-ink);
+button.strong,
+a.btn.strong {
+  background: var(--accent-wash);
+  border-color: color-mix(in srgb, var(--accent-ink) 45%, transparent);
   color: var(--accent-ink);
+  font-weight: 600;
+}
+button.strong:hover:not(:disabled),
+a.btn.strong:hover {
+  background: color-mix(in srgb, var(--accent-fill) 28%, var(--panel));
+  border-color: var(--accent-ink);
+}
+a.btn.primary {
+  background: var(--accent-fill);
+  border-color: var(--accent-fill);
+  color: var(--on-accent);
   font-weight: 600;
 }
 button.danger {
@@ -220,6 +250,8 @@ button.link {
   background: none;
   border: 0;
   padding: 0;
+  min-height: 0;
+  box-shadow: none;
   color: var(--accent-ink);
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -237,10 +269,46 @@ textarea {
   background: var(--panel);
   border: 1px solid var(--line-strong);
   border-radius: var(--r);
-  padding: 5px 9px;
+  padding: 0 10px;
+  min-height: var(--ctl-h);
   min-width: 0;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s;
+}
+select {
+  padding-right: 6px;
+}
+select:hover,
+input:is(
+  [type="search"],
+  [type="number"],
+  [type="text"],
+  [type="url"],
+  [type="password"],
+  [type="email"],
+  :not([type])
+):hover,
+textarea:hover {
+  border-color: color-mix(in srgb, var(--ink-3) 55%, var(--line-strong));
+}
+input:is(
+  [type="search"],
+  [type="number"],
+  [type="text"],
+  [type="url"],
+  [type="password"],
+  [type="email"],
+  :not([type])
+):focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  border-color: var(--accent-fill);
+  box-shadow: var(--ring);
 }
 textarea {
+  padding: 8px 10px;
   width: 100%;
   resize: vertical;
 }
@@ -292,38 +360,41 @@ label.chk {
 .st {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   border-radius: 999px;
-  padding: 1px 9px;
+  padding: 2px 10px;
   font-size: 12.5px;
-  border: 1px solid var(--line-strong);
+  font-weight: 500;
+  line-height: 1.5;
+  border: 1px solid transparent;
+  background: var(--panel-2);
   color: var(--ink-2);
   white-space: nowrap;
   vertical-align: middle;
 }
 .st::before {
   content: "";
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: currentColor;
   flex: none;
 }
 .st.ok {
   color: var(--good);
-  border-color: var(--good);
+  background: var(--good-wash);
 }
 .st.warn {
   color: var(--warn);
-  border-color: var(--warn);
+  background: var(--warn-wash);
 }
 .st.bad {
   color: var(--bad);
-  border-color: var(--bad);
+  background: var(--bad-wash);
 }
 .st.info {
   color: var(--info);
-  border-color: var(--info);
+  background: var(--info-wash);
 }
 
 /* theme picker: a segmented radio group */
@@ -642,6 +713,7 @@ fieldset.field > legend {
   background: var(--accent-wash);
   color: var(--ink);
   font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--accent-fill);
 }
 .main {
   min-width: 0;
@@ -681,7 +753,11 @@ fieldset.field > legend {
   min-height: 160px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  border-radius: 10px;
+  border-radius: 12px;
+  /* Several cards in one scrolling list keep the page's spacing between them. */
+  display: grid;
+  gap: 16px;
+  align-content: start;
 }
 #view .list-scroll:focus-visible {
   outline-offset: 2px;
@@ -702,9 +778,15 @@ fieldset.field > legend {
   gap: 8px 16px;
 }
 #view h1 {
-  font-size: 21px;
+  font-size: 22px;
   font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
   text-wrap: balance;
+}
+#view .head .sub,
+#view h1 + .sub {
+  margin-top: 4px;
 }
 #view h1:focus {
   outline: none;
@@ -712,13 +794,23 @@ fieldset.field > legend {
 #view .crumbs {
   margin-bottom: -6px;
 }
+#view .crumbs .link {
+  color: var(--ink-3);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 500;
+}
+#view .crumbs .link:hover {
+  color: var(--accent-ink);
+}
 #view .card {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 12px;
-  padding: 14px 16px;
+  box-shadow: var(--shadow);
+  padding: 16px 18px;
   display: grid;
-  gap: 10px;
+  gap: 12px;
   min-width: 0;
   align-content: start;
 }
@@ -734,6 +826,11 @@ fieldset.field > legend {
 #view .card > button,
 #view .card > a.btn {
   justify-self: start;
+}
+/* A lone setting does not stretch across a wide card. */
+#view .card > .field,
+#view .card > form > .field {
+  max-width: 560px;
 }
 #view .stack {
   display: grid;
@@ -771,9 +868,23 @@ fieldset.field > legend {
 #view th,
 #view td {
   text-align: left;
-  padding: 8px 14px 8px 0;
+  padding: 10px 14px 10px 0;
   border-bottom: 1px solid var(--line);
   vertical-align: middle;
+}
+#view tbody tr {
+  transition: background-color 0.12s;
+}
+#view .card tbody tr:hover > td {
+  background: color-mix(in srgb, var(--panel-2) 70%, transparent);
+}
+#view th:first-child,
+#view td:first-child {
+  padding-left: 6px;
+}
+#view th:last-child,
+#view td:last-child {
+  padding-right: 6px;
 }
 #view tr:last-child > td {
   border-bottom: 0;
@@ -781,8 +892,10 @@ fieldset.field > legend {
 #view th {
   color: var(--ink-3);
   font-weight: 500;
-  font-size: 12.5px;
+  font-size: 12px;
+  letter-spacing: 0.02em;
   white-space: nowrap;
+  padding-block: 8px;
 }
 #view td.num,
 #view th.num {
@@ -818,23 +931,27 @@ fieldset.field > legend {
 }
 #view .banner {
   border-radius: 10px;
-  padding: 10px 14px;
+  padding: 11px 14px 11px 16px;
   display: grid;
   gap: 8px;
-  border: 1px solid var(--line-strong);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-strong);
   background: var(--panel-2);
   justify-items: start;
 }
 #view .banner.bad {
-  border-color: var(--bad);
+  border-color: color-mix(in srgb, var(--bad) 28%, transparent);
+  border-left-color: var(--bad);
   background: var(--bad-wash);
 }
 #view .banner.warn {
-  border-color: var(--warn);
+  border-color: color-mix(in srgb, var(--warn) 28%, transparent);
+  border-left-color: var(--warn);
   background: var(--warn-wash);
 }
 #view .banner.info {
-  border-color: var(--info);
+  border-color: color-mix(in srgb, var(--info) 24%, transparent);
+  border-left-color: var(--info);
   background: var(--info-wash);
 }
 #view .confirm {
@@ -843,20 +960,21 @@ fieldset.field > legend {
   text-align: left;
   white-space: normal;
   background: var(--bad-wash);
-  border: 1px solid var(--bad);
+  border: 1px solid color-mix(in srgb, var(--bad) 40%, transparent);
   border-radius: 10px;
-  padding: 8px 10px;
+  padding: 10px 12px;
   max-width: 34em;
   margin-left: auto;
 }
 #view .empty {
-  background: var(--panel);
+  background: color-mix(in srgb, var(--panel) 60%, transparent);
   border: 1px dashed var(--line-strong);
   border-radius: 12px;
-  padding: 28px 20px;
+  padding: 32px 24px;
   display: grid;
-  gap: 6px;
-  justify-items: start;
+  gap: 8px;
+  justify-items: center;
+  text-align: center;
 }
 #view .empty p {
   color: var(--ink-2);
@@ -987,8 +1105,8 @@ fieldset.field > legend {
 }
 #view .mgrid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
-  gap: 18px 14px;
+  grid-template-columns: repeat(auto-fill, minmax(156px, 1fr));
+  gap: 22px 16px;
 }
 #view .mgrid.fetching {
   opacity: 0.6;
@@ -1004,17 +1122,31 @@ fieldset.field > legend {
   border-radius: 8px;
   min-width: 0;
 }
-#view .mcard:hover .poster,
+#view .mcard .poster {
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+  box-shadow: 0 1px 3px rgba(10, 12, 20, 0.12);
+}
+#view .mcard:hover .poster {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(10, 12, 20, 0.18);
+}
 #view .mcard:focus-visible .poster {
   outline: 2px solid var(--accent-fill);
   outline-offset: 2px;
+}
+#view .mcard .rating {
+  display: block;
+  white-space: nowrap;
 }
 #view .mcard:focus-visible {
   outline: none;
 }
 #view .mcard .mt {
   font-weight: 600;
-  line-height: 1.3;
+  line-height: 1.35;
+  margin-top: 4px;
 }
 #view .mcard .ms {
   color: var(--ink-3);
@@ -1029,7 +1161,8 @@ fieldset.field > legend {
   font-style: normal;
   font-family: var(--font-mono);
   font-size: 11px;
-  border: 1px solid var(--line-strong);
+  background: var(--panel-2);
+  border: 1px solid var(--line);
   border-radius: 4px;
   padding: 0 5px;
   color: var(--ink-2);
@@ -1147,8 +1280,14 @@ fieldset.field > legend {
   color: var(--ink-2);
   max-width: 74ch;
 }
-#view form.limit {
-  align-items: end;
+#view form.limit,
+#view form.align-end {
+  align-items: flex-start;
+}
+/* The button lines up with the input, not with the help line under it: one label line down. */
+#view form.limit > button,
+#view form.align-end > button {
+  margin-top: calc(14px * 1.5 + 4px);
 }
 #view .narrow-input {
   max-width: 140px;
@@ -1217,18 +1356,27 @@ fieldset.field > legend {
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 12px;
-  padding: 12px 14px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 16px;
-  align-items: flex-start;
+  box-shadow: var(--shadow);
+  padding: 14px 16px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px 18px;
+  align-items: start;
+}
+@media (max-width: 640px) {
+  #view .lib {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  #view .lib-act {
+    grid-column: 1 / -1;
+  }
 }
 #view .lib-main {
-  flex: 1 1 300px;
   min-width: 0;
   display: grid;
   gap: 6px;
   justify-items: start;
+  align-content: start;
 }
 #view .lib-main h2 {
   font-size: 16px;
@@ -1238,7 +1386,6 @@ fieldset.field > legend {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-left: auto;
 }
 #view .flow {
   list-style: none;
@@ -1249,23 +1396,29 @@ fieldset.field > legend {
   gap: 4px 6px;
   font-size: 13px;
 }
+#view .flow {
+  align-items: center;
+}
 #view .flow li {
-  border: 1px solid var(--line-strong);
   border-radius: 999px;
-  padding: 1px 10px;
+  padding: 2px 10px;
   color: var(--ink-3);
+  background: var(--panel-2);
+  display: inline-flex;
+  align-items: center;
 }
 #view .flow li.done {
-  border-color: var(--good);
   color: var(--good);
+  background: var(--good-wash);
 }
 #view .flow li.part {
-  border-color: var(--warn);
   color: var(--warn);
+  background: var(--warn-wash);
 }
 #view .flow li + li::before {
-  content: "→ ";
-  color: var(--ink-3);
+  content: "→";
+  margin-right: 5px;
+  opacity: 0.6;
 }
 
 /* forms and settings */
@@ -1363,8 +1516,17 @@ fieldset.field > legend {
   .prog i,
   .sw i,
   .sw i::after,
-  #view .mgrid.fetching {
+  #view .mgrid.fetching,
+  #view .mcard .poster,
+  button,
+  a.btn,
+  input,
+  select,
+  textarea {
     transition: none;
+  }
+  #view .mcard:hover .poster {
+    transform: none;
   }
 }
 
@@ -1399,6 +1561,10 @@ fieldset.field > legend {
     border: 1px solid var(--line);
     background: var(--panel);
   }
+  .side a[aria-current="page"] {
+    box-shadow: none;
+    border-color: color-mix(in srgb, var(--accent-ink) 45%, transparent);
+  }
   .top .right {
     margin-left: 0;
   }
@@ -1432,9 +1598,17 @@ fieldset.field > legend {
   .top .right {
     margin-left: auto;
   }
-  /* Room for the appearance button: the numbers stay, the little bar goes. */
-  .top .meter .bar {
+  /* One row for the brand and the buttons: the meter keeps only what is used (the limit is on its page). */
+  .top .meter .bar,
+  .top .meter .meter-limit {
     display: none;
+  }
+  .top {
+    gap: 8px 12px;
+    padding-block: 8px;
+  }
+  .top .right {
+    gap: 6px;
   }
 }
 
@@ -1526,9 +1700,6 @@ fieldset.field > legend {
 #view .sel {
   user-select: all;
   overflow-wrap: anywhere;
-}
-#view form.align-end {
-  align-items: flex-end;
 }
 #view form.align-end .field {
   flex: 1 1 240px;

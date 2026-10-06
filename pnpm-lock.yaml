@@ -242,6 +242,9 @@ importers:
       '@fontsource/ibm-plex-sans':
         specifier: 5.3.0
         version: 5.3.0
+      '@fontsource/noto-sans-tc':
+        specifier: 5.3.0
+        version: 5.3.0
       '@fontsource/oswald':
         specifier: 5.3.0
         version: 5.3.0
@@ -655,6 +658,9 @@ packages:
 
   '@fontsource/ibm-plex-sans@5.3.0':
     resolution: {integrity: sha512-CbE4CbbEEZJX860XyUiRpsksXIQR8Rp2XDva2VO53NJox9tVNtusrysd2x5YkUEY3ErQ66W1IiiQL8/wihhw5w==}
+
+  '@fontsource/noto-sans-tc@5.3.0':
+    resolution: {integrity: sha512-+0MguVH2vIxkVJLiaMHVKHk+yJZmZvMU9d8z88JdUx8C2CgMLOtm7WNloi3HYlvCNy7TpuvjIUvh5iiGp6INxQ==}
 
   '@fontsource/oswald@5.3.0':
     resolution: {integrity: sha512-16r2aHActe0pH+9FLdk/74/YxXM7HpGak05kAzx3RvSToiJwGvyhv6GvckPz+YuZmvL1nxWbEop2jAXRcXYPRg==}
@@ -2685,6 +2691,8 @@ snapshots:
   '@fontsource/ibm-plex-mono@5.3.0': {}
 
   '@fontsource/ibm-plex-sans@5.3.0': {}
+
+  '@fontsource/noto-sans-tc@5.3.0': {}
 
   '@fontsource/oswald@5.3.0': {}
 

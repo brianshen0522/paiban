@@ -159,7 +159,8 @@ function MovieCard({ m }: { m: MovieSummary }) {
       <span className="mt">{m.titleZh ?? m.title}</span>
       <span className="ms">
         {m.titleZh ? `${m.title} · ` : ''}
-        {m.year} · <Rating m={m} />
+        {m.year}
+        <Rating m={m} />
       </span>
       <span className="qs">
         {m.qualities.map((q) => (
