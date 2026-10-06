@@ -1,8 +1,9 @@
 import type { Torrent, TorrentLive } from '@paiban/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router';
+import { type KeyboardEvent, useMemo, useState } from 'react';
+import { Link, useParams, useSearchParams } from 'react-router';
 import { Banner, Chip, PageHead, Skeleton } from '../components/Bits';
+import { Flag } from '../components/Flag';
 import { Poster } from '../components/Poster';
 import { t } from '../copy/zh-TW';
 import { ApiFailure, get, post } from '../lib/api';
@@ -22,6 +23,8 @@ const TONE = {
   ready: 'ok',
 } as const;
 const RUNNING = new Set<Torrent['status']>(['downloading']);
+const VIEWS = ['map', 'pieces', 'speed'] as const;
+type View = (typeof VIEWS)[number];
 
 /**
  * One download in detail (docs/11-pages.md, "下載細節"; Brian, 2026-10-06): where the peers are,
@@ -47,6 +50,19 @@ export function DownloadDetailPage() {
   });
   const names = useMemo(() => new Intl.DisplayNames(['zh-TW'], { type: 'region' }), []);
   const [busy, setBusy] = useState(false);
+  const [params, setParams] = useSearchParams();
+  const view: View = (VIEWS as readonly string[]).includes(params.get('view') ?? '')
+    ? (params.get('view') as View)
+    : 'map';
+  const show = (k: View) => setParams(k === 'map' ? {} : { view: k }, { replace: true });
+  const onTabKey = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    const i = VIEWS.indexOf(view);
+    const next = VIEWS[(i + (e.key === 'ArrowRight' ? 1 : VIEWS.length - 1)) % VIEWS.length] ?? view;
+    e.preventDefault();
+    show(next);
+    requestAnimationFrame(() => document.getElementById(`dd-tab-${next}`)?.focus());
+  };
 
   if (torrent.error instanceof ApiFailure && (torrent.error.status === 404 || torrent.error.status === 403))
     return <NotFoundPage />;
@@ -77,7 +93,9 @@ export function DownloadDetailPage() {
   return (
     <>
       <div className="crumbs">
-        <Link to="/downloads">{t.downloadDetail.back}</Link>
+        <Link className="link" to="/downloads">
+          {t.downloadDetail.back}
+        </Link>
       </div>
       <PageHead
         title={title}
@@ -162,30 +180,61 @@ export function DownloadDetailPage() {
         </section>
       ) : (
         <>
-          <section className="card dd-map">
-            <div className="dd-map-head">
-              <h2>{t.downloadDetail.mapTitle}</h2>
-              <span className="sub">{v.peers.length ? countrySummary(v.peers, names) : t.downloadDetail.noPeers}</span>
-            </div>
-            <PeerMap peers={v.peers} home={v.home} />
-            <div className="pm-legend">
-              <span className="pm-key-in">{t.downloadDetail.legendIn}</span>
-              <span className="pm-key-out">{t.downloadDetail.legendOut}</span>
-              <span className="pm-key-home">{t.downloadDetail.legendHome(names.of(v.home) ?? v.home)}</span>
-              <span className="sub">{t.downloadDetail.credits}</span>
-            </div>
-            <PeerTable live={v} names={names} />
-          </section>
-
-          <section className="card">
-            <h2>{t.downloadDetail.piecesTitle}</h2>
-            {v.pieces ? <PieceGrid pieces={v.pieces} /> : <p className="sub">{t.downloadDetail.noMetadata}</p>}
-          </section>
-
-          <section className="card">
-            <h2>{t.downloadDetail.speedTitle}</h2>
-            <SpeedChart history={v.history} />
-          </section>
+          <div className="tabs" role="tablist" aria-label={t.downloadDetail.tabsLabel} onKeyDown={onTabKey}>
+            {VIEWS.map((k) => (
+              <button
+                key={k}
+                id={`dd-tab-${k}`}
+                type="button"
+                role="tab"
+                aria-selected={view === k}
+                aria-controls="dd-panel"
+                tabIndex={view === k ? 0 : -1}
+                onClick={() => show(k)}
+              >
+                {t.downloadDetail.tabs[k]}
+                <small>
+                  {k === 'map'
+                    ? t.downloadDetail.tabNotes.map(v.peers.length)
+                    : k === 'pieces'
+                      ? t.downloadDetail.tabNotes.pieces(percent(x.progress))
+                      : t.downloadDetail.tabNotes.speed(rate(v.downBps))}
+                </small>
+              </button>
+            ))}
+          </div>
+          <div id="dd-panel" role="tabpanel" aria-labelledby={`dd-tab-${view}`}>
+            {view === 'map' && (
+              <section className="card dd-map">
+                <div className="dd-map-head">
+                  <h2>{t.downloadDetail.mapTitle}</h2>
+                  <span className="sub">
+                    {v.peers.length ? countrySummary(v.peers, names) : t.downloadDetail.noPeers}
+                  </span>
+                </div>
+                <PeerMap peers={v.peers} home={v.home} />
+                <div className="pm-legend">
+                  <span className="pm-key-in">{t.downloadDetail.legendIn}</span>
+                  <span className="pm-key-out">{t.downloadDetail.legendOut}</span>
+                  <span className="pm-key-home">{t.downloadDetail.legendHome(names.of(v.home) ?? v.home)}</span>
+                  <span className="sub">{t.downloadDetail.credits}</span>
+                </div>
+                <PeerTable live={v} names={names} />
+              </section>
+            )}
+            {view === 'pieces' && (
+              <section className="card">
+                <h2>{t.downloadDetail.piecesTitle}</h2>
+                {v.pieces ? <PieceGrid pieces={v.pieces} /> : <p className="sub">{t.downloadDetail.noMetadata}</p>}
+              </section>
+            )}
+            {view === 'speed' && (
+              <section className="card">
+                <h2>{t.downloadDetail.speedTitle}</h2>
+                <SpeedChart history={v.history} />
+              </section>
+            )}
+          </div>
         </>
       )}
     </>
@@ -212,6 +261,7 @@ function PeerTable({ live, names }: { live: TorrentLive; names: Intl.DisplayName
           {live.peers.map((p) => (
             <tr key={p.id}>
               <td className="lead">
+                <Flag code={p.local ? null : p.country} />{' '}
                 <span>
                   {p.local
                     ? t.downloadDetail.localNetwork

@@ -165,6 +165,13 @@ export const t = {
       ready: '已經下載完成。',
       downloading: '',
     } as Record<string, string>,
+    tabsLabel: '下載細節',
+    tabs: { map: '節點地圖', pieces: '每一塊', speed: '速度' },
+    tabNotes: {
+      map: (n: number) => `${n} 個節點`,
+      pieces: (pct: number) => `已完成 ${pct}%`,
+      speed: (s: string) => s,
+    },
     mapTitle: '節點地圖',
     noPeers: '目前沒有連上任何節點，正在尋找…',
     legendIn: '從對方下載',

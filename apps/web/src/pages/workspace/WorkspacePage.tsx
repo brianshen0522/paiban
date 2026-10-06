@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { type KeyboardEvent, useEffect, useRef } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { Banner, Chip, Empty, Skeleton } from '../../components/Bits';
-import { Thumb } from '../../components/Poster';
+import { Poster } from '../../components/Poster';
 import { t } from '../../copy/zh-TW';
 import { ApiFailure, post } from '../../lib/api';
 import { versionLabel } from '../../lib/format';
@@ -111,12 +111,18 @@ function Loaded({ ws, tab }: { ws: Workspace; tab: Tab }) {
     <>
       <Crumbs />
       <section className="whead">
-        <Thumb title={x.movie.title} year={x.movie.year} />
+        <Poster
+          url={x.movie.posterUrl}
+          title={x.movie.title}
+          year={x.movie.year}
+          runtimeMin={x.movie.runtimeMin}
+          size="sm"
+        />
         <div>
-          <h1>{x.movie.title}</h1>
+          <h1>{x.movie.titleZh ?? x.movie.title}</h1>
           <p className="sub">
             {[
-              x.movie.titleZh,
+              x.movie.titleZh ? x.movie.title : null,
               String(x.movie.year),
               versionLabel(x.version),
               others.length ? t.workspace.sharedWith(others.join('、')) : null,

@@ -38,11 +38,3 @@ export function Poster({
     </div>
   );
 }
-
-export function Thumb({ title, year }: { title: string; year: number }) {
-  return (
-    <div className="thumb" style={{ ['--p' as string]: posterColor(title) }} aria-hidden="true">
-      {year}
-    </div>
-  );
-}

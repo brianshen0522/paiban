@@ -900,19 +900,6 @@ fieldset.field > legend {
 .poster.sm span {
   font-size: 9.5px;
 }
-.thumb {
-  width: 44px;
-  height: 62px;
-  flex: none;
-  border-radius: 5px;
-  background: var(--p, #2a3350);
-  color: var(--poster-ink);
-  display: grid;
-  place-items: end start;
-  padding: 4px 5px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-}
 
 /* search */
 #view .filters {
@@ -1958,4 +1945,18 @@ fieldset.field > legend {
   #view .dd-map table.rtable td[data-label]::before {
     color: #8da2c0;
   }
+}
+
+/* Country flags (flag-icons, bundled). */
+.flag {
+  display: inline-block;
+  width: 20px;
+  height: 15px;
+  border-radius: 2px;
+  vertical-align: -2px;
+  object-fit: cover;
+  box-shadow: 0 0 0 1px rgba(127, 140, 160, 0.35);
+}
+.flag-none {
+  background: linear-gradient(135deg, #2a3a55, #1a2438);
 }
