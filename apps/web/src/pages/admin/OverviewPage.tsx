@@ -19,6 +19,13 @@ const PAGE: Record<Problem['page'], string> = {
   system: '/admin/system',
 };
 
+/** A source's problem opens the settings tab that source is on: movie data or subtitle sources. */
+function sourcesTab(p: Problem): string {
+  const source = String(p.data.source ?? '');
+  const movies = p.code.startsWith('YTS_') || source === 'yts' || source === 'tmdb';
+  return `${PAGE.sources}?tab=${movies ? 'movies' : 'subtitles'}`;
+}
+
 function sentence(p: Problem): string {
   const d = p.data;
   const s = String;
@@ -138,7 +145,7 @@ export function OverviewPage() {
         ) : (
           <ul className="plist">
             {d.problems.map((p, i) => {
-              const to = PAGE[p.page];
+              const to = p.page === 'sources' ? sourcesTab(p) : PAGE[p.page];
               return (
                 // biome-ignore lint/suspicious/noArrayIndexKey: problems have no id and the list is rebuilt whole
                 <li key={i}>
