@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { GeoTable } from '../geo/geoip.js';
 import type { EngineSnapshot } from './engine.js';
-import { buildLive, homeCountry, maskAddress } from './live.js';
+import { buildLive, HomeFinder, homeCountry, maskAddress, yourIp } from './live.js';
 import { clientName } from './peer-client.js';
 
 const hex = (s: string) => Buffer.from(s, 'latin1').toString('hex');
@@ -30,6 +30,47 @@ describe('the live view', () => {
     expect(homeCountry(undefined)).toBe('TW');
   });
 
+  it('reads the address peers say they see us at (BEP 10 "yourip"), IPv4 or IPv6', () => {
+    expect(yourIp(Uint8Array.from([61, 220, 33, 4]))).toBe('61.220.33.4');
+    expect(yourIp(Buffer.from('20010db8000000000000000000000005', 'hex'))).toBe('2001:db8:0:0:0:0:0:5');
+    expect(yourIp(Uint8Array.from([1, 2, 3]))).toBeNull();
+    expect(yourIp('61.220.33.4')).toBeNull();
+    expect(yourIp(undefined)).toBeNull();
+  });
+
+  it("finds the server's country from what peers report, one vote per peer, time zone until then", () => {
+    const geo = new GeoTable([
+      ['61.220.0.0', '61.231.255.255', 'TW'],
+      ['126.0.0.0', '126.255.255.255', 'JP'],
+    ]);
+    const home = new HomeFinder('US');
+    expect(home.current).toBe('US');
+    expect(home.from).toBe('timezone');
+    // A private or unknown address says nothing.
+    home.observe(
+      [
+        { peer: '10.0.0.2:1', yourIp: '192.168.1.5' },
+        { peer: '8.8.8.8:1', yourIp: '9.9.9.9' },
+      ],
+      geo,
+    );
+    expect(home.current).toBe('US');
+    home.observe([{ peer: '1.1.1.1:1', yourIp: '61.220.33.4' }], geo);
+    expect(home).toMatchObject({ current: 'TW', from: 'peers' });
+    // The same peer seen again on every pass is still one vote; a lone dissenter does not move it.
+    for (let i = 0; i < 5; i++) home.observe([{ peer: '2.2.2.2:1', yourIp: '126.1.2.3' }], geo);
+    home.observe([{ peer: '3.3.3.3:1', yourIp: '61.220.9.9' }], geo);
+    expect(home.current).toBe('TW');
+    home.observe(
+      [
+        { peer: '4.4.4.4:1', yourIp: '126.1.2.3' },
+        { peer: '5.5.5.5:1', yourIp: '126.1.2.3' },
+      ],
+      geo,
+    );
+    expect(home.current).toBe('JP');
+  });
+
   it('builds peers with countries, directions and shares, busiest first, no full addresses', () => {
     const geo = new GeoTable([['61.220.0.0', '61.231.255.255', 'TW']]);
     const snap: EngineSnapshot = {
@@ -48,6 +89,7 @@ describe('the live view', () => {
           downBps: 10,
           upBps: 0,
           pieces: 2,
+          yourIp: null,
         },
         {
           address: '61.224.1.2',
@@ -58,10 +100,14 @@ describe('the live view', () => {
           downBps: 900,
           upBps: 50,
           pieces: 5,
+          yourIp: null,
         },
       ],
     };
-    const live = buildLive(snap, { downBps: 910.4, upBps: 50 }, [{ downBps: 1, upBps: 2 }], geo, 'TW');
+    const live = buildLive(snap, { downBps: 910.4, upBps: 50 }, [{ downBps: 1, upBps: 2 }], geo, {
+      country: 'TW',
+      from: 'timezone',
+    });
     expect(live.peers.map((p) => [p.address, p.country, p.local, p.direction, p.transport, p.has, p.client])).toEqual([
       ['61.224.x.x', 'TW', false, 'out', 'utp', 0.5, 'Transmission 4.0.5'],
       ['192.168.x.x', null, true, 'in', 'tcp', 0.2, null],
@@ -78,7 +124,9 @@ describe('the live view', () => {
   });
 
   it('has no pieces before the metadata arrived', () => {
-    expect(buildLive(null, { downBps: 0, upBps: 0 }, [], new GeoTable([]), 'TW')).toMatchObject({
+    expect(
+      buildLive(null, { downBps: 0, upBps: 0 }, [], new GeoTable([]), { country: 'TW', from: 'timezone' }),
+    ).toMatchObject({
       pieces: null,
       peers: [],
     });

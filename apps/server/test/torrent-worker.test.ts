@@ -178,7 +178,7 @@ describe('the torrent service', { timeout: 90_000 }, () => {
     expect((await live()).json()).toBeNull();
     await until(async () => (await live()).json() !== null, 20_000);
     const v = (await live()).json();
-    expect(v.home).toBe('TW');
+    expect(v).toMatchObject({ home: 'TW', homeFrom: 'timezone' });
     expect(v.pieces.count).toBeGreaterThan(10);
     const have = Buffer.from(v.pieces.have, 'base64');
     expect(have.length).toBe(Math.ceil(v.pieces.count / 8));

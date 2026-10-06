@@ -281,8 +281,12 @@ export type TorrentLive = {
     availability: string;
   } | null;
   peers: TorrentLivePeer[];
-  /** Where this server is, as a country code, from its time zone; the map draws lines to it. */
+  /**
+   * Where this server is, as a country code; the map is centred on it and draws its lines to it.
+   * From the address peers say they see us at (BEP 10 "yourip"), or the time zone until one has.
+   */
   home: string;
+  homeFrom: 'peers' | 'timezone';
 };
 
 export type AssetState = 'none' | 'pending' | 'running' | 'ready' | 'failed';

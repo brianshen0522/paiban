@@ -57,6 +57,70 @@ export function homeCountry(tz: string | undefined): string {
   return (tz && ZONES[tz]) || 'TW';
 }
 
+/**
+ * The address a peer says it sees us at: BEP 10's "yourip" in the extended handshake, 4 bytes for
+ * IPv4 and 16 for IPv6. qBittorrent, Deluge and Transmission send it; WebTorrent does not.
+ */
+export function yourIp(v: unknown): string | null {
+  if (!(v instanceof Uint8Array)) return null;
+  if (v.length === 4) return Array.from(v).join('.');
+  if (v.length === 16) {
+    const groups: string[] = [];
+    for (let i = 0; i < 16; i += 2) groups.push((((v[i] ?? 0) << 8) | (v[i + 1] ?? 0)).toString(16));
+    return groups.join(':');
+  }
+  return null;
+}
+
+/** At most this many peers' reports are remembered; the oldest go first. */
+const MAX_REPORTS = 200;
+
+/**
+ * Where this server is, for the map (Brian, 2026-10-06: detect it and centre the map on it). Peers
+ * report the public address they see us at; each peer's report is one vote for that address's
+ * country, and the country with the most votes wins. Nothing is asked of any outside service.
+ * Until a peer has said anything, the time zone's guess stands. Kept in memory: the map is only
+ * shown while peers are connected, and they report again after a restart.
+ */
+export class HomeFinder {
+  private readonly votes = new Map<string, string>();
+  private found: string | null = null;
+  private readonly fallback: string;
+
+  constructor(fallback: string) {
+    this.fallback = fallback;
+  }
+
+  get current(): string {
+    return this.found ?? this.fallback;
+  }
+
+  get from(): 'peers' | 'timezone' {
+    return this.found ? 'peers' : 'timezone';
+  }
+
+  observe(reports: ReadonlyArray<{ peer: string; yourIp: string | null }>, geo: CountryLookup): void {
+    let changed = false;
+    for (const r of reports) {
+      if (!r.yourIp || isInternalAddress(r.yourIp)) continue;
+      const country = geo.country(r.yourIp);
+      if (!country || this.votes.get(r.peer) === country) continue;
+      this.votes.delete(r.peer);
+      this.votes.set(r.peer, country);
+      if (this.votes.size > MAX_REPORTS) this.votes.delete(this.votes.keys().next().value as string);
+      changed = true;
+    }
+    if (!changed) return;
+    const counts = new Map<string, number>();
+    for (const c of this.votes.values()) counts.set(c, (counts.get(c) ?? 0) + 1);
+    let best = this.found;
+    let bestN = best ? (counts.get(best) ?? 0) : 0;
+    // A tie keeps the country already shown, so the map does not flip back and forth.
+    for (const [c, n] of counts) if (n > bestN) [best, bestN] = [c, n];
+    this.found = best;
+  }
+}
+
 /** "61.220.x.x", "2001:db8:x": enough to tell connections apart, not enough to identify anyone. */
 export function maskAddress(ip: string): string {
   const plain = ip.replace(/^::ffff:/i, '');
@@ -76,7 +140,7 @@ export function buildLive(
   speed: { downBps: number; upBps: number },
   history: ReadonlyArray<{ downBps: number; upBps: number }>,
   geo: CountryLookup,
-  home: string,
+  home: { country: string; from: 'peers' | 'timezone' },
   now = new Date(),
 ): TorrentLive {
   const peers: TorrentLivePeer[] = (snap?.peers ?? []).map((p) => {
@@ -114,6 +178,7 @@ export function buildLive(
         }
       : null,
     peers,
-    home,
+    home: home.country,
+    homeFrom: home.from,
   };
 }

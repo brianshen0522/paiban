@@ -1,5 +1,5 @@
 import type { TorrentLivePeer } from '@paiban/shared';
-import { memo, useMemo } from 'react';
+import { memo, useId, useMemo } from 'react';
 import { t } from '../copy/zh-TW';
 import { CENTROIDS, LAND, MAP_HEIGHT, MAP_WIDTH } from './world-map';
 
@@ -43,8 +43,16 @@ const GRATICULE = (() => {
   return d;
 })();
 
+/** A longitude shift on the equirectangular map, wrapping round the edges. */
+const wrap = (x: number) => ((x % MAP_WIDTH) + MAP_WIDTH) % MAP_WIDTH;
+
 export const PeerMap = memo(function PeerMap({ peers, home }: { peers: TorrentLivePeer[]; home: string }) {
-  const [hx, hy] = CENTROIDS[home] ?? CENTROIDS.TW ?? [835, 167];
+  const world = useId();
+  const [homeX, hy] = CENTROIDS[home] ?? CENTROIDS.TW ?? [835, 167];
+  // The server's country sits in the middle (Brian, 2026-10-06); the world is turned round to put it
+  // there, so every line from a peer takes the short way.
+  const shift = MAP_WIDTH / 2 - homeX;
+  const hx = MAP_WIDTH / 2;
   const placed = useMemo(
     () =>
       peers.flatMap((p): Placed[] => {
@@ -55,9 +63,9 @@ export const PeerMap = memo(function PeerMap({ peers, home }: { peers: TorrentLi
         const c = p.country ? CENTROIDS[p.country] : undefined;
         if (!c) return [];
         const [dx, dy] = jitter(p.id, 8);
-        return [{ peer: p, x: c[0] + dx, y: c[1] + dy }];
+        return [{ peer: p, x: wrap(c[0] + shift) + dx, y: c[1] + dy }];
       }),
-    [peers, hx, hy],
+    [peers, hx, hy, shift],
   );
   const busiest = Math.max(1, ...peers.map((p) => p.downBps + p.upBps));
 
@@ -66,6 +74,7 @@ export const PeerMap = memo(function PeerMap({ peers, home }: { peers: TorrentLi
       className="peer-map"
       viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}
       preserveAspectRatio="xMidYMid meet"
+      overflow="hidden"
       aria-hidden="true"
       focusable="false"
     >
@@ -83,8 +92,16 @@ export const PeerMap = memo(function PeerMap({ peers, home }: { peers: TorrentLi
         </filter>
       </defs>
       <rect width={MAP_WIDTH} height={MAP_HEIGHT} className="pm-sea" />
-      <path d={GRATICULE} className="pm-grid" />
-      <path d={LAND} className="pm-land" />
+      <defs>
+        <g id={world}>
+          <path d={GRATICULE} className="pm-grid" />
+          <path d={LAND} className="pm-land" />
+        </g>
+      </defs>
+      {/* the world three times side by side, shifted, so the edges join wherever it is cut */}
+      {[-MAP_WIDTH, 0, MAP_WIDTH].map((o) => (
+        <use key={o} href={`#${world}`} x={shift + o} />
+      ))}
 
       {placed.map(({ peer, x, y }) => {
         const strength = (peer.downBps + peer.upBps) / busiest;

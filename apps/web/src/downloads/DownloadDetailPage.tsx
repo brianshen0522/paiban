@@ -216,7 +216,9 @@ export function DownloadDetailPage() {
                 <div className="pm-legend">
                   <span className="pm-key-in">{t.downloadDetail.legendIn}</span>
                   <span className="pm-key-out">{t.downloadDetail.legendOut}</span>
-                  <span className="pm-key-home">{t.downloadDetail.legendHome(names.of(v.home) ?? v.home)}</span>
+                  <span className="pm-key-home">
+                    {t.downloadDetail.legendHome(names.of(v.home) ?? v.home, v.homeFrom === 'peers')}
+                  </span>
                   <span className="sub">{t.downloadDetail.credits}</span>
                 </div>
                 <PeerTable live={v} names={names} />

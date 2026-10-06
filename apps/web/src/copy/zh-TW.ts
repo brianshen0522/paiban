@@ -177,7 +177,8 @@ export const t = {
     noPeers: '目前沒有連上任何節點，正在尋找…',
     legendIn: '從對方下載',
     legendOut: '上傳給對方',
-    legendHome: (where: string) => `這台伺服器（${where}）`,
+    legendHome: (where: string, byPeers: boolean) =>
+      `這台伺服器（${where}，${byPeers ? '依節點回報的位址' : '依時區推測'}）`,
     credits: 'IP 位置資料：DB-IP.com（CC BY 4.0）· 地圖：Natural Earth',
     localNetwork: '區網',
     unknownPlace: '位置不明',

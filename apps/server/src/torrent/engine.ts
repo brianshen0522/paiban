@@ -1,4 +1,5 @@
 import WebTorrent from 'webtorrent';
+import { yourIp } from './live.js';
 
 /**
  * The only file that touches WebTorrent's untyped API (AGENTS.md: wrap third-party boundaries).
@@ -20,6 +21,8 @@ export type EnginePeer = {
   upBps: number;
   /** How many of the torrent's pieces the peer has. */
   pieces: number;
+  /** The address the peer says it sees us at (BEP 10 "yourip"), when it said. */
+  yourIp: string | null;
 };
 
 /** What the engine knows about one torrent right now; null before its metadata arrived. */
@@ -107,7 +110,7 @@ type WtWire = {
   remotePort?: number;
   type?: string;
   peerId?: string | null;
-  peerExtendedHandshake?: { v?: unknown };
+  peerExtendedHandshake?: { v?: unknown; yourip?: unknown };
   peerPieces?: { get(i: number): boolean };
   downloadSpeed?: () => number;
   uploadSpeed?: () => number;
@@ -253,6 +256,7 @@ function snapshotOf(t: WtTorrent): EngineSnapshot | null {
       downBps: Math.max(0, Math.round(w.downloadSpeed?.() ?? 0)),
       upBps: Math.max(0, Math.round(w.uploadSpeed?.() ?? 0)),
       pieces,
+      yourIp: yourIp(w.peerExtendedHandshake?.yourip),
     };
   });
   return { pieceCount: count, pieceLength: t.pieceLength, have, active, availability, peers };

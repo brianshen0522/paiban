@@ -12,7 +12,7 @@ import { removeDownloadFiles, removeExportTracks, removePoster } from '../storag
 import { admit, predictDirectPlay } from '../storage/usage.js';
 import { versionLabel } from '../torrents/view.js';
 import type { Engine, EngineTorrent } from './engine.js';
-import { buildLive, HISTORY_POINTS } from './live.js';
+import { buildLive, HISTORY_POINTS, HomeFinder } from './live.js';
 import { mainVideo, pathsAreSafe, pickToStart, stalled } from './schedule.js';
 
 /**
@@ -80,7 +80,8 @@ export class TorrentWorker {
   private stopping = false;
   private throttleKey = '';
   private readonly geo: CountryLookup;
-  private readonly home: string;
+  /** Where this server is, for the map: from what peers report, the time zone until then. */
+  readonly home: HomeFinder;
   /** Recent speeds per running download, for the detail page's chart. */
   private readonly history = new Map<string, { downBps: number; upBps: number }[]>();
   lastIncomingAt: string | null = null;
@@ -93,7 +94,7 @@ export class TorrentWorker {
     this.disk = d.disk;
     this.now = d.now ?? Date.now;
     this.geo = d.geo ?? { country: () => null, size: 0 };
-    this.home = d.home ?? 'TW';
+    this.home = new HomeFinder(d.home ?? 'TW');
   }
 
   private torrentDir(hash: string): string {
@@ -146,14 +147,17 @@ export class TorrentWorker {
     );
     for (const { torrent_id: id } of watched) {
       const t = running.get(id);
+      const snap = t?.snapshot() ?? null;
+      if (snap)
+        this.home.observe(
+          snap.peers.map((p) => ({ peer: `${p.address}:${p.port}`, yourIp: p.yourIp })),
+          this.geo,
+        );
       const data = t
-        ? buildLive(
-            t.snapshot(),
-            { downBps: t.downloadSpeed, upBps: t.uploadSpeed },
-            this.history.get(id) ?? [],
-            this.geo,
-            this.home,
-          )
+        ? buildLive(snap, { downBps: t.downloadSpeed, upBps: t.uploadSpeed }, this.history.get(id) ?? [], this.geo, {
+            country: this.home.current,
+            from: this.home.from,
+          })
         : null;
       await this.pool.query('update torrent_live set data = $2, updated_at = now() where torrent_id = $1', [id, data]);
     }
