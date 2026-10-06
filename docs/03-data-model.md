@@ -105,6 +105,10 @@ API 回給前端的 `TorrentStatus` 是算出來的，不是存起來的：
 
 未完成的三個狀態算 `max(size_bytes, length_bytes) + preview_reserve_bytes`；`failed` 算 `disk_bytes`；`completed` 算 `disk_bytes`。規則和例子在 [10-storage.md](10-storage.md)。
 
+### 即時檢視：`torrent_live`
+
+下載細節頁開著時才有內容的暫存資料（unlogged）：`wanted_until`（頁面每次要資料就延後 10 秒）、`data`（最新一份 `TorrentLive`）、`updated_at`。下載被刪除時跟著刪。見 [06-torrent-worker.md](06-torrent-worker.md) 的「即時檢視」。
+
 ### 持有人：`torrent_holders`
 
 - 建立下載的人自動成為第一位持有人。

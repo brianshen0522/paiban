@@ -15,6 +15,11 @@ export function bytes(n: number): string {
 }
 
 export const speed = (bps: number) => `${(bps / MB).toFixed(1)} MB/s`;
+/** A piece size: torrents use powers of two from 16 KB to 16 MB. */
+export const pieceSize = (n: number) => (n < MB ? `${Math.round(n / 1024)} KB` : `${Math.round(n / MB)} MB`);
+/** A speed that reads well when small too: KB/s under 1 MB/s, "—" for nothing. */
+export const rate = (bps: number) =>
+  bps <= 0 ? '—' : bps < MB ? `${Math.max(1, Math.round(bps / 1024))} KB/s` : speed(bps);
 export const percent = (p: number) => Math.floor(Math.min(1, Math.max(0, p)) * 100);
 
 export function eta(seconds: number | null): string {

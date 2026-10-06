@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link, useOutletContext, useSearchParams } from 'react-router';
 import { Banner, Chip, ConfirmInline, Empty, PageHead, Progress, Skeleton, type Tone } from '../components/Bits';
-import { Thumb } from '../components/Poster';
+import { Poster } from '../components/Poster';
 import { SpaceShort } from '../components/SpaceShort';
 import { useToast } from '../components/Toasts';
 import { t } from '../copy/zh-TW';
@@ -239,10 +239,25 @@ function Row({ x, me, showHolders }: { x: Torrent; me: Me; showHolders: boolean 
 
   return (
     <div className="dl">
-      <Thumb title={x.movie.title} year={x.movie.year} />
+      <Link to={`/downloads/${x.id}`} className="dl-poster" tabIndex={-1} aria-hidden="true">
+        <Poster
+          url={x.movie.posterUrl}
+          title={x.movie.title}
+          year={x.movie.year}
+          runtimeMin={x.movie.runtimeMin}
+          size="sm"
+        />
+      </Link>
       <div className="dl-main">
         <div>
-          <b>{x.movie.title}</b> <span className="sub-i">{versionLabel(x.version)}</span>
+          <Link
+            to={`/downloads/${x.id}`}
+            className="dl-title"
+            aria-label={t.downloadDetail.openDetail(x.movie.titleZh ?? x.movie.title)}
+          >
+            <b>{x.movie.titleZh ?? x.movie.title}</b>
+          </Link>{' '}
+          <span className="sub-i">{versionLabel(x.version)}</span>
         </div>
         {(x.status === 'downloading' || x.status === 'paused' || x.status === 'failed') && (
           <Progress value={x.progress} bad={x.status === 'failed'} label={`${x.movie.title} ${percent(x.progress)}%`} />

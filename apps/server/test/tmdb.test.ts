@@ -2,7 +2,7 @@ import { type FakeSources, startFakeSources } from '@paiban/fakes/subtitles';
 import { type FakeYts, startFakeYts } from '@paiban/fakes/yts';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { parseFind } from '../src/tmdb/tmdb.js';
-import { call, createUser, login, setSetting, type TestApp, testApp, testDb } from './helpers.js';
+import { call, createUser, GB, login, setLimit, setSetting, type TestApp, testApp, testDb } from './helpers.js';
 
 /**
  * TMDB in place of IMDb for what people see (Brian, 2026-10-06): titles, overviews, posters and
@@ -103,6 +103,18 @@ describe('search and the film page', () => {
     expect(items[0]).toMatchObject({ ratingSource: 'imdb', titleZh: null });
     const sources = (await call(t.app, 'GET', '/api/admin/settings', { cookie: boss })).json().sources;
     expect(sources.find((s: { id: string }) => s.id === 'tmdb')).toMatchObject({ state: 'warn', code: 'INVALID_KEY' });
+  });
+
+  it('gives a film the TMDB answer when a download creates its row after the page looked it up', async () => {
+    await setKey();
+    await setLimit(db.pool, 100 * GB);
+    const detail = (await call(t.app, 'GET', '/api/yts/movies/3', { cookie: mei })).json();
+    const hash = detail.versions[0].infoHash;
+    const res = await call(t.app, 'POST', '/api/torrents', { cookie: mei, body: { ytsId: 3, infoHash: hash } });
+    expect(res.statusCode).toBe(201);
+    expect(res.json().torrent.movie.titleZh).toBe('小報妙冤家');
+    const row = (await db.pool.query('select tmdb_id from movies where yts_id = 3')).rows[0];
+    expect(row.tmdb_id).toBe(900_003);
   });
 
   it('writes the TMDB id onto a film already in the library, for the subtitle sources', async () => {

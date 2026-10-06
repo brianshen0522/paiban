@@ -15,19 +15,19 @@ import { ffsubsyncCandidates, runFfsubsyncEngines } from '../src/subtitles/align
 import { normalizeCues, parseSrt } from '../src/subtitles/text.ts';
 
 const D = '/home/brian/projects/paiban/.dev-data/media/06387126-128e-4834-8a0f-08efedff1ef2';
-const speech = JSON.parse(fs.readFileSync(D + '/speech.json', 'utf8'));
-const asr = JSON.parse(fs.readFileSync(D + '/asr.json', 'utf8'));
+const speech = JSON.parse(fs.readFileSync(`${D}/speech.json`, 'utf8'));
+const asr = JSON.parse(fs.readFileSync(`${D}/asr.json`, 'utf8'));
 const heardAt: number[] = asr.segments.map((s: { start: number }) => s.start);
 const sp = SyncCore.makeSpeech(speech);
 const truth = normalizeCues(
   parseSrt(
     fs.readFileSync(
-      '/home/brian/projects/paiban/.scratch/tears-of-steel/Tears of Steel/Tears of Steel.' + process.argv[2] + '.srt',
+      `/home/brian/projects/paiban/.scratch/tears-of-steel/Tears of Steel/Tears of Steel.${process.argv[2]}.srt`,
       'utf8',
     ),
   ),
 );
-const mid = truth.length >> 1;
+const _mid = truth.length >> 1;
 let gapAt = 1;
 for (let i = 1; i < truth.length; i++)
   if (truth[i].start - truth[i - 1].end > truth[gapAt].start - truth[gapAt - 1].end) gapAt = i;
@@ -52,7 +52,7 @@ function hits(cues: SyncCore.Cue[], segs: SyncCore.Segment[], tol = 0.4) {
 for (const [name, f] of Object.entries(scen).filter(([n]) => !process.env.ONLY || n === process.env.ONLY)) {
   const cues = truth.map((c, i) => ({ ...c, start: f(c.start, i), end: f(c.end, i) }));
   const work = mkdtempSync('/tmp/claude-1000/te-');
-  const outs = await runFfsubsyncEngines(D + '/ref.npz', cues, true, work);
+  const outs = await runFfsubsyncEngines(`${D}/ref.npz`, cues, true, work);
   const cands = [
     ...ffsubsyncCandidates(speech, cues, outs),
     { method: 'core', segments: SyncCore.autoAlign(sp, cues, { allowSplit: true, radius: 60 }).segments },

@@ -1605,3 +1605,357 @@ fieldset.field > legend {
 #view .minfo a {
   color: var(--accent-ink);
 }
+
+/* ------------------------------------------------------------------ downloads: poster and detail */
+#view .dl-poster {
+  flex: none;
+  width: 48px;
+}
+#view .dl-poster .poster.sm {
+  width: 48px;
+  padding: 4px;
+}
+#view .dl-poster .poster.sm b,
+#view .dl-poster .poster.sm span {
+  display: none;
+}
+#view .dl-title {
+  color: inherit;
+  text-decoration: none;
+}
+#view .dl-title:hover b,
+#view .dl-title:focus-visible b {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+#view .dd-head {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+}
+#view .dd-head .poster.sm {
+  width: 96px;
+}
+#view .dd-main {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+}
+#view .dd-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+#view .dd-pct {
+  font-size: 40px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+#view .dd-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--line);
+  overflow: hidden;
+}
+#view .dd-bar i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-fill), #38e1ff);
+  transition: width 0.6s ease;
+}
+#view .dd-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px 16px;
+  margin: 0;
+}
+#view .dd-stats dt {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+#view .dd-stats dd {
+  margin: 2px 0 0;
+  font-size: 15px;
+}
+
+/* The map panel stays dark in both themes: the glow needs a night sky. */
+#view .dd-map {
+  background: #060a12;
+  border-color: #1b2740;
+  color: #d7e3f4;
+}
+#view .dd-map h2 {
+  color: #eef4ff;
+}
+#view .dd-map .sub {
+  color: #8da2c0;
+}
+#view .dd-map-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+.peer-map {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 10px 0 6px;
+  border-radius: 8px;
+}
+.peer-map .pm-sea {
+  fill: #070d18;
+}
+.peer-map .pm-grid {
+  stroke: #12203a;
+  stroke-width: 0.6;
+  fill: none;
+}
+.peer-map .pm-land {
+  fill: #12213a;
+  stroke: #24406b;
+  stroke-width: 0.5;
+}
+.peer-map .pm-arc {
+  fill: none;
+  stroke: #2a8fb0;
+  stroke-opacity: 0.55;
+  stroke-linecap: round;
+}
+.peer-map .pm-arc-glow {
+  fill: none;
+  stroke: #38e1ff;
+  stroke-opacity: 0.18;
+}
+.peer-map .pm-flow {
+  fill: none;
+  stroke-linecap: round;
+  stroke-dasharray: 3 14;
+  animation: pm-flow 1.1s linear infinite;
+}
+.peer-map .pm-in {
+  stroke: #9ff6ff;
+}
+.peer-map .pm-out {
+  stroke: #ffb547;
+}
+.peer-map .pm-peer {
+  fill: #c9fbff;
+}
+.peer-map .pm-ping {
+  fill: none;
+  stroke: #7ef9ff;
+  stroke-width: 1.2;
+  animation: pm-ping 1.6s ease-out 1 forwards;
+}
+.peer-map .pm-home {
+  fill: #ffe08a;
+}
+.peer-map .pm-home-ring {
+  fill: none;
+  stroke: #ffcf52;
+  stroke-width: 1.2;
+  animation: pm-ring 2.4s ease-out infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+.peer-map .pm-pulse {
+  animation: pm-pulse 2s ease-in-out infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+@keyframes pm-flow {
+  to {
+    stroke-dashoffset: -17;
+  }
+}
+@keyframes pm-ping {
+  from {
+    r: 3;
+    stroke-opacity: 0.9;
+  }
+  to {
+    r: 26;
+    stroke-opacity: 0;
+  }
+}
+@keyframes pm-ring {
+  from {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  to {
+    transform: scale(3.2);
+    opacity: 0;
+  }
+}
+@keyframes pm-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .peer-map .pm-flow,
+  .peer-map .pm-ping,
+  .peer-map .pm-home-ring,
+  .peer-map .pm-pulse {
+    animation: none;
+  }
+  .peer-map .pm-flow {
+    stroke-dasharray: none;
+  }
+}
+#view .pm-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  font-size: 12.5px;
+  margin-bottom: 12px;
+}
+#view .pm-legend > span::before {
+  content: "";
+  display: inline-block;
+  width: 18px;
+  height: 3px;
+  border-radius: 2px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+#view .pm-legend .pm-key-in::before {
+  background: #9ff6ff;
+}
+#view .pm-legend .pm-key-out::before {
+  background: #ffb547;
+}
+#view .pm-legend .pm-key-home::before {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ffe08a;
+}
+#view .pm-legend .sub::before {
+  display: none;
+}
+#view .dd-map .tw {
+  border-color: #1b2740;
+}
+#view .dd-peers th {
+  color: #8da2c0;
+  border-color: #1b2740;
+}
+#view .dd-peers td {
+  border-color: #142036;
+}
+#view .dd-peers tbody tr:hover {
+  background: #0c1526;
+}
+
+#view .piece-grid {
+  display: grid;
+  gap: 8px;
+}
+#view .pg-wrap {
+  width: 100%;
+}
+#view .pg-wrap canvas {
+  display: block;
+  cursor: crosshair;
+}
+#view .pg-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  font-size: 12.5px;
+}
+#view .pg-legend i {
+  display: inline-block;
+  width: 11px;
+  height: 11px;
+  border-radius: 2px;
+  margin-right: 6px;
+  vertical-align: -1px;
+}
+#view .pg-done {
+  background: var(--accent-fill);
+}
+#view .pg-active {
+  background: #38e1ff;
+}
+#view .pg-missing {
+  background: var(--line-strong);
+  opacity: 0.45;
+}
+#view .pg-none {
+  background: var(--bad);
+  opacity: 0.6;
+}
+#view .pg-hover {
+  min-height: 1.4em;
+}
+
+#view .speed-chart {
+  margin: 0;
+}
+#view .speed-chart svg {
+  display: block;
+  width: 100%;
+  height: 140px;
+}
+.speed-chart .sc-grid {
+  stroke: var(--line);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.speed-chart .sc-down {
+  fill: none;
+  stroke: #1fb8d6;
+  stroke-width: 2;
+}
+.speed-chart .sc-up {
+  fill: none;
+  stroke: #e89a1c;
+  stroke-width: 2;
+}
+#view .speed-chart figcaption {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin-top: 6px;
+}
+#view .sc-key::before {
+  content: "";
+  display: inline-block;
+  width: 14px;
+  height: 3px;
+  margin-right: 6px;
+  vertical-align: middle;
+  border-radius: 2px;
+}
+#view .sc-key-down::before {
+  background: #1fb8d6;
+}
+#view .sc-key-up::before {
+  background: #e89a1c;
+}
+@media (max-width: 480px) {
+  #view .dd-head .poster.sm {
+    width: 64px;
+  }
+  #view .dd-pct {
+    font-size: 30px;
+  }
+}
+
+@media (max-width: 640px) {
+  #view .dd-map table.rtable tr {
+    border-color: #142036;
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+  #view .dd-map table.rtable td[data-label]::before {
+    color: #8da2c0;
+  }
+}

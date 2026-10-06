@@ -11,6 +11,7 @@ import { ApiError } from '../http/errors.js';
 import { parse, requireAdmin, requireUser } from '../http/guards.js';
 import { readSettings } from '../settings/settings.js';
 import { admit, predictDirectPlay, previewPlan } from '../storage/usage.js';
+import { applyCachedFilm } from '../tmdb/tmdb.js';
 import { fetchPoster, getMovie } from '../yts/routes.js';
 import { selectTorrents, type TorrentRow, toTorrent, versionLabel } from './view.js';
 
@@ -90,6 +91,8 @@ export function torrentRoutes(app: FastifyInstance, deps: Deps): void {
           movie.language,
         ],
       );
+      // The film page usually looked it up on TMDB already: the new row gets that answer.
+      await applyCachedFilm(c, movie.imdbCode);
       const t = await one<{ id: string }>(
         c,
         `insert into torrents (info_hash, movie_id, quality, source_type, video_codec, bit_depth, audio_channels, size_bytes,

@@ -3,7 +3,7 @@ import { loadConfig } from './config.js';
 import { waitForSchema } from './db/migrate.js';
 import { createPool } from './db/pool.js';
 import { assertSafeEnvironment } from './env.js';
-import { loadGeoTable } from './geo/geoip.js';
+import { type CountryLookup, loadGeoTable } from './geo/geoip.js';
 import { startHeartbeat } from './heartbeat.js';
 import { createLogger } from './log.js';
 import { readSettings } from './settings/settings.js';
@@ -33,8 +33,19 @@ engine.onError((err) => {
 });
 
 // The IP → country table for the download page's map (built into the image; see deploy/Dockerfile).
-const geo = await loadGeoTable(process.env.GEOIP_CSV);
-log.info({ ranges: geo.size }, geo.size ? 'country table loaded' : 'no country table: peers show without a country');
+// Loading takes seconds on a slow machine, so it happens alongside start-up; until it is in, peers
+// show without a country.
+let table: CountryLookup | null = null;
+const geo: CountryLookup = {
+  country: (ip) => table?.country(ip) ?? null,
+  get size() {
+    return table?.size ?? 0;
+  },
+};
+void loadGeoTable(process.env.GEOIP_CSV).then((t) => {
+  table = t;
+  log.info({ ranges: t.size }, t.size ? 'country table loaded' : 'no country table: peers show without a country');
+});
 const worker = new TorrentWorker({
   pool,
   config,

@@ -16,6 +16,14 @@
 
 ---
 
+## 2026-10-06 下載頁加海報和下載細節頁
+
+- 原本：下載頁每一列左邊是一塊顏色，沒有細節頁。
+- 改成：每一列有海報，片名連到新的「下載細節」頁：節點世界地圖（連線像網路攻擊即時地圖那樣畫成弧線）、每一塊的狀態格子、速度曲線、節點表。新端點 `GET /api/torrents/:id/live`、合約 `TorrentLive`、資料表 `torrent_live`（遷移 `0004`）、映像檔裡的 DB-IP 國家對照表。
+- 原因：Brian 在對話裡要求（海報、可以點開看下載細節、地圖顯示節點並連線、用格子顯示每一塊）。
+- 改了哪些檔案：docs/03-data-model.md、docs/06-torrent-worker.md、docs/11-pages.md、db/schema.sql、packages/shared/src/contracts/api.ts
+- Brian 是否已確認：是（他提出的）；伺服器位置用時區推、IP 遮一半、DB-IP 的資料是我決定的
+
 ## 2026-10-06 電影資料改用 TMDB，取代 IMDb
 
 - 原本：搜尋和電影頁的片名、簡介、海報、評分都是 YTS 給的（評分是 IMDb 的）；TMDB 只用來換編號和查中文片名。

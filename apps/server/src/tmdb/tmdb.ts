@@ -1,6 +1,6 @@
 import type { Logger } from 'pino';
 import { z } from 'zod';
-import { many, type Pool } from '../db/pool.js';
+import { many, type Pool, type Queryable } from '../db/pool.js';
 import { OutboundError, type OutboundPolicy, outboundFetch } from '../net/outbound.js';
 import { recordSourceHealth } from '../settings/health.js';
 
@@ -155,10 +155,29 @@ export async function fetchFilm(env: TmdbEnv, imdb: string, originalTitle: strin
   return film;
 }
 
+/**
+ * Copies a cached TMDB answer onto our row for the film when the row does not have it yet: the row
+ * is created when a download starts, usually after the film page already looked the film up.
+ */
+export async function applyCachedFilm(q: Queryable, imdb: string): Promise<void> {
+  await q.query(
+    `update movies m set tmdb_id = (c.payload->'film'->>'tmdbId')::int,
+            title_zh = coalesce(c.payload->'film'->>'titleZh', m.title_zh)
+       from provider_cache c
+      where m.imdb_code = $1 and m.tmdb_id is null
+        and c.provider = 'tmdb' and c.cache_key = 'film:' || $1 and c.expires_at > now()
+        and c.payload->'film' <> 'null'::jsonb`,
+    [imdb],
+  );
+}
+
 /** One film: the cached answer, otherwise TMDB. */
 export async function tmdbFilm(env: TmdbEnv, imdb: string, originalTitle: string): Promise<TmdbFilm | null> {
   const cached = await cachedFilms(env.pool, [imdb]);
-  if (cached.has(imdb)) return cached.get(imdb) ?? null;
+  if (cached.has(imdb)) {
+    await applyCachedFilm(env.pool, imdb);
+    return cached.get(imdb) ?? null;
+  }
   return fetchFilm(env, imdb, originalTitle);
 }
 

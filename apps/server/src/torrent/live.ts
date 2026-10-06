@@ -60,7 +60,7 @@ export function homeCountry(tz: string | undefined): string {
 /** "61.220.x.x", "2001:db8:x": enough to tell connections apart, not enough to identify anyone. */
 export function maskAddress(ip: string): string {
   const plain = ip.replace(/^::ffff:/i, '');
-  if (isIPv4(plain)) return plain.split('.').slice(0, 2).join('.') + '.x.x';
+  if (isIPv4(plain)) return `${plain.split('.').slice(0, 2).join('.')}.x.x`;
   return `${plain.split(':').slice(0, 2).join(':')}:x`;
 }
 
@@ -92,7 +92,7 @@ export function buildLive(
       transport: t.includes('utp') ? 'utp' : t.includes('webseed') ? 'http' : 'tcp',
       downBps: p.downBps,
       upBps: p.upBps,
-      has: snap && snap.pieceCount ? Math.round((p.pieces / snap.pieceCount) * 1000) / 1000 : 0,
+      has: snap?.pieceCount ? Math.round((p.pieces / snap.pieceCount) * 1000) / 1000 : 0,
     };
   });
   // Busiest first: the list and the map's brightest lines agree.

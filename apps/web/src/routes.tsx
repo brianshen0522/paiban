@@ -83,6 +83,10 @@ export const routes: RouteObject[] = [
       { path: 'search', element: <SearchPage /> },
       { path: 'movies/:ytsId', element: <MoviePage /> },
       { path: 'downloads', element: <DownloadsPage /> },
+      {
+        path: 'downloads/:torrentId',
+        lazy: async () => ({ Component: (await import('./downloads/DownloadDetailPage')).DownloadDetailPage }),
+      },
       { path: 'library', element: <LibraryPage /> },
       { path: 'library/:torrentId', element: <Navigate to="subtitles" replace /> },
       { path: 'library/:torrentId/subtitles', lazy: workspace('subtitles') },

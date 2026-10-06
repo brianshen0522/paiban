@@ -41,13 +41,32 @@ RUN uv venv /opt/asr --python /usr/bin/python3 \
  && uv pip install --python /opt/asr/bin/python --no-cache faster-whisper==1.2.1 \
  && /opt/asr/bin/python -c "from faster_whisper import WhisperModel; WhisperModel('base', device='cpu', compute_type='int8', download_root='/opt/asr/models')" \
  && chmod -R a+rX /opt/asr
+# IP → country for the download page's peer map: DB-IP's free "IP to Country Lite" (CC BY 4.0,
+# credited on the page), this month's or last month's. Lookups then never leave the machine.
+RUN <<'PY' python3
+import datetime, os, sys, urllib.request
+os.makedirs("/opt/geo", exist_ok=True)
+first = datetime.date.today().replace(day=1)
+for month in (first, (first - datetime.timedelta(days=1)).replace(day=1)):
+    url = "https://download.db-ip.com/free/dbip-country-lite-%s.csv.gz" % month.strftime("%Y-%m")
+    try:
+        urllib.request.urlretrieve(url, "/opt/geo/dbip-country-lite.csv.gz")
+        print("geo:", url)
+        break
+    except Exception as err:
+        print("geo: not", url, err)
+else:
+    sys.exit("no DB-IP country table could be downloaded")
+os.chmod("/opt/geo/dbip-country-lite.csv.gz", 0o644)
+PY
 ENV NODE_ENV=production \
     FFSUBSYNC=/opt/ffs/bin/ffsubsync \
     FFS_PYTHON=/opt/ffs/bin/python \
     ASR_PYTHON=/opt/asr/bin/python \
     ASR_MODELS=/opt/asr/models \
     ASR_MODEL=base \
-    HF_HUB_OFFLINE=1
+    HF_HUB_OFFLINE=1 \
+    GEOIP_CSV=/opt/geo/dbip-country-lite.csv.gz
 WORKDIR /app
 COPY --from=build /out/server ./
 # The compose file sets the numeric user; nothing in the image needs root at run time.

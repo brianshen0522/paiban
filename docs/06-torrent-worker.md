@@ -174,6 +174,18 @@ new WebTorrent({
 2. 依 [03-data-model.md](03-data-model.md) 的「刪除一個下載時發生的事」：刪除所有相關資料夾；在一個交易裡把這部片還沒做完的匯出標成失敗、其他還沒結束的 `tasks` 標成取消、刪掉這一列。不用等 `media`：正在處理這部片的工作會自己停，而且不會留下東西。
 3. `NOTIFY`：`torrent.removed`、`usage`，以及被改動的工作、匯出和新寫的通知各自的那一則（清單在 03 的同一節）。
 
+## 即時檢視（下載細節頁）
+
+下載細節頁（[11-pages.md](11-pages.md)）開著時，`api` 每次被問 `GET /api/torrents/:id/live` 就把 `torrent_live.wanted_until` 設成 10 秒後。主迴圈每一輪（2 秒）的最後，對 `wanted_until` 還沒過的下載寫一份快照到 `torrent_live.data`；沒人在看的下載什麼都不寫。`api` 只回 6 秒內寫的快照，否則回 `null`（還沒做好，或下載沒在跑）。
+
+快照（`TorrentLive`）從 WebTorrent 讀（`engine.ts` 的 `snapshot()`，所有內部欄位都在這一個檔案裡包起來）：
+
+- 每個連線：位址（遮成「61.220.x.x」才離開這個服務）、國家、是不是區網、程式名稱（對方 extended handshake 的 `v`，沒有時從 peer id 的「-qB4630-」解出來）、誰連誰、TCP 或 uTP、速度、對方擁有幾成。
+- 每一塊：已完成、正在跟某個節點要（`_reservations` 不空）、幾個連線中的節點有（最多 255）。
+- 最近兩分鐘的速度：每一輪記一點，只記在記憶體裡，每部片最多 60 點。
+
+國家用 DB-IP 的免費「IP to Country Lite」（CC BY 4.0），建置映像檔時下載到 `/opt/geo`（`GEOIP_CSV`），查詢不連外。載入在啟動時背景進行（這台機器上約 7 秒、約 100 MB 記憶體），載入前節點沒有國家。IPv6 只比對前 64 位元：沒有國家分配到比 /64 更小的範圍。伺服器自己的位置不去問任何人，由 `TZ` 對應國家（`live.ts` 的表，不認得的時區當作台灣）。
+
 ## 重啟
 
 啟動時：
