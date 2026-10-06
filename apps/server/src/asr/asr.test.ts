@@ -175,6 +175,28 @@ describe('choosing with pairs', () => {
     expect(picked.support).toBe(pairSupport(film.late, pairs, right.segments));
   });
 
+  it('without pairs, lets the times recognised sentences start decide (another language, no model)', async () => {
+    const { timingHits } = await import('./fit.js');
+    const at = hear().segments.map((x) => x.start);
+    const right: SyncCore.Segment[] = [{ from: 0, scale: 1, offset: -2.37 }];
+    const wrong: SyncCore.Segment[] = [
+      { from: 0, scale: 1, offset: -2.37 },
+      { from: 60, scale: 1, offset: 40 },
+    ];
+    expect(timingHits(film.late, right, at)).toBeGreaterThan(timingHits(film.late, wrong, at));
+    const picked = pickWithPairs(
+      sp,
+      film.late,
+      [
+        { method: 'core', segments: wrong },
+        { method: 'ffsubsync-linear', segments: right },
+      ],
+      [],
+      at,
+    );
+    expect(picked.best.method).toBe('ffsubsync-linear');
+  });
+
   it('is pickAlignment when there are no pairs', () => {
     const cands = [{ method: 'core', segments: [{ from: 0, scale: 1, offset: -2.37 }] }];
     expect(pickWithPairs(sp, film.late, cands, []).best.method).toBe('core');

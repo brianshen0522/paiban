@@ -160,6 +160,40 @@ function agreeing(cues: ReadonlyArray<Cue>, pairs: ReadonlyArray<Pair>, segments
   return out;
 }
 
+/** How close (seconds) a cue's start must be to a recognised sentence's start to count as a hit. */
+const HIT_TOLERANCE = 0.4;
+/** Fewer recognised sentences than this, and their timing says too little to referee. */
+const MIN_HEARD_FOR_TIMING = 8;
+
+/**
+ * How many recognised sentences start where the alignment starts a cue (within HIT_TOLERANCE).
+ * Needs no understanding of either language: subtitle lines begin when sentences begin, and
+ * recognition, unlike speech detection, is not set off by music. Each sentence counts once.
+ */
+export function timingHits(
+  cues: ReadonlyArray<Cue>,
+  segments: ReadonlyArray<Segment>,
+  heardAt: ReadonlyArray<number>,
+): number {
+  const starts = cues.map((_, i) => mappedStart(cues, segments, i)).sort((a, b) => a - b);
+  let n = 0;
+  for (const t of heardAt) {
+    let lo = 0;
+    let hi = starts.length;
+    while (lo < hi) {
+      const m = (lo + hi) >> 1;
+      if (starts[m] < t) lo = m + 1;
+      else hi = m;
+    }
+    const near = Math.min(
+      lo < starts.length ? Math.abs(starts[lo] - t) : Infinity,
+      lo > 0 ? Math.abs(starts[lo - 1] - t) : Infinity,
+    );
+    if (near <= HIT_TOLERANCE) n++;
+  }
+  return n;
+}
+
 /** Recognised lines inside a segment's film time before one of them is expected to agree with it. */
 const HEARD_TO_JUDGE = 2;
 
@@ -200,9 +234,12 @@ export function unheardSegments(
  * Of the rest, alignments with a segment that recognition listened to and found no agreeing line
  * for (`unheardSegments`) go too, if any alignment is left without one: speech detection invents
  * cuts in loud passages, and a cut nobody heard is not believed over one the words support.
+ * Without enough pairs (a subtitle in another language and no model), the times recognised
+ * sentences start referee instead (`timingHits`): alignments that start clearly fewer cues where
+ * sentences start than the best one go.
  * The usual scoring (docs/08-media-pipeline.md, pickAlignment) chooses among the rest. Detected
- * speech alone is easily fooled by music and effects; words that match are not. Without enough
- * pairs this is pickAlignment unchanged.
+ * speech alone is easily fooled by music and effects; words that match are not. With neither
+ * pairs nor recognised sentences this is pickAlignment unchanged.
  */
 export function pickWithPairs(
   sp: Speech,
@@ -222,6 +259,12 @@ export function pickWithPairs(
     eligible = candidates.filter((_, i) => [...sets[top]].filter((k) => !sets[i].has(k)).length <= slack);
     const heardOut = eligible.filter((c) => unheardSegments(cues, pairs, c.segments, heardAt) === 0);
     if (heardOut.length) eligible = heardOut;
+  } else if (heardAt.length >= MIN_HEARD_FOR_TIMING) {
+    // No words matched (another language and no model): when sentences start still tells.
+    const hits = candidates.map((c) => timingHits(cues, c.segments, heardAt));
+    const best = Math.max(...hits);
+    const slack = Math.max(1, Math.round(0.1 * best));
+    if (best > 0) eligible = candidates.filter((_, i) => hits[i] >= best - slack);
   }
   const { best } = SyncCore.pickAlignment(sp, cues, eligible);
   const engine = (m: string) => m.split('-')[0];

@@ -244,7 +244,9 @@ describe('pacing (D41)', () => {
       await Promise.all([go(env), go(env2), go(env), go(env2)]);
       const times = fake.requests.map((r) => r.at).sort((a, b) => a - b);
       expect(times.length).toBe(4);
-      for (let i = 1; i < times.length; i++) expect((times[i] ?? 0) - (times[i - 1] ?? 0)).toBeGreaterThanOrEqual(950);
+      // The slots are a second apart when the requests leave; arrival at the fake adds event-loop
+      // and socket jitter that a busy machine stretches to tens of milliseconds (62 ms seen).
+      for (let i = 1; i < times.length; i++) expect((times[i] ?? 0) - (times[i - 1] ?? 0)).toBeGreaterThanOrEqual(900);
     } finally {
       await other.end();
     }

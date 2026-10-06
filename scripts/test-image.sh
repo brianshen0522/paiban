@@ -8,4 +8,4 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 docker run --rm --network host -v "$PWD":/work -w /work/apps/server -e HOME=/tmp \
   -e TEST_DATABASE_URL="${TEST_DATABASE_URL:-postgres://paiban:paiban-test-not-real@127.0.0.1:55432/postgres}" \
-  --entrypoint ./node_modules/.bin/vitest paiban-server:latest run "$@"
+  --entrypoint ./node_modules/.bin/vitest paiban-server:latest run --maxWorkers=4 "$@"
