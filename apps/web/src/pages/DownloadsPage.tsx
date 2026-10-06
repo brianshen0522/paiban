@@ -77,7 +77,10 @@ export function DownloadsPage() {
       ) : (
         <ScrollList label={t.downloads.title}>
           <section className="card">
-            <h2>{t.downloads.active}</h2>
+            <div className="dl-head">
+              <h2>{t.downloads.active}</h2>
+              {active.length > 0 && <Summary active={active} />}
+            </div>
             {active.length === 0 ? (
               <p className="sub">{t.downloads.nothingActive}</p>
             ) : (
@@ -98,11 +101,47 @@ export function DownloadsPage() {
               {done.map((x) => (
                 <Row key={x.id} x={x} me={me} showHolders={showAll} />
               ))}
+              <p className="sub dl-more">
+                {t.downloads.moreDone}{' '}
+                <Link className="link" to="/library">
+                  {t.downloads.toLibrary}
+                </Link>
+              </p>
             </section>
           )}
         </ScrollList>
       )}
     </FillPage>
+  );
+}
+
+/** "1 GB / 2.4 GB": what has arrived of the whole. */
+const sizeOf = (x: Torrent) => t.downloads.sizeOf(bytes(x.downloadedBytes), bytes(x.sizeBytes));
+
+/**
+ * One line over the list (Brian, 2026-10-06, "優化下載頁面"): how many are downloading, waiting
+ * and paused, the speed of all of them together and when the last one should be done.
+ */
+function Summary({ active }: { active: Torrent[] }) {
+  const n = (s: Torrent['status']) => active.filter((x) => x.status === s).length;
+  const running = active.filter((x) => x.status === 'downloading');
+  const total = running.reduce((a, x) => a + x.speedBps, 0);
+  const left = active.reduce((a, x) => a + Math.max(0, x.sizeBytes - x.downloadedBytes), 0);
+  // Only downloads that are moving have a finish time; the slowest of them is "all done".
+  const etas = running.map((x) => x.etaSeconds).filter((s): s is number => s !== null && Number.isFinite(s));
+  const last = etas.length === running.length && running.length > 0 ? Math.max(...etas) : null;
+  const parts = [
+    n('downloading') ? t.downloads.summary.downloading(n('downloading')) : null,
+    n('queued') ? t.downloads.summary.queued(n('queued')) : null,
+    n('paused') ? t.downloads.summary.paused(n('paused')) : null,
+  ].filter(Boolean);
+  return (
+    <p className="dl-sum">
+      <span>{parts.join(' · ')}</span>
+      {total > 0 && <b className="mono">{t.downloads.summary.speed(speed(total))}</b>}
+      {left > 0 && <span className="mono">{t.downloads.summary.left(bytes(left))}</span>}
+      {last !== null && <span>{t.downloads.summary.eta(Math.round(last / 60))}</span>}
+    </p>
   );
 }
 
@@ -113,12 +152,12 @@ function meta(x: Torrent, me: Me): string {
   switch (x.status) {
     case 'downloading':
       if (x.progress === 0 && x.peers === 0) return t.downloads.findingPeers;
-      return t.downloads.downloadingMeta(pct, speed(x.speedBps), x.peers, eta(x.etaSeconds));
+      return t.downloads.downloadingMeta(pct, sizeOf(x), speed(x.speedBps), x.peers, eta(x.etaSeconds));
     case 'paused':
-      return t.downloads.pausedMeta(pct);
+      return t.downloads.pausedMeta(pct, sizeOf(x));
     case 'queued':
       return x.queuePosition
-        ? t.downloads.queuedMeta(x.queuePosition, me.limits.maxActiveDownloads)
+        ? t.downloads.queuedMeta(x.queuePosition, me.limits.maxActiveDownloads, bytes(x.sizeBytes))
         : t.downloads.queuedWaiting;
     case 'analyzing':
       return t.downloads.analyzingMeta;
@@ -237,6 +276,15 @@ function Row({ x, me, showHolders }: { x: Torrent; me: Me; showHolders: boolean 
       )}
     </>
   );
+  const detail = x.status !== 'ready' && x.status !== 'analyzing' && (
+    <Link
+      className="btn dl-detail"
+      to={`/downloads/${x.id}`}
+      aria-label={t.downloads.detailLabel(x.movie.titleZh ?? x.movie.title)}
+    >
+      {t.downloads.detail} ›
+    </Link>
+  );
 
   return (
     <div className="dl">
@@ -261,7 +309,12 @@ function Row({ x, me, showHolders }: { x: Torrent; me: Me; showHolders: boolean 
           <span className="sub-i">{versionLabel(x.version)}</span>
         </div>
         {(x.status === 'downloading' || x.status === 'paused' || x.status === 'failed') && (
-          <Progress value={x.progress} bad={x.status === 'failed'} label={`${x.movie.title} ${percent(x.progress)}%`} />
+          <Progress
+            value={x.progress}
+            bad={x.status === 'failed'}
+            live={x.status === 'downloading' && x.speedBps > 0}
+            label={`${x.movie.title} ${percent(x.progress)}%`}
+          />
         )}
         <span className="dl-meta">{meta(x, me)}</span>
         {showHolders && (
@@ -271,6 +324,7 @@ function Row({ x, me, showHolders }: { x: Torrent; me: Me; showHolders: boolean 
       <div className="dl-act">
         <Chip tone={TONE[x.status]}>{t.downloads.status[x.status]}</Chip>
         {actions}
+        {detail}
       </div>
       {confirm && (
         <div className="dl-confirm">

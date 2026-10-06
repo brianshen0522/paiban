@@ -1443,8 +1443,19 @@ fieldset.field > legend {
   flex-wrap: wrap;
   gap: 10px 14px;
   align-items: center;
-  padding: 10px 0;
+  padding: 12px 0;
   border-top: 1px solid var(--line);
+}
+@media (max-width: 640px) {
+  #view .dl {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr);
+    align-items: start;
+  }
+  #view .dl-act,
+  #view .dl-confirm {
+    grid-column: 1 / -1;
+  }
 }
 #view .card > h2 + .dl {
   border-top: 0;
@@ -1489,6 +1500,30 @@ fieldset.field > legend {
 }
 .prog.bad i {
   background: var(--bad);
+}
+/* Data arriving: light runs along the filled part. */
+#view .dd-bar.live i::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 0%, rgba(255, 255, 255, 0.5) 45%, transparent 60%) no-repeat;
+  background-size: 160px 100%;
+  animation: prog-run 1.6s linear infinite;
+}
+.prog.live i {
+  background-image: linear-gradient(100deg, transparent 0%, rgba(255, 255, 255, 0.45) 45%, transparent 60%);
+  background-size: 160px 100%;
+  background-repeat: no-repeat;
+  background-color: var(--accent-fill);
+  animation: prog-run 1.6s linear infinite;
+}
+@keyframes prog-run {
+  from {
+    background-position: -160px 0;
+  }
+  to {
+    background-position: calc(100% + 160px) 0;
+  }
 }
 
 /* library */
@@ -1657,6 +1692,11 @@ fieldset.field > legend {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .prog.live i,
+  #view .dd-bar.live i::after {
+    animation: none;
+    background-image: none;
+  }
   .prog i,
   .sw i,
   .sw i::after,
@@ -1985,6 +2025,40 @@ fieldset.field > legend {
   width: 48px;
   padding: 4px;
 }
+/* With a picture there is no frame round it (the padding is for the drawn placeholder only). */
+#view .dl-poster .poster.sm.has-img {
+  padding: 0;
+}
+#view .dl-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+}
+#view .dl-head h2 {
+  font-size: 15px;
+  font-weight: 600;
+}
+#view .dl-sum {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+#view .dl-sum b {
+  color: var(--info);
+  font-weight: 500;
+}
+#view .dl-more {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+#view .dl-detail {
+  color: var(--ink-2);
+}
 #view .dl-poster .poster.sm b,
 #view .dl-poster .poster.sm span {
   display: none;
@@ -2032,6 +2106,8 @@ fieldset.field > legend {
 }
 #view .dd-bar i {
   display: block;
+  position: relative;
+  overflow: hidden;
   height: 100%;
   background: linear-gradient(90deg, var(--accent-fill), #38e1ff);
   transition: width 0.6s ease;

@@ -34,11 +34,22 @@ export function Empty({ title, hint, children }: { title: string; hint?: string;
   );
 }
 
-export function Progress({ value, bad = false, label }: { value: number; bad?: boolean; label: string }) {
+export function Progress({
+  value,
+  bad = false,
+  live = false,
+  label,
+}: {
+  value: number;
+  bad?: boolean;
+  /** Data is arriving: the filled part moves, so a stalled download looks different from a moving one. */
+  live?: boolean;
+  label: string;
+}) {
   const pct = Math.round(Math.min(1, Math.max(0, value)) * 100);
   return (
     <div
-      className={`prog${bad ? ' bad' : ''}`}
+      className={`prog${bad ? ' bad' : ''}${live ? ' live' : ''}`}
       role="progressbar"
       aria-valuemin={0}
       aria-valuemax={100}

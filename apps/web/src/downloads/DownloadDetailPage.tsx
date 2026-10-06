@@ -7,7 +7,7 @@ import { Flag } from '../components/Flag';
 import { Poster } from '../components/Poster';
 import { t } from '../copy/zh-TW';
 import { ApiFailure, get, post } from '../lib/api';
-import { bytes, eta, percent, rate, versionLabel } from '../lib/format';
+import { bytes, percent, rate, versionLabel } from '../lib/format';
 import { keys } from '../lib/queries';
 import { NotFoundPage } from '../pages/StatusPages';
 import { countrySummary, PeerMap } from './PeerMap';
@@ -116,7 +116,7 @@ export function DownloadDetailPage() {
             <Chip tone={TONE[x.status]}>{t.downloads.status[x.status]}</Chip>
           </div>
           <div
-            className="dd-bar"
+            className={`dd-bar${x.status === 'downloading' && (v?.downBps ?? x.speedBps) > 0 ? ' live' : ''}`}
             role="progressbar"
             aria-valuenow={percent(x.progress)}
             aria-valuemin={0}
@@ -136,7 +136,9 @@ export function DownloadDetailPage() {
             </div>
             <div>
               <dt>{t.downloadDetail.left}</dt>
-              <dd className="mono">{x.status === 'downloading' ? eta(x.etaSeconds) : '—'}</dd>
+              <dd className="mono">
+                {x.status === 'downloading' && x.etaSeconds !== null ? t.downloadDetail.leftTime(x.etaSeconds) : '—'}
+              </dd>
             </div>
             <div>
               <dt>{t.downloadDetail.peers}</dt>
