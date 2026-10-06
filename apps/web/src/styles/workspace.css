@@ -77,6 +77,45 @@ button[aria-pressed="true"] {
   align-items: center;
   min-width: 0;
 }
+/* A thumbnail, not a poster: the workspace is for working (the sync tab needs the height). */
+#view .whead .poster.sm {
+  width: 44px;
+  padding: 0;
+  border-radius: 5px;
+}
+#view .whead .poster.sm:not(.has-img) > * {
+  display: none;
+}
+#view .whead .poster.sm::after {
+  inset: 3px;
+  border-radius: 3px;
+}
+/* The subtitle being synced: one compact row above the workbench. */
+#view .syncpick {
+  padding: 10px 14px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+}
+#view .syncpick > .sub {
+  flex: 1 1 22em;
+}
+/* What the media panel says fits on the same line, unless it carries a warning or a progress bar. */
+#view .syncpick .mediapanel:has(.banner, .mp-progress) {
+  flex: 1 1 100%;
+}
+#view .syncpick .frow {
+  gap: 8px 12px;
+}
+#view .syncpick .field {
+  grid-template-columns: auto minmax(0, 380px);
+  align-items: center;
+  gap: 10px;
+}
+#view .syncpick .field > label {
+  white-space: nowrap;
+}
 #view .whead h1 {
   margin: 0;
   overflow-wrap: anywhere;
@@ -260,11 +299,88 @@ button[aria-pressed="true"] {
   color: var(--accent-ink);
   font-weight: 500;
 }
+/* Video, message and the tool in use on the left; the lines on the right, as tall as that column
+   (Brian, 2026-10-06: listening to a checkpoint and marking it should not need scrolling). */
 #view .bench .work {
   display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.62fr);
   gap: 14px;
   align-items: stretch;
+}
+#view .bench .stage-col {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+#view .bench .dock {
+  display: grid;
+  min-width: 0;
+}
+#view .bench .dock-tabs {
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-inline: 4px;
+}
+#view .bench .dock-tabs button {
+  flex: none;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  background: none;
+  min-height: 0;
+  padding: 7px 12px 6px;
+  color: var(--ink-3);
+  font-size: 13px;
+  gap: 6px;
+}
+#view .bench .dock-tabs button:hover {
+  color: var(--ink);
+  background: var(--panel-2);
+}
+#view .bench .dock-tabs button[aria-selected="true"] {
+  background: var(--panel);
+  border-color: var(--line);
+  color: var(--ink);
+  font-weight: 600;
+  position: relative;
+  box-shadow: inset 0 2px 0 var(--accent-fill);
+}
+/* The selected tab joins the panel: cover the panel's top border under it. */
+#view .bench .dock-tabs button[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 1px;
+  background: var(--panel);
+}
+#view .bench .dock-tabs small {
+  font-size: 11.5px;
+  color: var(--ink-3);
+  font-weight: 400;
+}
+#view .bench .dock-panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  min-height: 112px;
+}
+#view .bench .ctl-sep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--line);
+  margin-inline: 4px;
+}
+#view .bench .dock-scope {
+  margin: 0;
 }
 #view .bench .stage {
   min-width: 0;
@@ -279,6 +395,9 @@ button[aria-pressed="true"] {
   overflow: hidden;
   aspect-ratio: 16 / 9;
   max-width: 100%;
+  /* Never so tall that the tools under it leave the screen; the picture letterboxes inside. */
+  max-height: max(240px, calc(100vh - 600px));
+  width: 100%;
 }
 #view .bench .screen video {
   width: 100%;
@@ -376,7 +495,7 @@ button[aria-pressed="true"] {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  max-height: 560px;
+  min-height: 0;
 }
 #view .bench .cues-head {
   display: flex;
@@ -640,52 +759,30 @@ button[aria-pressed="true"] {
 #view .bench .log button {
   padding: 2px 10px;
 }
-#view .bench .tools {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
-  gap: 10px;
-}
-#view .bench .tool {
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 10px 12px;
-  display: grid;
-  gap: 7px;
-  align-content: start;
-  min-width: 0;
-}
-#view .bench .tool h2 {
-  margin: 0;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--ink-3);
-  letter-spacing: 0.04em;
-}
-#view .bench .tool .ctl {
+#view .bench .dock-panel .ctl {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   align-items: center;
 }
-#view .bench .tool p {
+#view .bench .dock-panel p {
   margin: 0;
   color: var(--ink-3);
   font-size: 12.5px;
 }
-#view .bench .tool .ctl button {
+#view .bench .dock-panel .ctl button {
   padding-inline: 9px;
 }
-#view .bench .tool input.offset {
+#view .bench .dock-panel input.offset {
   width: 5.8em;
   text-align: right;
 }
-#view .bench .tool .grow {
+#view .bench .dock-panel .grow {
   flex: 1 1 100%;
   min-width: 0;
   white-space: nowrap;
 }
-#view .bench .tool .grow select {
+#view .bench .dock-panel .grow select {
   flex: 1 1 auto;
   min-width: 0;
   width: 100%;

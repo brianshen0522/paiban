@@ -10,6 +10,7 @@ import {
 } from '@paiban/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
   type PointerEvent as ReactPointerEvent,
   useCallback,
@@ -72,6 +73,9 @@ type Msg = { text: string; actions?: { label: string; run: () => void }[] };
 type SaveState = 'saved' | 'saving' | 'dirty' | 'failed' | 'conflict';
 
 const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5];
+/** The tools under the video, one at a time, in the order the steps use them. */
+const DOCK_TABS = ['auto', 'checkpoints', 'offset', 'anchors', 'compare'] as const;
+type DockTab = (typeof DOCK_TABS)[number];
 const SAVE_DELAY = 1500;
 const SAVE_RETRY = 5000;
 
@@ -155,6 +159,12 @@ function Bench({ ws, detail }: { ws: Workspace; detail: SubtitleDetail }) {
   const [query, setQuery] = useState('');
   const [follow, setFollow] = useState(true);
   const [allowSplit, setAllowSplit] = useState(true);
+  // The tool shown under the video (Brian, 2026-10-06): listening and adjusting without scrolling away from it.
+  const [dock, setDock] = useState<DockTab>(() =>
+    sub.status === 'confirmed' || detail.doc.segments.some((x) => x.offset !== 0 || x.scale !== 1)
+      ? 'checkpoints'
+      : 'auto',
+  );
   const [aligning, setAligning] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [askConfirm, setAskConfirm] = useState<number | null>(null);
@@ -535,6 +545,7 @@ function Bench({ ws, detail }: { ws: Workspace; detail: SubtitleDetail }) {
       const next = applyAlignment(docRef.current, r.segments);
       commit(next, { reason: 'auto-align' });
       setCpCur(-1);
+      setDock('checkpoints');
       const after = scoreOf(next);
       const multi = next.segments.length > 1;
       const parts = next.segments
@@ -649,6 +660,7 @@ function Bench({ ws, detail }: { ws: Workspace; detail: SubtitleDetail }) {
     const cp = docRef.current.checkpoints[j];
     if (!cp) return;
     setCpCur(j);
+    setDock('checkpoints');
     select(cp.cue, true);
     const m = mapped[cp.cue];
     if (!m) return;
@@ -1194,11 +1206,26 @@ function Bench({ ws, detail }: { ws: Workspace; detail: SubtitleDetail }) {
     </div>
   );
 
+  const onDockKey = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    const i = DOCK_TABS.indexOf(dock);
+    const next = DOCK_TABS[(i + (e.key === 'ArrowRight' ? 1 : DOCK_TABS.length - 1)) % DOCK_TABS.length] ?? dock;
+    e.preventDefault();
+    e.stopPropagation();
+    setDock(next);
+    requestAnimationFrame(() => document.getElementById(`dock-${next}`)?.focus());
+  };
+
   return (
     <div className="bench">
       <header className="bar">
-        <p className="meta mono">{info.join(' · ')}</p>
+        <ol className="steps" aria-label={t.bench.stepsLabel}>
+          {t.bench.steps.map((s) => (
+            <li key={s}>{s}</li>
+          ))}
+        </ol>
         <div className="bar-actions">
+          <span className="meta mono">{info.join(' · ')}</span>
           {saveText && (
             <span className={`sub${saveState === 'failed' || saveState === 'conflict' ? ' warnt' : ''}`} role="status">
               {saveText}
@@ -1237,70 +1264,292 @@ function Bench({ ws, detail }: { ws: Workspace; detail: SubtitleDetail }) {
 
       {removed && <Banner tone="warn">{t.bench.msg.removedElsewhere}</Banner>}
 
-      <ol className="steps" aria-label={t.bench.stepsLabel}>
-        {t.bench.steps.map((s) => (
-          <li key={s}>{s}</li>
-        ))}
-      </ol>
-
       <div className="work">
-        <section className="stage" aria-label={t.bench.video}>
-          {stage}
-          {better && (
-            <div className="banner info">
-              <span>{t.media.proxyReadySwitch}</span>
-              <button type="button" onClick={() => switchTo(better.kind)}>
-                {t.media.switchToProxy}
+        <div className="stage-col">
+          <section className="stage" aria-label={t.bench.video}>
+            {stage}
+            {better && (
+              <div className="banner info">
+                <span>{t.media.proxyReadySwitch}</span>
+                <button type="button" onClick={() => switchTo(better.kind)}>
+                  {t.media.switchToProxy}
+                </button>
+              </div>
+            )}
+            {!active && !allFailed && <p className="sub">{t.media.nothingPlayable}</p>}
+            {allFailed && <Banner tone="bad">{t.media.playbackFailed}</Banner>}
+            <div className="transport">
+              <button type="button" className="strong play" disabled={!active} onClick={togglePlay}>
+                {isPlaying ? t.bench.pause : t.bench.play}
               </button>
+              <button type="button" aria-label={t.bench.back1Label} onClick={() => seek(clock() - 1)}>
+                {t.bench.back1}
+              </button>
+              <button type="button" aria-label={t.bench.fwd1Label} onClick={() => seek(clock() + 1)}>
+                {t.bench.fwd1}
+              </button>
+              <span className="clock mono">
+                <output ref={clockRef}>{timecode(0)}</output> <span className="dur">/ {timecode(duration)}</span>
+              </span>
+              <span className="push">
+                <label className="chk">
+                  {t.bench.speed}
+                  <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))}>
+                    {SPEEDS.map((s) => (
+                      <option key={s} value={s}>
+                        {`${s}×`}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {others.length > 0 && (
+                  <>
+                    <label className="chk">
+                      <input type="checkbox" checked={secondOn} onChange={(e) => setSecondOn(e.target.checked)} />
+                      {t.bench.second}
+                    </label>
+                    <label className="chk">
+                      <span className="sr-only">{t.bench.secondPick}</span>
+                      <select value={secondId ?? ''} disabled={!secondOn} onChange={(e) => setSecondId(e.target.value)}>
+                        {others.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {langName(s.language)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </>
+                )}
+              </span>
             </div>
-          )}
-          {!active && !allFailed && <p className="sub">{t.media.nothingPlayable}</p>}
-          {allFailed && <Banner tone="bad">{t.media.playbackFailed}</Banner>}
-          <div className="transport">
-            <button type="button" className="strong play" disabled={!active} onClick={togglePlay}>
-              {isPlaying ? t.bench.pause : t.bench.play}
-            </button>
-            <button type="button" aria-label={t.bench.back1Label} onClick={() => seek(clock() - 1)}>
-              {t.bench.back1}
-            </button>
-            <button type="button" aria-label={t.bench.fwd1Label} onClick={() => seek(clock() + 1)}>
-              {t.bench.fwd1}
-            </button>
-            <span className="clock mono">
-              <output ref={clockRef}>{timecode(0)}</output> <span className="dur">/ {timecode(duration)}</span>
-            </span>
-            <span className="push">
-              <label className="chk">
-                {t.bench.speed}
-                <select value={speed} onChange={(e) => setSpeed(Number(e.target.value))}>
-                  {SPEEDS.map((s) => (
-                    <option key={s} value={s}>
-                      {`${s}×`}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {others.length > 0 && (
+          </section>
+          <div className="log" role="status" aria-live="polite">
+            <Rich text={msg.text} />
+            {msg.actions?.map((a) => (
+              <button type="button" key={a.label} onClick={a.run}>
+                {a.label}
+              </button>
+            ))}
+          </div>
+
+          <section className="dock" aria-label={t.bench.tools}>
+            <div className="dock-tabs" role="tablist" aria-label={t.bench.tools} onKeyDown={onDockKey}>
+              {DOCK_TABS.map((d) => (
+                <button
+                  key={d}
+                  id={`dock-${d}`}
+                  type="button"
+                  role="tab"
+                  aria-selected={dock === d}
+                  aria-controls="dock-panel"
+                  tabIndex={dock === d ? 0 : -1}
+                  onClick={() => setDock(d)}
+                >
+                  {t.bench.dock[d]}
+                  {d === 'checkpoints' && doc.checkpoints.length > 0 && (
+                    <small className="mono">{`${okCount}/${doc.checkpoints.length}`}</small>
+                  )}
+                </button>
+              ))}
+            </div>
+            <div id="dock-panel" className="dock-panel" role="tabpanel" aria-labelledby={`dock-${dock}`}>
+              {dock === 'auto' && (
                 <>
-                  <label className="chk">
-                    <input type="checkbox" checked={secondOn} onChange={(e) => setSecondOn(e.target.checked)} />
-                    {t.bench.second}
-                  </label>
-                  <label className="chk">
-                    <span className="sr-only">{t.bench.secondPick}</span>
-                    <select value={secondId ?? ''} disabled={!secondOn} onChange={(e) => setSecondId(e.target.value)}>
-                      {others.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {langName(s.language)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <div className="ctl">
+                    <button
+                      type="button"
+                      className="strong"
+                      disabled={!speech || aligning || disabled}
+                      onClick={() => void auto()}
+                    >
+                      {aligning ? t.bench.auto.running : t.bench.auto.run}
+                    </button>
+                    <label className="chk">
+                      <input type="checkbox" checked={allowSplit} onChange={(e) => setAllowSplit(e.target.checked)} />
+                      {t.bench.auto.allowSplit}
+                    </label>
+                    <button type="button" disabled={!speech || disabled} onClick={snap}>
+                      {t.bench.auto.snap}
+                    </button>
+                  </div>
+                  <p>{noSpeechReason ?? t.bench.auto.note}</p>
+                  {refPicked && (
+                    <>
+                      <div className="ctl">
+                        <label className="chk grow ref-pick">
+                          {t.bench.auto.byRef}
+                          <select value={refPicked.id} onChange={(e) => setRefId(e.target.value)}>
+                            {refChoices.map((s) => (
+                              <option key={s.id} value={s.id}>
+                                {t.bench.auto.refOption(langName(s.language), s.releaseName, s.status === 'confirmed')}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <button type="button" disabled={aligning || disabled} onClick={() => void auto(refPicked.id)}>
+                          {t.bench.auto.runByRef}
+                        </button>
+                      </div>
+                      <p>{refPicked.status === 'confirmed' ? t.bench.auto.refNote : t.bench.auto.refDraftNote}</p>
+                    </>
+                  )}
                 </>
               )}
-            </span>
-          </div>
-        </section>
+              {dock === 'checkpoints' && (
+                <>
+                  <div className="ctl">
+                    <button type="button" onClick={cpNext}>
+                      {t.bench.checkpoints.next}
+                    </button>
+                    <span className="dots">
+                      {doc.checkpoints.map((c, j) => (
+                        <button
+                          type="button"
+                          key={c.cue}
+                          className={`${c.status === 'ok' ? 'ok' : c.status === 'bad' ? 'bad' : ''}${j === cpCur ? ' cur' : ''}`}
+                          aria-label={t.bench.checkpoints.dot(j + 1, c.cue + 1, t.bench.checkpoints.states[c.status])}
+                          title={t.bench.checkpoints.dot(j + 1, c.cue + 1, t.bench.checkpoints.states[c.status])}
+                          onClick={() => cpGo(j)}
+                        >
+                          {j + 1}
+                        </button>
+                      ))}
+                    </span>
+                    <span className="ctl-sep" aria-hidden="true" />
+                    <button type="button" onClick={() => cpMark('ok')}>
+                      {t.bench.checkpoints.ok}
+                    </button>
+                    <button type="button" onClick={() => cpMark('bad')}>
+                      {t.bench.checkpoints.bad}
+                    </button>
+                  </div>
+                  <p>{doc.checkpoints.length ? t.bench.checkpoints.help : t.bench.checkpoints.none}</p>
+                </>
+              )}
+              {dock === 'offset' && (
+                <>
+                  <p className="dock-scope">
+                    <span className="chip">
+                      {multi ? t.bench.offset.scope(k + 1, ra + 1, rb) : t.bench.offset.whole}
+                    </span>
+                  </p>
+                  <div className="ctl">
+                    <button type="button" onClick={() => nudge(-0.5)}>
+                      −500
+                    </button>
+                    <button type="button" onClick={() => nudge(-0.05)}>
+                      −50
+                    </button>
+                    <input
+                      className="mono offset"
+                      inputMode="decimal"
+                      aria-label={t.bench.offset.label}
+                      value={offsetText}
+                      onFocus={() => {
+                        offsetFocused.current = true;
+                      }}
+                      onChange={(e) => setOffsetText(e.target.value)}
+                      onBlur={() => {
+                        offsetFocused.current = false;
+                        applyOffsetText();
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') applyOffsetText();
+                      }}
+                    />
+                    <span>{t.bench.offset.unit}</span>
+                    <button type="button" onClick={() => nudge(0.05)}>
+                      +50
+                    </button>
+                    <button type="button" onClick={() => nudge(0.5)}>
+                      +500
+                    </button>
+                  </div>
+                  <div className="ctl">
+                    <label className="chk grow">
+                      {t.bench.offset.rate}
+                      <select value={rateId} onChange={(e) => changeRate(e.target.value)}>
+                        {SyncCore.RATES.map((r) => (
+                          <option key={r.id} value={r.id}>
+                            {(t.bench.rates[r.id] ?? r.id) + (r.scale === 1 ? '' : `（${rateText(r.scale)}）`)}
+                          </option>
+                        ))}
+                        {rateId === 'custom' && (
+                          <option value="custom">{t.bench.offset.custom(rateText(seg.scale))}</option>
+                        )}
+                      </select>
+                    </label>
+                  </div>
+                </>
+              )}
+              {dock === 'anchors' && (
+                <>
+                  <div className="ctl">
+                    <button type="button" onClick={anchor}>
+                      {t.bench.anchors.anchor}
+                    </button>
+                    <button type="button" onClick={split}>
+                      {t.bench.anchors.split}
+                    </button>
+                    {multi && k > 0 && (
+                      <button type="button" onClick={merge}>
+                        {t.bench.anchors.merge}
+                      </button>
+                    )}
+                  </div>
+                  {multi && (
+                    <div className="chips">
+                      {doc.segments.map((s, j) => {
+                        const [a, b] = segRange(doc, n, j);
+                        return (
+                          <span key={s.from} className={`chip ${'abc'[j % 3]}${j === k ? ' cur' : ''}`}>
+                            {t.bench.anchors.segChip(a + 1, b, signed(s.offset))}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <p>
+                    {anchorsHere >= 2
+                      ? t.bench.anchors.noteN(anchorsHere)
+                      : anchorsHere === 1
+                        ? t.bench.anchors.note1
+                        : t.bench.anchors.note0}
+                  </p>
+                </>
+              )}
+              {dock === 'compare' && (
+                <>
+                  <div className="ctl">
+                    <button
+                      type="button"
+                      onPointerDown={() => setOrig(true)}
+                      onPointerUp={() => setOrig(false)}
+                      onPointerLeave={() => setOrig(false)}
+                      onPointerCancel={() => setOrig(false)}
+                      onBlur={() => setOrig(false)}
+                      onKeyDown={(e) => {
+                        if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) setOrig(true);
+                      }}
+                      onKeyUp={() => setOrig(false)}
+                    >
+                      {t.bench.compare.orig}
+                    </button>
+                    <button type="button" onClick={undo}>
+                      {t.bench.compare.undo}
+                    </button>
+                    <button type="button" onClick={redo}>
+                      {t.bench.compare.redo}
+                    </button>
+                    <button type="button" onClick={reset}>
+                      {t.bench.compare.reset}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </section>
+        </div>
 
         <section className="cues" aria-label={t.bench.listLabel}>
           <div className="cues-head">
@@ -1435,208 +1684,6 @@ function Bench({ ws, detail }: { ws: Workspace; detail: SubtitleDetail }) {
           </li>
           <li>{t.bench.legend.drag}</li>
         </ul>
-      </section>
-
-      <div className="log" role="status" aria-live="polite">
-        <Rich text={msg.text} />
-        {msg.actions?.map((a) => (
-          <button type="button" key={a.label} onClick={a.run}>
-            {a.label}
-          </button>
-        ))}
-      </div>
-
-      <section className="tools" aria-label={t.bench.tools}>
-        <div className="tool">
-          <h2>{t.bench.auto.title}</h2>
-          <div className="ctl">
-            <button
-              type="button"
-              className="strong"
-              disabled={!speech || aligning || disabled}
-              onClick={() => void auto()}
-            >
-              {aligning ? t.bench.auto.running : t.bench.auto.run}
-            </button>
-            <label className="chk">
-              <input type="checkbox" checked={allowSplit} onChange={(e) => setAllowSplit(e.target.checked)} />
-              {t.bench.auto.allowSplit}
-            </label>
-            <button type="button" disabled={!speech || disabled} onClick={snap}>
-              {t.bench.auto.snap}
-            </button>
-          </div>
-          <p>{noSpeechReason ?? t.bench.auto.note}</p>
-          {refPicked && (
-            <>
-              <div className="ctl">
-                <label className="chk grow ref-pick">
-                  {t.bench.auto.byRef}
-                  <select value={refPicked.id} onChange={(e) => setRefId(e.target.value)}>
-                    {refChoices.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {t.bench.auto.refOption(langName(s.language), s.releaseName, s.status === 'confirmed')}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <button type="button" disabled={aligning || disabled} onClick={() => void auto(refPicked.id)}>
-                  {t.bench.auto.runByRef}
-                </button>
-              </div>
-              <p>{refPicked.status === 'confirmed' ? t.bench.auto.refNote : t.bench.auto.refDraftNote}</p>
-            </>
-          )}
-        </div>
-
-        <div className="tool">
-          <h2>
-            {t.bench.offset.title}{' '}
-            <span className="chip">{multi ? t.bench.offset.scope(k + 1, ra + 1, rb) : t.bench.offset.whole}</span>
-          </h2>
-          <div className="ctl">
-            <button type="button" onClick={() => nudge(-0.5)}>
-              −500
-            </button>
-            <button type="button" onClick={() => nudge(-0.05)}>
-              −50
-            </button>
-            <input
-              className="mono offset"
-              inputMode="decimal"
-              aria-label={t.bench.offset.label}
-              value={offsetText}
-              onFocus={() => {
-                offsetFocused.current = true;
-              }}
-              onChange={(e) => setOffsetText(e.target.value)}
-              onBlur={() => {
-                offsetFocused.current = false;
-                applyOffsetText();
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') applyOffsetText();
-              }}
-            />
-            <span>{t.bench.offset.unit}</span>
-            <button type="button" onClick={() => nudge(0.05)}>
-              +50
-            </button>
-            <button type="button" onClick={() => nudge(0.5)}>
-              +500
-            </button>
-          </div>
-          <div className="ctl">
-            <label className="chk grow">
-              {t.bench.offset.rate}
-              <select value={rateId} onChange={(e) => changeRate(e.target.value)}>
-                {SyncCore.RATES.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {(t.bench.rates[r.id] ?? r.id) + (r.scale === 1 ? '' : `（${rateText(r.scale)}）`)}
-                  </option>
-                ))}
-                {rateId === 'custom' && <option value="custom">{t.bench.offset.custom(rateText(seg.scale))}</option>}
-              </select>
-            </label>
-          </div>
-        </div>
-
-        <div className="tool">
-          <h2>{t.bench.anchors.title}</h2>
-          <div className="ctl">
-            <button type="button" onClick={anchor}>
-              {t.bench.anchors.anchor}
-            </button>
-            <button type="button" onClick={split}>
-              {t.bench.anchors.split}
-            </button>
-            {multi && k > 0 && (
-              <button type="button" onClick={merge}>
-                {t.bench.anchors.merge}
-              </button>
-            )}
-          </div>
-          {multi && (
-            <div className="chips">
-              {doc.segments.map((s, j) => {
-                const [a, b] = segRange(doc, n, j);
-                return (
-                  <span key={s.from} className={`chip ${'abc'[j % 3]}${j === k ? ' cur' : ''}`}>
-                    {t.bench.anchors.segChip(a + 1, b, signed(s.offset))}
-                  </span>
-                );
-              })}
-            </div>
-          )}
-          <p>
-            {anchorsHere >= 2
-              ? t.bench.anchors.noteN(anchorsHere)
-              : anchorsHere === 1
-                ? t.bench.anchors.note1
-                : t.bench.anchors.note0}
-          </p>
-        </div>
-
-        <div className="tool">
-          <h2>{t.bench.checkpoints.title}</h2>
-          <div className="ctl">
-            <button type="button" onClick={cpNext}>
-              {t.bench.checkpoints.next}
-            </button>
-            <span className="dots">
-              {doc.checkpoints.map((c, j) => (
-                <button
-                  type="button"
-                  key={c.cue}
-                  className={`${c.status === 'ok' ? 'ok' : c.status === 'bad' ? 'bad' : ''}${j === cpCur ? ' cur' : ''}`}
-                  aria-label={t.bench.checkpoints.dot(j + 1, c.cue + 1, t.bench.checkpoints.states[c.status])}
-                  title={t.bench.checkpoints.dot(j + 1, c.cue + 1, t.bench.checkpoints.states[c.status])}
-                  onClick={() => cpGo(j)}
-                >
-                  {j + 1}
-                </button>
-              ))}
-            </span>
-          </div>
-          <div className="ctl">
-            <button type="button" onClick={() => cpMark('ok')}>
-              {t.bench.checkpoints.ok}
-            </button>
-            <button type="button" onClick={() => cpMark('bad')}>
-              {t.bench.checkpoints.bad}
-            </button>
-          </div>
-          {!doc.checkpoints.length && <p>{t.bench.checkpoints.none}</p>}
-        </div>
-
-        <div className="tool">
-          <h2>{t.bench.compare.title}</h2>
-          <div className="ctl">
-            <button
-              type="button"
-              onPointerDown={() => setOrig(true)}
-              onPointerUp={() => setOrig(false)}
-              onPointerLeave={() => setOrig(false)}
-              onPointerCancel={() => setOrig(false)}
-              onBlur={() => setOrig(false)}
-              onKeyDown={(e) => {
-                if ((e.key === ' ' || e.key === 'Enter') && !e.repeat) setOrig(true);
-              }}
-              onKeyUp={() => setOrig(false)}
-            >
-              {t.bench.compare.orig}
-            </button>
-            <button type="button" onClick={undo}>
-              {t.bench.compare.undo}
-            </button>
-            <button type="button" onClick={redo}>
-              {t.bench.compare.redo}
-            </button>
-            <button type="button" onClick={reset}>
-              {t.bench.compare.reset}
-            </button>
-          </div>
-        </div>
       </section>
 
       {status === 'confirmed' && (

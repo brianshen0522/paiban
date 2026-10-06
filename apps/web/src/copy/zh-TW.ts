@@ -833,6 +833,13 @@ export const t = {
     },
     segLabel: (n: number) => `第 ${n} 段`,
     tools: '同步工具',
+    dock: {
+      auto: '自動對齊',
+      checkpoints: '檢查點',
+      offset: '位移與速率',
+      anchors: '對齊點與分段',
+      compare: '比較與復原',
+    },
     auto: {
       title: '自動',
       run: '自動對齊',
@@ -883,6 +890,7 @@ export const t = {
       dot: (j: number, cue: number, state: string) => `檢查點 ${j}，第 ${cue} 句，${state}`,
       states: { ok: '已確認', bad: '不準', todo: '還沒聽' },
       none: '這條字幕沒有檢查點。按「全部重設」會重新挑。',
+      help: '按「聽下一個」（或 N）播放下一句，聽它是不是在開口的瞬間出現，再標「這句準」或「這句不準」。全部標成準就可以確認同步。',
     },
     compare: { title: '比較與復原', orig: '按住看原始時間', undo: '復原', redo: '重做', reset: '全部重設' },
     keys: {
