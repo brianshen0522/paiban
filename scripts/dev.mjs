@@ -43,6 +43,7 @@ const env = {
     'dl.subdl.com': `${sources}/subdl-dl`,
     'api.subdl.com': `${sources}/subdl`,
     'api.themoviedb.org': `${sources}/tmdb`,
+    'image.tmdb.org': `${sources}/tmdb-img`,
     'yts-subs.com': `${sources}/yify`,
     'subtitles.yts-subs.com': `${sources}/yify-dl`,
     'api.assrt.net': `${sources}/assrt`,

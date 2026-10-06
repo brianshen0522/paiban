@@ -147,7 +147,14 @@ export const t = {
     western: '西部',
   } as Record<string, string>,
 
+  rating: {
+    tmdb: 'TMDB',
+    imdb: 'IMDb',
+    title: (source: string) => `評分來源：${source}`,
+  },
+
   movie: {
+    onTmdb: '在 TMDB 查看',
     backToSearch: '← 回到搜尋',
     runtime: (n: number) => `${n} 分鐘`,
     capacity: (used: string, limit: string, free: string) => `容量：已用 ${used}，上限 ${limit}，還能放 ${free}。`,
@@ -358,7 +365,7 @@ export const t = {
       keyEmpty: '沒有輸入新的值，維持原設定。',
       tmdb: 'TMDB（片名與編號對照）',
       tmdbLead:
-        '用來把 YTS 給的 IMDb 編號換成 TMDB 編號（JustSubtitles 需要），並取得中文片名（射手網的關鍵字搜尋需要）。',
+        '搜尋和電影頁的中文片名、中文簡介、海報和評分都來自 TMDB；字幕查詢也用 TMDB 的編號。沒有金鑰時改用 YTS 的英文資料和 IMDb 評分。',
       tmdbKey: 'API 金鑰',
       tmdbKeyName: 'TMDB 金鑰',
       tmdbHelp: '在 TMDB 帳號設定裡免費申請。',

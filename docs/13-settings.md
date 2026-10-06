@@ -58,7 +58,7 @@ API 的形狀是 `packages/shared/src/contracts/api.ts` 的 `Settings`、`Settin
 
 | 名稱 | 用途 | 沒有設定時 |
 | --- | --- | --- |
-| `tmdbKey` | IMDb 編號換 TMDB 編號（JustSubtitles 需要）；取得中文片名（射手網的搜尋需要） | JustSubtitles 改用片名比對（可能對不到）；射手網只用英文片名查；電影沒有中文片名 |
+| `tmdbKey` | 搜尋和電影頁的中文片名、中文簡介、海報、評分（Brian，2026-10-06）；IMDb 編號換 TMDB 編號（JustSubtitles 需要）；射手網搜尋用的中文片名 | 片名、簡介是 YTS 的英文，海報是 YTS 的，評分是 YTS 給的 IMDb 評分（標「IMDb」）；JustSubtitles 改用片名比對（可能對不到）；射手網只用英文片名查 |
 | `subdlKey` | JustSubtitles 的備援模式 | 備援模式不能用 |
 | `assrtToken` | 射手網（偽） | 這個來源顯示「還沒設定」，其他來源不受影響 |
 | `llmKey` | 自動對齊用的語言模型（`align.llm`）：Anthropic 的 API 金鑰，或 OpenAI 相容服務的金鑰 | Claude：字幕和片中語言不同時不配對，自動對齊照舊只看人聲。OpenAI 相容：不帶金鑰送出（本機的 Ollama 通常不需要） |

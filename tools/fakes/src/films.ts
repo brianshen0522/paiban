@@ -325,3 +325,53 @@ export function catalogue(baseUrl: string, local: LocalVersion[] = []): YtsMovie
     };
   });
 }
+
+/**
+ * What a fake TMDB knows about the same films (Chinese titles and plots from the prototype). The
+ * rating is set a little apart from YTS's IMDb figure, so a page shows which one it used.
+ */
+const ZH: Record<string, [title: string, plot: string, color: string]> = {
+  notld: ['活死人之夜', '一群陌生人躲進鄉間農舍，門外是不斷聚集的活死人，屋裡的人卻先吵了起來。', '#3a2c2c'],
+  charade: ['謎中謎', '丈夫離奇身亡後，一筆失蹤的鉅款讓她被三個男人追著跑，唯一幫她的人身分卻一變再變。', '#7a2f3a'],
+  hisgirl: ['小報妙冤家', '報社主編想留住準備再婚的前妻兼王牌記者，最好的辦法就是丟給她一條大新聞。', '#2f4a6b'],
+  lastman: ['地球最後一人', '瘟疫過後只剩他一個活人，白天獵殺、夜裡死守，日復一日過了三年。', '#4a4f39'],
+  metropolis: ['大都會', '未來都市分成地上的享樂者與地下的勞工，一個機器人被造出來挑起兩邊的衝突。', '#8a6a1f'],
+  stranger: ['陌生人', '戰犯化名躲在小鎮當老師，追查他的調查員只有一條線索：他對鐘錶的著迷。', '#26323d'],
+  scarlet: ['血紅街道', '中年出納員迷上年輕女子，被她和情人一步步騙走了畫作、積蓄與人生。', '#8c2b22'],
+  shop: ['恐怖小店', '花店小店員養的怪植物只吃一種東西，而且胃口越來越大。', '#2f5a3c'],
+  plan9: ['外太空九號計劃', '外星人為了阻止人類造出毀滅性武器，決定讓死人復活。', '#3d2f63'],
+  carnival: ['', '車禍中唯一生還的女子搬到新城市，卻不斷被一座廢棄遊樂場和一張蒼白的臉吸引。', '#4b4b55'],
+  haunted: ['', '富翁邀五個陌生人到鬧鬼的大宅過夜，撐到天亮的人各得一萬美元。', '#5a3d1e'],
+  general: ['將軍號', '南北戰爭中，火車司機單槍匹馬去追被搶走的火車頭，和車上的未婚妻。', '#6b4a2a'],
+  nosferatu: ['吸血鬼', '房地產經紀人遠赴古堡簽約，把一位不該請進城的伯爵帶回了家鄉。', '#1f3a3a'],
+  doa: ['', '他走進警局報案：被謀殺的人是他自己，毒發前只剩幾天找出兇手。', '#2c2c33'],
+};
+
+export type TmdbFake = {
+  imdb: string;
+  tmdbId: number;
+  title: string;
+  originalTitle: string;
+  overview: string;
+  voteAverage: number;
+  voteCount: number;
+  posterPath: string;
+  color: string;
+};
+
+export function tmdbCatalogue(): TmdbFake[] {
+  return F.map((f) => {
+    const [zh, plot, color] = ZH[f.slug] ?? ['', '', '#333333'];
+    return {
+      imdb: `tt${String(9_000_000 + f.id).padStart(7, '0')}`,
+      tmdbId: 900_000 + f.id,
+      title: zh || f.title,
+      originalTitle: f.title,
+      overview: plot,
+      voteAverage: Math.round((f.rating - 0.4) * 10) / 10,
+      voteCount: 500 + f.id * 37,
+      posterPath: `/fake-${f.slug}.png`,
+      color,
+    };
+  });
+}

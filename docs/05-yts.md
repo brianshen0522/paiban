@@ -181,3 +181,15 @@ DHT 是開著的，所以 tracker 全部失效時通常還是找得到 peers，�
 ## 開發與測試用的假 YTS
 
 自動化測試和本機開發**不連真的 YTS**。請做一個假的 YTS（同樣的兩個端點、同樣的回應形狀），片單可以直接用原型裡那 14 部公有領域的老片（`prototype/platform/src/app1.js` 的 `MOVIES`）。其中一部的某個版本要對應到本機測試用的 torrent，讓整條流程能在沒有網路的情況下跑完。做法在 [15-testing.md](15-testing.md)。
+
+## 電影資料改用 TMDB（Brian，2026-10-06）
+
+YTS 只負責「有哪些片、有哪些版本可以下載」。人看到的電影資料改用 TMDB：用 YTS 給的 IMDb 編號呼叫一次 `GET /3/find/<imdb>?external_source=imdb_id&language=zh-TW`，拿到 TMDB 編號、中文片名、中文簡介、海報路徑和評分（`apps/server/src/tmdb/tmdb.ts`）。
+
+- 結果存在 `provider_cache`（`tmdb`、`film:<imdb>`）一週；TMDB 不認得的片存一天。片子已經在資料庫時，順便寫入 `movies.tmdb_id` 和 `title_zh`，字幕來源就直接用 TMDB 編號。
+- 搜尋頁一頁 24 部，快取以外的同時最多問 6 個，最多等 2.5 秒；沒等到的這次先用 YTS 的資料，答案照樣存進快取給下一次用。
+- 評分：TMDB 有 5 票以上時用 TMDB 的，否則用 YTS 的 IMDb 評分。頁面上寫明來源。
+- 海報：有 TMDB 海報就經由這個伺服器抓 `image.tmdb.org/t/p/w342/…`（瀏覽器不直接連 TMDB，D30），沒有才用 YTS 的封面。
+- 沒有 TMDB 金鑰、或金鑰被拒時，全部退回 YTS 的資料；金鑰被拒會在來源設定的 TMDB 卡片顯示。
+- IMDb 編號還是保留：YTS 和 YIFY Subtitles 只認得它。
+

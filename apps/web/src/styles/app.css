@@ -1600,3 +1600,8 @@ fieldset.field > legend {
     transition: none;
   }
 }
+
+/* An outside link on the film page (TMDB): the site's link colour, not the browser's blue. */
+#view .minfo a {
+  color: var(--accent-ink);
+}

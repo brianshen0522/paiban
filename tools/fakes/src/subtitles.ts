@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { fileURLToPath } from 'node:url';
+import { deflateSync } from 'node:zlib';
+import { tmdbCatalogue } from './films.ts';
 
 /**
  * The fake subtitle sources (docs/15-testing.md, "假的字幕來源"): one HTTP server that answers for
@@ -20,6 +22,7 @@ export type FakeSource =
   | 'subdl'
   | 'subdl-dl'
   | 'tmdb'
+  | 'tmdb-img'
   | 'yify'
   | 'yify-dl'
   | 'assrt'
@@ -47,6 +50,42 @@ export type FakeSources = {
 const repo = (p: string) => fileURLToPath(new URL(`../../../${p}`, import.meta.url));
 const recorded = (f: string) => readFileSync(repo(`reference/providers/${f}`), 'utf8');
 
+/** A plain PNG of one colour, the size of a TMDB w342 poster: enough to see a poster arrive. */
+function solidPng(hex: string, w = 342, h = 513): Buffer {
+  const [r, g, b] = [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16));
+  const row = Buffer.alloc(1 + w * 3);
+  for (let x = 0; x < w; x++) row.set([r ?? 0, g ?? 0, b ?? 0], 1 + x * 3);
+  const raw = Buffer.concat(Array.from({ length: h }, () => row));
+  const crcTable = Array.from({ length: 256 }, (_, n) => {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    return c >>> 0;
+  });
+  const crc = (buf: Buffer) => {
+    let c = 0xffffffff;
+    for (const byte of buf) c = (crcTable[(c ^ byte) & 0xff] ?? 0) ^ (c >>> 8);
+    return (c ^ 0xffffffff) >>> 0;
+  };
+  const chunk = (type: string, data: Buffer) => {
+    const len = Buffer.alloc(4);
+    len.writeUInt32BE(data.length);
+    const body = Buffer.concat([Buffer.from(type), data]);
+    const sum = Buffer.alloc(4);
+    sum.writeUInt32BE(crc(body));
+    return Buffer.concat([len, body, sum]);
+  };
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(w, 0);
+  ihdr.writeUInt32BE(h, 4);
+  ihdr.set([8, 2, 0, 0, 0], 8);
+  return Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', ihdr),
+    chunk('IDAT', deflateSync(raw)),
+    chunk('IEND', Buffer.alloc(0)),
+  ]);
+}
+
 export const INCEPTION = { imdb: 'tt1375666', tmdb: 27205 } as const;
 
 export async function startFakeSources(
@@ -63,6 +102,7 @@ export async function startFakeSources(
   const jsMissing = recorded('justsubtitles.subtitles.missing.sample.json');
   const jsSearch = JSON.parse(recorded('justsubtitles.search.sample.json'));
   const tmdbFind = recorded('tmdb.find.sample.json');
+  const tmdbFilms = tmdbCatalogue();
   const yifyMovie = recorded('yify.movie-page.sample.html');
   const yifySub = recorded('yify.subtitle-page.sample.html');
   const assrtSearch = recorded('assrt.search.sample.json');
@@ -116,8 +156,35 @@ export async function startFakeSources(
         if (!auth && !key) return send(401, '{"status_code":7,"status_message":"Invalid API key"}');
         if ((key ?? auth ?? '').includes('rejected')) return send(401, '{"status_code":7}');
         const m = /^\/3\/find\/(tt\d+)$/.exec(path);
-        if (isInception(m?.[1])) return send(200, tmdbFind);
+        const film = tmdbFilms.find((f) => f.imdb === m?.[1]);
+        // A film answered as Inception keeps Inception's TMDB id (the subtitle sources know only
+        // that one) but its own title, overview and poster.
+        if (isInception(m?.[1]) && !film) return send(200, tmdbFind);
+        if (film)
+          return send(
+            200,
+            JSON.stringify({
+              movie_results: [
+                {
+                  id: isInception(film.imdb) ? INCEPTION.tmdb : film.tmdbId,
+                  title: film.title,
+                  original_title: film.originalTitle,
+                  overview: film.overview,
+                  poster_path: film.posterPath,
+                  vote_average: film.voteAverage,
+                  vote_count: film.voteCount,
+                  media_type: 'movie',
+                },
+              ],
+              person_results: [],
+              tv_results: [],
+            }),
+          );
         return send(200, '{"movie_results":[],"person_results":[],"tv_results":[]}');
+      }
+      case 'tmdb-img': {
+        const film = tmdbFilms.find((f) => path.endsWith(f.posterPath));
+        return film ? send(200, solidPng(film.color), 'image/png') : send(404, 'not found', 'text/plain');
       }
       case 'subdl': {
         const key = url.searchParams.get('api_key');
@@ -195,6 +262,7 @@ export function fakeSourceOverrides(base: string): Record<string, string> {
     'dl.subdl.com': `${base}/subdl-dl`,
     'api.subdl.com': `${base}/subdl`,
     'api.themoviedb.org': `${base}/tmdb`,
+    'image.tmdb.org': `${base}/tmdb-img`,
     'yts-subs.com': `${base}/yify`,
     'subtitles.yts-subs.com': `${base}/yify-dl`,
     'api.assrt.net': `${base}/assrt`,

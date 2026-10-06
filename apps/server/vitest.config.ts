@@ -8,5 +8,8 @@ export default defineConfig({
     globalSetup: ['test/global-setup.ts'],
     testTimeout: 30_000,
     hookTimeout: 60_000,
+    // Several files run real downloads, ffmpeg and timing checks: more at once than this starves
+    // them on a modest machine and turns load into flaky failures.
+    maxWorkers: 4,
   },
 });

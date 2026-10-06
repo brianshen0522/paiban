@@ -113,7 +113,7 @@
 
 ## 對外請求
 
-伺服器會連出去的地方只有：YTS、TMDB、三個字幕來源和它們的下載主機、BitTorrent。前四類都經過一個共用的 HTTP 用戶端，它負責：
+伺服器會連出去的地方只有：YTS、TMDB（`api.themoviedb.org`，以及海報的 `image.tmdb.org`）、三個字幕來源和它們的下載主機、BitTorrent。前四類都經過一個共用的 HTTP 用戶端，它負責：
 
 - **主機白名單**：每個來源有固定的清單（見 [07-subtitle-providers.md](07-subtitle-providers.md)），YTS 的是管理員設定的那個主機。不在清單裡的網址不連。
 - **擋內部位址**：DNS 解析後，如果是私有網段、loopback、link-local、或 IPv6 的對應範圍，不連。這包含管理員自己填的 YTS 網址和 YIFY 網址（防止有人把它指到內部服務）。判斷位址是不是內部的，用 Node 內建的 `net.BlockList`，或把範圍明白列出來並寫測試；**不要用 npm 上的 `ip` 套件**，它的 `isPublic` / `isPrivate` 有已知的誤判（GHSA-2p57-rm9w-gvfp）。

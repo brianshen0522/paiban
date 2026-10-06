@@ -4,6 +4,7 @@ import { Fragment, useState } from 'react';
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router';
 import { Banner, Chip, Skeleton } from '../components/Bits';
 import { Poster } from '../components/Poster';
+import { Rating } from '../components/Rating';
 import { SpaceShort } from '../components/SpaceShort';
 import { useToast } from '../components/Toasts';
 import { UsageBar } from '../components/Usage';
@@ -45,19 +46,26 @@ export function MoviePage() {
       <div className="mhead">
         <Poster url={m.posterUrl} title={m.title} year={m.year} runtimeMin={m.runtimeMin} size="lg" />
         <div className="minfo">
-          <h1>{m.title}</h1>
+          <h1>{m.titleZh ?? m.title}</h1>
           <p className="sub">
             {[
-              m.titleZh,
+              m.titleZh ? m.title : null,
               String(m.year),
               m.runtimeMin > 0 ? t.movie.runtime(m.runtimeMin) : null,
               m.genres.map(genreLabel).join('、') || null,
             ]
               .filter(Boolean)
               .join(' · ')}{' '}
-            · <span className="mono">★ {m.rating.toFixed(1)}</span>
+            · <Rating m={m} />
           </p>
           {m.summary && <p className="plot">{m.summary}</p>}
+          {m.tmdbUrl && (
+            <p>
+              <a href={m.tmdbUrl} target="_blank" rel="noopener noreferrer">
+                {t.movie.onTmdb} ↗
+              </a>
+            </p>
+          )}
           <p className="sub">
             {t.movie.capacity(bytes(m.usage.usedBytes), bytes(m.usage.limitBytes), bytes(m.usage.freeBytes))}
           </p>

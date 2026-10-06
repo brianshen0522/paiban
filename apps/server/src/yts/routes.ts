@@ -10,10 +10,24 @@ import { ApiError } from '../http/errors.js';
 import { parse, requireUser } from '../http/guards.js';
 import { OutboundError, outboundFetch } from '../net/outbound.js';
 import { recordSourceHealth } from '../settings/health.js';
+import { readSecret } from '../settings/secrets.js';
 import { readSettings } from '../settings/settings.js';
 import { predictDirectPlay, previewPlan, readUsage } from '../storage/usage.js';
+import {
+  filmsFor,
+  TMDB_IMAGE_HOST,
+  type TmdbEnv,
+  type TmdbFilm,
+  tmdbFilm,
+  tmdbPageUrl,
+  tmdbPosterUrl,
+} from '../tmdb/tmdb.js';
 import { posterUrl, selectTorrents, statusOf } from '../torrents/view.js';
 import { cacheGet, cachePut, YtsClient, type YtsMovie, type YtsPage } from './client.js';
+
+export function tmdbEnv(deps: Deps): TmdbEnv {
+  return { pool: deps.pool, outbound: deps.outbound, log: deps.log, key: () => readSecret(deps, 'tmdbKey') };
+}
 
 export async function ytsClient(deps: Deps): Promise<YtsClient> {
   const { yts } = await readSettings(deps.pool);
@@ -103,7 +117,11 @@ export function ytsRoutes(app: FastifyInstance, deps: Deps): void {
       [ids, user.id],
     );
     const byId = new Map(local.map((l) => [l.yts_id, l]));
-    const items: MovieSummary[] = page.movies.map((m) => summary(m, byId.get(m.ytsId)));
+    const tmdb = await filmsFor(
+      tmdbEnv(deps),
+      page.movies.map((m) => ({ imdb: m.imdbCode, title: m.title })),
+    );
+    const items: MovieSummary[] = page.movies.map((m) => summary(m, byId.get(m.ytsId), tmdb.get(m.imdbCode)));
     return { items, total: page.total, page: p.page, pageSize: SEARCH_PAGE_SIZE };
   });
 
@@ -156,9 +174,11 @@ export function ytsRoutes(app: FastifyInstance, deps: Deps): void {
       : rows.some((r) => r.holders.some((h) => h.id === user.id))
         ? 'downloading'
         : 'none';
+    const film = await tmdbFilm(tmdbEnv(deps), movie.imdbCode, movie.title).catch(() => null);
     const detail: MovieDetail = {
-      ...summary(movie, { title_zh: zh?.title_zh ?? null, mine }),
-      summary: movie.summary,
+      ...summary(movie, { title_zh: zh?.title_zh ?? null, mine }, film),
+      summary: film?.overview ?? movie.summary,
+      tmdbUrl: film ? tmdbPageUrl(film.tmdbId) : null,
       language: movie.language,
       versions,
       usage,
@@ -196,15 +216,19 @@ async function baseUrl(deps: Deps): Promise<string> {
 function summary(
   m: YtsMovie,
   local?: { title_zh: string | null; mine: 'none' | 'downloading' | 'ready' },
+  film?: TmdbFilm | null,
 ): MovieSummary {
+  const tmdbRating = film?.rating ?? null;
   return {
     ytsId: m.ytsId,
     imdbCode: m.imdbCode,
+    tmdbId: film?.tmdbId ?? null,
     title: m.title,
-    titleZh: local?.title_zh ?? null,
+    titleZh: film?.titleZh ?? local?.title_zh ?? null,
     year: m.year,
     runtimeMin: m.runtimeMin,
-    rating: m.rating,
+    rating: tmdbRating ?? m.rating,
+    ratingSource: tmdbRating !== null ? 'tmdb' : 'imdb',
     genres: m.genres,
     posterUrl: posterUrl(m.ytsId),
     qualities: [...new Set(m.torrents.map((t) => t.quality))],
@@ -222,6 +246,12 @@ export async function fetchPoster(deps: Deps, ytsId: number): Promise<{ type: st
   const base = await baseUrl(deps);
   if (!base) return null;
   const { movie } = await getMovie(deps, ytsId);
+  // TMDB's poster first (Brian, 2026-10-06), YTS's cover when TMDB has none or no key is set.
+  const film = await tmdbFilm(tmdbEnv(deps), movie.imdbCode, movie.title).catch(() => null);
+  if (film?.posterPath) {
+    const fromTmdb = await image(deps, tmdbPosterUrl(film.posterPath), (h) => h === TMDB_IMAGE_HOST);
+    if (fromTmdb) return fromTmdb;
+  }
   if (!movie.coverUrl) return null;
   const host = new URL(base).hostname;
   const allow = (h: string) => h === host || h.endsWith(`.${host}`);
@@ -232,14 +262,19 @@ export async function fetchPoster(deps: Deps, ytsId: number): Promise<{ type: st
     return null;
   }
   if (!allow(url.hostname)) return null;
+  // Redirects are followed only within the YTS host and its subdomains (yts.gg sends covers to
+  // img.yts.gg); `allow` is checked again after every hop.
+  return image(deps, url.toString(), allow);
+}
+
+/** One image from an allowed host: only images, at most 2 MB. */
+async function image(
+  deps: Deps,
+  url: string,
+  allow: (host: string) => boolean,
+): Promise<{ type: string; body: Buffer } | null> {
   try {
-    // Redirects are followed only within the YTS host and its subdomains (yts.gg sends covers to
-    // img.yts.gg); `allow` is checked again after every hop.
-    const res = await outboundFetch(deps.outbound, url.toString(), {
-      allow,
-      maxBytes: 2 * 1024 * 1024,
-      timeoutMs: 10_000,
-    });
+    const res = await outboundFetch(deps.outbound, url, { allow, maxBytes: 2 * 1024 * 1024, timeoutMs: 10_000 });
     const type = (res.headers.get('content-type') ?? '').split(';')[0]?.trim() ?? '';
     if (res.status !== 200 || !IMAGE_TYPES.includes(type)) return null;
     return { type, body: res.body };

@@ -138,11 +138,15 @@ export type MovieSummary = {
   ytsId: number;
   imdbCode: string;
   title: string;
+  /** TMDB's id for the film, once it has been looked up (a TMDB key is configured). */
+  tmdbId: number | null;
   /** From TMDB when a key is configured, otherwise null. */
   titleZh: string | null;
   year: number;
   runtimeMin: number;
+  /** TMDB's rating when TMDB has one with enough votes; otherwise the IMDb rating YTS gives. */
   rating: number;
+  ratingSource: 'tmdb' | 'imdb';
   genres: string[];
   /** Always a path on this server; browsers never contact YTS. */
   posterUrl: string;
@@ -152,7 +156,10 @@ export type MovieSummary = {
 };
 
 export type MovieDetail = MovieSummary & {
+  /** TMDB's zh-TW overview when it has one, otherwise YTS's English summary. */
   summary: string;
+  /** The film's page on TMDB, opened in a new tab (D30); null before a TMDB lookup. */
+  tmdbUrl: string | null;
   language: string | null;
   versions: Version[];
   usage: Usage;

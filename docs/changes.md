@@ -16,6 +16,14 @@
 
 ---
 
+## 2026-10-06 電影資料改用 TMDB，取代 IMDb
+
+- 原本：搜尋和電影頁的片名、簡介、海報、評分都是 YTS 給的（評分是 IMDb 的）；TMDB 只用來換編號和查中文片名。
+- 改成：有 TMDB 金鑰時，中文片名（放在前面）、中文簡介、海報、評分都來自 TMDB，評分標明來源，電影頁有「在 TMDB 查看」。沒有金鑰時退回 YTS。合約多了 `MovieSummary.tmdbId`、`ratingSource`，`MovieDetail.tmdbUrl`。篩選和排序的評分仍是 YTS 的 IMDb 評分（只有它能篩整個片庫）。
+- 原因：Brian 在對話裡要求「use TMDB API, replace imdb」，範圍選了全部（評分、電影資料、TMDB 連結、字幕查詢用 TMDB 編號）。
+- 改了哪些檔案：docs/05-yts.md、docs/11-pages.md、docs/12-auth.md、docs/13-settings.md、packages/shared/src/contracts/api.ts
+- Brian 是否已確認：是（他提出的）
+
 ## 2026-10-06 外觀改成角落的一個按鈕
 
 - 原本：外觀是一組三選一的按鈕（淺色／深色／跟隨系統），放在帳號選單、個人設定、登入頁底部。

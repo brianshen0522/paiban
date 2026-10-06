@@ -3,6 +3,7 @@ import { type FormEvent, useEffect, useState } from 'react';
 import { Link, useOutletContext, useSearchParams } from 'react-router';
 import { Banner, Chip, Empty, PageHead } from '../components/Bits';
 import { Poster } from '../components/Poster';
+import { Rating } from '../components/Rating';
 import { t } from '../copy/zh-TW';
 import { ApiFailure } from '../lib/api';
 import { useSearch } from '../lib/queries';
@@ -149,10 +150,10 @@ function MovieCard({ m }: { m: MovieSummary }) {
   return (
     <Link to={`/movies/${m.ytsId}`} className="mcard">
       <Poster url={m.posterUrl} title={m.title} year={m.year} runtimeMin={m.runtimeMin} />
-      <span className="mt">{m.title}</span>
+      <span className="mt">{m.titleZh ?? m.title}</span>
       <span className="ms">
-        {m.titleZh ? `${m.titleZh} · ` : ''}
-        {m.year} · <span className="mono">★ {m.rating.toFixed(1)}</span>
+        {m.titleZh ? `${m.title} · ` : ''}
+        {m.year} · <Rating m={m} />
       </span>
       <span className="qs">
         {m.qualities.map((q) => (
