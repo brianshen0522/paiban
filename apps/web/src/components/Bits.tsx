@@ -51,8 +51,11 @@ export function Progress({ value, bad = false, label }: { value: number; bad?: b
 }
 
 /**
- * The in-place confirmation (docs/11-pages.md, "確認框的樣式"): a red box where the button was,
- * the consequences in words, a red button and "not now". Esc cancels; focus moves into it.
+ * The confirmation before a destructive action (docs/11-pages.md, "確認框的樣式"): a modal dialog
+ * over the page, so the list or card it came from keeps its size (Brian, 2026-10-06: a red box
+ * opening inside a card made it grow). The consequences in words, a red button and "not now".
+ * Focus starts on "not now", so Enter does not delete; Esc or a click outside cancels; focus goes
+ * back to the button that opened it.
  */
 export function ConfirmInline({
   text,
@@ -67,25 +70,52 @@ export function ConfirmInline({
   onConfirm: () => void;
   onCancel: () => void;
 }) {
-  const ref = useRef<HTMLButtonElement>(null);
+  const dialog = useRef<HTMLDialogElement>(null);
+  const cancel = useRef<HTMLButtonElement>(null);
+  const textId = useId();
+  const cancelRef = useRef(onCancel);
+  cancelRef.current = onCancel;
   useEffect(() => {
-    ref.current?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onCancel();
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onCancel]);
+    const d = dialog.current;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    if (d && !d.open) {
+      if (typeof d.showModal === 'function') d.showModal();
+      else d.setAttribute('open', '');
+    }
+    cancel.current?.focus();
+    return () => {
+      if (d?.open && typeof d.close === 'function') d.close();
+      opener?.focus();
+    };
+  }, []);
   return (
-    <div className="confirm">
-      <p>{text}</p>
-      <div className="frow">
-        <button type="button" className="danger" onClick={onConfirm} disabled={busy} ref={ref}>
-          {confirmLabel}
-        </button>
-        <button type="button" onClick={onCancel}>
-          {t.common.notNow}
-        </button>
+    // biome-ignore lint/a11y/useKeyWithClickEvents: the backdrop click is a pointer shortcut; the keyboard has Esc and "not now"
+    <dialog
+      ref={dialog}
+      className="cdialog"
+      aria-labelledby={textId}
+      onCancel={(e) => {
+        // Esc: the parent decides, by unmounting this.
+        e.preventDefault();
+        if (!busy) cancelRef.current();
+      }}
+      onClick={(e) => {
+        // A click on the backdrop lands on the dialog element itself.
+        if (e.target === e.currentTarget && !busy) cancelRef.current();
+      }}
+    >
+      <div className="cdialog-body">
+        <p id={textId}>{text}</p>
+        <div className="cdialog-act">
+          <button type="button" onClick={onCancel} ref={cancel} disabled={busy}>
+            {t.common.notNow}
+          </button>
+          <button type="button" className="danger" onClick={onConfirm} disabled={busy}>
+            {confirmLabel}
+          </button>
+        </div>
       </div>
-    </div>
+    </dialog>
   );
 }
 
