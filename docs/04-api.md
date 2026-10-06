@@ -106,7 +106,7 @@
 | 端點 | 權限 | 行為 |
 | --- | --- | --- |
 | `GET /api/torrents/:id/candidates` | 持有人 | 各來源的狀態、候選清單、排名是否進行中、字幕庫的搜尋連結 |
-| `POST /api/torrents/:id/subtitle-search` | 持有人 | 替每個啟用的來源排入一次查詢，**立刻回傳**（各來源是 `running`）。每個來源完成時發 `candidates` 事件。帶 `provider` 時只查那一個。有還沒過期的快取就用快取；`refresh: true` 略過快取（「重新搜尋」和「重試」都帶它） |
+| `POST /api/torrents/:id/subtitle-search` | 持有人 | 替每個啟用的來源排入一次查詢，**立刻回傳**（各來源是 `running`；回應在任何來源開始跑之前讀出，所以一定是 `running`，即使像沒有 token 的射手網那樣馬上就結束的來源也一樣）。每個來源完成時發 `candidates` 事件。帶 `provider` 時只查那一個。有還沒過期的快取就用快取；`refresh: true` 略過快取（「重新搜尋」和「重試」都帶它） |
 | `POST /api/torrents/:id/candidates/rank` | 持有人 | 把所選語言的候選（最多 30 條）都抓下來並自動對齊一次，依分數排名。選了繁體中文時，這部片所有中文的候選都算在內。立刻回傳，進度靠 `candidates` 事件。沒有人聲資料（分析還沒好，或分析失敗了）回 `MEDIA_NOT_READY`；介面在這種情況下本來就把按鈕停用並說明原因。已經有一次排名在跑就直接回現況，不重複啟動 |
 | `POST /api/torrents/:id/uploads` | 持有人 | 上傳一個字幕檔或壓縮檔，上限 20 MB。副檔名不對回 `UNSUPPORTED_FILE`，太大回 `UPLOAD_TOO_LARGE`。檔案一收到，清單上就多一條「處理中」的候選；內容在背景處理，讀不了的話那條候選變成失敗並帶原因（`fetchError`） |
 | `POST /api/candidates/:id/add` | 持有人 | 把候選加入這部片。還沒抓檔的先抓，**最多等 30 秒**。抓不到回 `CANDIDATE_UNAVAILABLE`，`details.reason` 是原因：候選的 `fetchError`，或 `TIMEOUT`（背景還在抓，晚一點再按一次）。`convertToTraditional` 沒給就用呼叫者的偏好。內容和既有字幕完全相同回 `SUBTITLE_DUPLICATE` |

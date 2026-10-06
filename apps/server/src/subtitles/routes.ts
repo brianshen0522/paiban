@@ -238,10 +238,13 @@ export function subtitleRoutes(app: FastifyInstance, deps: Deps): void {
            started_at = excluded.started_at, finished_at = null, error_code = null, retry_at = null`,
         [id, p, body.languages],
       );
-      worker.search(id, p, !!body.refresh);
     }
     await publishCandidates(pool, events, id);
-    return list(user, id, body.languages);
+    // The answer says what this request started, so it is read before any source runs: one with
+    // nothing to ask (射手網 without a token) could otherwise finish in between and show as done.
+    const answer = await list(user, id, body.languages);
+    for (const p of targets) worker.search(id, p, !!body.refresh);
+    return answer;
   });
 
   /** All chosen-language candidates fetched and aligned once, best score per language marked (docs/07, "全部自動對齊並排名"). */

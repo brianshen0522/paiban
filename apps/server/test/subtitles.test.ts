@@ -219,6 +219,19 @@ describe('keys (docs/13-settings.md, "金鑰")', () => {
 });
 
 describe('searching (docs/07)', () => {
+  it('answers with what it started, even for a source that has nothing to ask and finishes at once', async () => {
+    // 射手網 without a token fails without a request; it used to be able to finish before the answer
+    // was read, and the answer then said "error" where it should say "running" (seen under load).
+    for (let i = 0; i < 20; i++) {
+      const r = await call(t.app, 'POST', `/api/torrents/${inception.tid}/subtitle-search`, {
+        cookie: mei,
+        body: { languages: ['en'], provider: 'assrt' },
+      });
+      expect(r.json().providers.find((p: { id: string }) => p.id === 'assrt').state).toBe('running');
+      await t.app.subtitleWorker.idle();
+    }
+  });
+
   it('answers at once with every source running, then fills in each one on its own', async () => {
     const res = await call(t.app, 'POST', `/api/torrents/${inception.tid}/subtitle-search`, {
       cookie: mei,
