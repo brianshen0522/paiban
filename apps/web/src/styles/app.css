@@ -2036,3 +2036,15 @@ fieldset.field > legend {
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+
+/* "Confirm anyway?" under the workbench's confirm button: a question, not a warning. */
+#view .confirm.bench-ask {
+  justify-self: end;
+  max-width: 520px;
+  background: var(--accent-wash);
+  border-color: var(--accent-fill);
+}
+#view .bench-ask-error {
+  justify-self: end;
+  margin: 0;
+}

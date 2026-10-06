@@ -156,6 +156,8 @@ function Bench({ ws, detail }: { ws: Workspace; detail: SubtitleDetail }) {
   const [allowSplit, setAllowSplit] = useState(true);
   const [aligning, setAligning] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [askConfirm, setAskConfirm] = useState<number | null>(null);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
   const [speed, setSpeed] = useState(1);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playingCue, setPlayingCue] = useState(-1);
@@ -735,16 +737,19 @@ function Bench({ ws, detail }: { ws: Workspace; detail: SubtitleDetail }) {
 
   const confirm = useLatest(async (force = false) => {
     const left = docRef.current.checkpoints.filter((c) => c.status !== 'ok').length;
+    // Asked right under the button: the message bar is below the timeline, out of sight from here.
     if (left && !force) {
-      say(t.bench.msg.pending(left), [
-        { label: t.bench.msg.confirmAnyway, run: () => void confirm(true) },
-        { label: t.bench.msg.listenNext, run: () => cpNext() },
-      ]);
+      setAskConfirm(left);
       return;
     }
+    setAskConfirm(null);
+    setConfirmError(null);
     setConfirming(true);
     try {
-      if (!(await save())) return;
+      if (!(await save())) {
+        setConfirmError(t.bench.msg.confirmFailed);
+        return;
+      }
       const s = await post<Subtitle>(`/api/subtitles/${sub.id}/confirm`, {
         rev: savedRef.current.rev,
         ...(left ? { force: true } : {}),
@@ -768,7 +773,11 @@ function Bench({ ws, detail }: { ws: Workspace; detail: SubtitleDetail }) {
         conflictRef.current = true;
         setConflict(c);
         setSaveState('conflict');
-      } else say(asFailure(e).code === 'NETWORK' ? t.common.offline : t.bench.msg.confirmFailed);
+      } else {
+        const text = asFailure(e).code === 'NETWORK' ? t.common.offline : t.bench.msg.confirmFailed;
+        say(text);
+        setConfirmError(text);
+      }
     } finally {
       setConfirming(false);
     }
@@ -1176,6 +1185,23 @@ function Bench({ ws, detail }: { ws: Workspace; detail: SubtitleDetail }) {
           </button>
         </div>
       </header>
+
+      {confirmError && (
+        <p className="bad bench-ask-error" role="alert">
+          {confirmError}
+        </p>
+      )}
+      {askConfirm !== null && (
+        <ConfirmAsk
+          left={askConfirm}
+          onConfirm={() => void confirm(true)}
+          onListen={() => {
+            setAskConfirm(null);
+            cpNext();
+          }}
+          onCancel={() => setAskConfirm(null)}
+        />
+      )}
 
       {removed && <Banner tone="warn">{t.bench.msg.removedElsewhere}</Banner>}
 
@@ -1621,6 +1647,45 @@ function Bench({ ws, detail }: { ws: Workspace; detail: SubtitleDetail }) {
           ))}
         </dl>
       </details>
+    </div>
+  );
+}
+
+/** "Some checkpoints are not heard yet": asked next to the confirm button, focus on the answer. */
+function ConfirmAsk({
+  left,
+  onConfirm,
+  onListen,
+  onCancel,
+}: {
+  left: number;
+  onConfirm: () => void;
+  onListen: () => void;
+  onCancel: () => void;
+}) {
+  const first = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    first.current?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onCancel();
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onCancel]);
+  return (
+    <div className="confirm bench-ask" role="alertdialog" aria-labelledby="bench-ask-text">
+      <p id="bench-ask-text">
+        <Rich text={t.bench.msg.pending(left)} />
+      </p>
+      <div className="frow">
+        <button type="button" className="primary" ref={first} onClick={onConfirm}>
+          {t.bench.msg.confirmAnyway}
+        </button>
+        <button type="button" onClick={onListen}>
+          {t.bench.msg.listenNext}
+        </button>
+        <button type="button" onClick={onCancel}>
+          {t.common.notNow}
+        </button>
+      </div>
     </div>
   );
 }
