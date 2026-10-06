@@ -7,13 +7,6 @@ import { Shell } from './components/Shell';
 import { t } from './copy/zh-TW';
 import { ApiFailure } from './lib/api';
 import { useMe } from './lib/queries';
-import { AuditPage } from './pages/admin/AuditPage';
-import { DownloadSettingsPage } from './pages/admin/DownloadSettingsPage';
-import { OverviewPage } from './pages/admin/OverviewPage';
-import { SourcesPage } from './pages/admin/SourcesPage';
-import { StorageAdminPage } from './pages/admin/StorageAdminPage';
-import { SystemPage } from './pages/admin/SystemPage';
-import { UsersPage } from './pages/admin/UsersPage';
 import { DownloadsPage } from './pages/DownloadsPage';
 import { LibraryPage } from './pages/LibraryPage';
 import { LoginPage } from './pages/LoginPage';
@@ -24,7 +17,6 @@ import { ResetPage } from './pages/ResetPage';
 import { SearchPage } from './pages/SearchPage';
 import { ForbiddenPage, NotFoundPage } from './pages/StatusPages';
 import { StoragePage } from './pages/StoragePage';
-import { WorkspacePage } from './pages/workspace/WorkspacePage';
 
 /** Signed-in area: not signed in goes to /login and comes back afterwards (docs/11-pages.md, "路徑"). */
 function RequireAuth() {
@@ -69,6 +61,17 @@ function RequireAdmin() {
   return me.user.role === 'admin' ? <Outlet context={me} /> : <ForbiddenPage />;
 }
 
+/**
+ * The film workspace (with the sync workbench) and the administrator pages load on first visit:
+ * most visits never open them, and together they were most of the bundle.
+ */
+function workspace(tab: 'subtitles' | 'sync' | 'export') {
+  return async () => {
+    const { WorkspacePage } = await import('./pages/workspace/WorkspacePage');
+    return { Component: () => <WorkspacePage tab={tab} /> };
+  };
+}
+
 export const routes: RouteObject[] = [
   { path: '/login', element: <LoginPage /> },
   { path: '/invite/:code?', element: <RegisterPage /> },
@@ -82,22 +85,33 @@ export const routes: RouteObject[] = [
       { path: 'downloads', element: <DownloadsPage /> },
       { path: 'library', element: <LibraryPage /> },
       { path: 'library/:torrentId', element: <Navigate to="subtitles" replace /> },
-      { path: 'library/:torrentId/subtitles', element: <WorkspacePage tab="subtitles" /> },
-      { path: 'library/:torrentId/sync/:subtitleId?', element: <WorkspacePage tab="sync" /> },
-      { path: 'library/:torrentId/export', element: <WorkspacePage tab="export" /> },
+      { path: 'library/:torrentId/subtitles', lazy: workspace('subtitles') },
+      { path: 'library/:torrentId/sync/:subtitleId?', lazy: workspace('sync') },
+      { path: 'library/:torrentId/export', lazy: workspace('export') },
       { path: 'storage', element: <StoragePage /> },
       { path: 'profile', element: <ProfilePage /> },
       {
         path: 'admin',
         element: <RequireAdmin />,
         children: [
-          { index: true, element: <OverviewPage /> },
-          { path: 'users', element: <UsersPage /> },
-          { path: 'audit', element: <AuditPage /> },
-          { path: 'storage', element: <StorageAdminPage /> },
-          { path: 'sources', element: <SourcesPage /> },
-          { path: 'downloads', element: <DownloadSettingsPage /> },
-          { path: 'system', element: <SystemPage /> },
+          { index: true, lazy: async () => ({ Component: (await import('./pages/admin/OverviewPage')).OverviewPage }) },
+          { path: 'users', lazy: async () => ({ Component: (await import('./pages/admin/UsersPage')).UsersPage }) },
+          { path: 'audit', lazy: async () => ({ Component: (await import('./pages/admin/AuditPage')).AuditPage }) },
+          {
+            path: 'storage',
+            lazy: async () => ({ Component: (await import('./pages/admin/StorageAdminPage')).StorageAdminPage }),
+          },
+          {
+            path: 'sources',
+            lazy: async () => ({ Component: (await import('./pages/admin/SourcesPage')).SourcesPage }),
+          },
+          {
+            path: 'downloads',
+            lazy: async () => ({
+              Component: (await import('./pages/admin/DownloadSettingsPage')).DownloadSettingsPage,
+            }),
+          },
+          { path: 'system', lazy: async () => ({ Component: (await import('./pages/admin/SystemPage')).SystemPage }) },
         ],
       },
       { path: '*', element: <NotFoundPage /> },
