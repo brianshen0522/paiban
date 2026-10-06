@@ -461,6 +461,11 @@ export type AlignResult = {
     support: number;
     via: 'text' | 'llm' | 'timing';
     llmError: LlmErrorCode | null;
+    /**
+     * Seconds the reference itself is off from the film's detected speech, when it clearly is;
+     * null when it fits or there is no speech to check against. The reference is followed either way.
+     */
+    offBy: number | null;
   } | null;
   /** Ids of lines at the start or end that match nothing in the reference and look like credits: offered for deletion. */
   extraLines: number[];

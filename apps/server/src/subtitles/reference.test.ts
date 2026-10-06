@@ -3,7 +3,7 @@ import { SyncCore } from '@paiban/shared';
 import { describe, expect, it } from 'vitest';
 import { sameLanguagePairs } from '../asr/align.js';
 import { computeReferenceAlignment } from './align.js';
-import { extraLines, referenceLines, referenceSpeech, referenceTranscript } from './reference.js';
+import { extraLines, referenceLines, referenceOffBy, referenceSpeech, referenceTranscript } from './reference.js';
 
 type Cue = SyncCore.Cue;
 
@@ -139,6 +139,20 @@ describe('aligning to the reference', () => {
     expect(r.extraLines).toEqual([1, 2]);
     // Scored against the film's own speech, like any alignment.
     expect(r.score).toBeGreaterThan(r.scoreBefore);
+  });
+
+  it('says when the reference itself is off from the film, and follows it anyway', () => {
+    const lateRef = referenceLines(film.late, SyncCore.identityDoc());
+    expect(referenceOffBy(film.speech, ref.lines, 60)).toBeNull();
+    expect(referenceOffBy(film.speech, lateRef, 60)).toBeCloseTo(2.4, 0);
+    const r = computeReferenceAlignment({ subtitleId: 'late', lines: lateRef }, foreign(film.truth), {
+      allowSplit: false,
+      filmSpeech: film.speech,
+    });
+    expect(r.reference?.offBy).toBeCloseTo(2.4, 0);
+    expect(Math.abs((r.segments[0]?.offset ?? 0) - 2.37)).toBeLessThan(0.15);
+    // Without the film's speech there is nothing to check against.
+    expect(computeReferenceAlignment(ref, foreign(film.late), { allowSplit: false }).reference?.offBy).toBeNull();
   });
 
   it('offers nothing for deletion when every line has its place', () => {

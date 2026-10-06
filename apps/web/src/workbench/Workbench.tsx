@@ -568,6 +568,8 @@ function Bench({ ws, detail }: { ws: Workspace; detail: SubtitleDetail }) {
       if (ref) {
         const name = langName(ws.subtitles.find((x) => x.id === ref.subtitleId)?.language ?? '');
         text += ref.via === 'text' ? t.bench.msg.refPaired(name, ref.pairs, ref.support) : t.bench.msg.refTiming(name);
+        // Followed either way; but if the reference itself is off from the film's speech, say so.
+        if (ref.offBy != null) text += t.bench.msg.refOff(name, ref.offBy.toFixed(1));
       }
       // Lines the reference has nothing for: offered, never deleted without the person saying so.
       const extra = r.extraLines ?? [];

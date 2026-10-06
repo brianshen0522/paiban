@@ -931,6 +931,8 @@ export const t = {
       } as Record<string, string>,
       refPaired: (lang: string, pairs: number, support: number) =>
         `和${lang}字幕的文字配出 ${pairs} 對，這次的結果符合其中 ${support} 對。`,
+      refOff: (lang: string, sec: string) =>
+        `注意：${lang}字幕本身和片中人聲差了約 ${sec} 秒，可能沒對準；這次的結果也會跟著差這麼多。先聽幾個檢查點；不對的話按「復原」，改用「自動對齊」，或先把${lang}字幕對好。`,
       refTiming: (lang: string) => `兩條字幕語言不同，只依${lang}字幕每句出現的時間對齊。`,
       refExtra: (lines: string) => `第 ${lines} 句在另一條字幕裡找不到對應，看起來是片頭片尾的製作資訊。`,
       refDelete: (n: number) => `刪除這 ${n} 句`,

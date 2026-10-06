@@ -4,7 +4,14 @@ import { join } from 'node:path';
 import { type AlignResult, type Cue, type SpeechData, SyncCore, type SyncDoc } from '@paiban/shared';
 import type { HeardPairs } from '../asr/align.js';
 import { fitPairs, pickWithPairs } from '../asr/fit.js';
-import { creditIndexes, extraLines, foldEdgeSegments, type RefLine, referenceSpeech } from './reference.js';
+import {
+  creditIndexes,
+  extraLines,
+  foldEdgeSegments,
+  type RefLine,
+  referenceOffBy,
+  referenceSpeech,
+} from './reference.js';
 import { parseSrt } from './text.js';
 
 /**
@@ -148,6 +155,7 @@ export function computeReferenceAlignment(
       support: r.heard?.support ?? 0,
       via: pairs ? (heard.via === 'llm' ? 'llm' : 'text') : 'timing',
       llmError: heard.llmError,
+      offBy: opts.filmSpeech ? referenceOffBy(opts.filmSpeech, ref.lines, MAX_OFFSET_SECONDS) : null,
     },
     extraLines: extraLines(cues, segments, ref.lines),
   };

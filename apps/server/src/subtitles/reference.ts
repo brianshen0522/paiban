@@ -66,6 +66,29 @@ export function referenceTranscript(lines: readonly RefLine[], language: string,
   };
 }
 
+/** Moving this far to fit the film's speech, the reference is off. */
+const OFF_SECONDS = 1;
+/** And the fit has to improve at least this much, so a film with unclear speech does not raise alarms. */
+const OFF_GAIN = 0.03;
+
+/**
+ * How far the reference itself is from the film's detected speech, when it clearly is (more than
+ * a second, with a real gain in fit); null when it fits. A reference marked confirmed can still be
+ * wrong, and everything aligned to it would be wrong the same way.
+ */
+export function referenceOffBy(film: SpeechData, lines: readonly RefLine[], radius: number): number | null {
+  if (lines.length < 8) return null;
+  const sp = SyncCore.makeSpeech(film);
+  const cues: Cue[] = lines.map((l, i) => ({ id: i + 1, start: l.start, end: l.end, text: l.text }));
+  const seg = SyncCore.autoAlign(sp, cues, { allowSplit: false, radius }).segments[0];
+  if (!seg) return null;
+  const moved = SyncCore.applyDoc(cues, { segments: [seg], edits: {} });
+  const off = Math.max(...cues.map((c, i) => Math.abs((moved[i]?.start ?? c.start) - c.start)));
+  const gain =
+    SyncCore.totalScore(sp, moved) - SyncCore.totalScore(sp, SyncCore.applyDoc(cues, SyncCore.identityDoc()));
+  return off > OFF_SECONDS && gain > OFF_GAIN ? Math.round(off * 10) / 10 : null;
+}
+
 /** Words that give away a line about the subtitle rather than the film. */
 const CREDITS =
   /(https?:\/\/|www\.|\.(com|net|org|tv|cc|io)\b|@|字幕|翻譯|翻译|校對|校对|時間軸|时间轴|压制|壓制|片源|subtitle|subbed|subs by|synced|sync by|resync|corrected by|opensubtitles|subscene|addic7ed|podnapisi|yify|yts\b|rarbg|advertise|support us|become a vip)/i;
