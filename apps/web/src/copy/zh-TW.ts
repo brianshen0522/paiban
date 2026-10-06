@@ -973,6 +973,7 @@ export const t = {
     tcols: { kind: '任務', item: '項目', state: '狀態', note: '說明', action: '動作' },
     kinds: {
       analyze: '分析波形與人聲',
+      asr: '語音辨識',
       preview: '轉預覽檔',
       align: '自動對齊',
       rank: '字幕排名',

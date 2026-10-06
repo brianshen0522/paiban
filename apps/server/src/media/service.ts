@@ -62,7 +62,7 @@ export class MediaService {
     await pool.query(`update exports set state = 'queued', progress = 0 where state = 'running'`);
     await pool.query(`update subtitle_candidates set align_state = 'queued' where align_state = 'running'`);
     await pool.query(
-      `update tasks set state = 'queued' where state = 'running' and kind in ('analyze', 'preview', 'export', 'rank', 'rescan')`,
+      `update tasks set state = 'queued' where state = 'running' and kind in ('analyze', 'asr', 'preview', 'export', 'rank', 'rescan')`,
     );
     // Nobody waits for an interrupted alignment any more: the request that asked for it is gone.
     await pool.query(
@@ -84,14 +84,15 @@ export class MediaService {
       quality: string;
       source_type: string;
       video_codec: string;
-      kind: 'analyze' | 'preview';
+      kind: 'analyze' | 'asr' | 'preview';
     }>(
       pool,
       `select mf.id, mf.torrent_id, m.title, t.quality, t.source_type, t.video_codec, k.kind
          from media_files mf join torrents t on t.id = mf.torrent_id join movies m on m.id = t.movie_id
-         cross join lateral (values ('analyze'), ('preview')) as k(kind)
+         cross join lateral (values ('analyze'), ('asr'), ('preview')) as k(kind)
         where t.want <> 'remove'
           and ((k.kind = 'analyze' and mf.analysis_state = 'pending')
+            or (k.kind = 'asr' and mf.analysis_state = 'ready' and mf.asr_state = 'pending')
             or (k.kind = 'preview' and mf.probe_state <> 'failed' and 'pending' in (mf.audio_state, mf.proxy_state)))
           and not exists (select 1 from tasks x where x.kind = k.kind and x.input->>'mediaId' = mf.id::text and x.state in ('queued', 'running'))`,
     );
@@ -105,7 +106,7 @@ export class MediaService {
     // Tasks whose subject is gone (the film was removed): nothing to do any more.
     await pool.query(
       `update tasks set state = 'cancelled', finished_at = now()
-        where state in ('queued', 'running') and kind in ('analyze', 'preview')
+        where state in ('queued', 'running') and kind in ('analyze', 'asr', 'preview')
           and not exists (select 1 from media_files mf join torrents t on t.id = mf.torrent_id
                            where mf.id::text = tasks.input->>'mediaId' and t.want <> 'remove')`,
     );
@@ -210,7 +211,7 @@ export class MediaService {
     return (this.cooling.get(id) ?? 0) > Date.now();
   }
 
-  private async task(kind: 'analyze' | 'preview', mediaId: string): Promise<string | null> {
+  private async task(kind: 'analyze' | 'asr' | 'preview', mediaId: string): Promise<string | null> {
     const t = await one<{ id: string }>(
       this.d.pool,
       `select id from tasks where kind = $1 and input->>'mediaId' = $2 and state in ('queued', 'running') order by created_at limit 1`,
@@ -235,7 +236,8 @@ export class MediaService {
     const result = await analysisJob(this.d, row, await this.task('analyze', row.id));
     if (result === 'retry') this.cooling.set(row.id, Date.now() + 60_000);
     if (result === 'skipped') this.cooling.set(row.id, Date.now() + 5_000);
-    if (result === 'done') this.kick('asr');
+    // Recognition is queued now: reconciling gives it its task row, then starts it.
+    if (result === 'done') void this.reconcile().catch((err) => this.d.log.error({ err }, 'reconcile failed'));
     return true;
   }
 
@@ -247,7 +249,7 @@ export class MediaService {
     );
     const row = rows.find((r) => !this.cool(`asr:${r.id}`));
     if (!row) return false;
-    const result = await asrJob(this.d, row);
+    const result = await asrJob(this.d, row, await this.task('asr', row.id));
     if (result === 'skipped') this.cooling.set(`asr:${row.id}`, Date.now() + 5_000);
     return true;
   }

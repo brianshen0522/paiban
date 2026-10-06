@@ -305,10 +305,18 @@ const AsrOutput = z.object({
  * never the whole film. The result, asr.json, is what auto-align pairs subtitle lines with. A
  * failure only means auto-align works without it; it is not retried by itself.
  */
-export async function asrJob(d: JobDeps, row: MediaRow): Promise<'done' | 'failed' | 'skipped'> {
+export async function asrJob(
+  d: JobDeps,
+  row: MediaRow,
+  taskId: string | null = null,
+): Promise<'done' | 'failed' | 'skipped'> {
   const { pool, config, log } = d;
   if (!(await readSettings(pool)).align.asr) {
     await pool.query(`update media_files set asr_state = 'none' where id = $1 and asr_state = 'pending'`, [row.id]);
+    if (taskId)
+      await pool.query(`update tasks set state = 'cancelled', finished_at = now() where id = $1 and state = 'queued'`, [
+        taskId,
+      ]);
     await notify(pool, row.torrent_id);
     return 'skipped';
   }
@@ -318,6 +326,11 @@ export async function asrJob(d: JobDeps, row: MediaRow): Promise<'done' | 'faile
     [row.id],
   );
   if (!claimed.rowCount) return 'skipped';
+  if (taskId)
+    await pool.query(`update tasks set state = 'running', started_at = coalesce(started_at, now()) where id = $1`, [
+      taskId,
+    ]);
+  await pool.query(`select pg_notify('paiban_events', '{"type":"task"}')`);
   await notify(pool, row.torrent_id);
   const work = workDir(config, `asr-${row.id}`);
   try {
@@ -355,11 +368,27 @@ export async function asrJob(d: JobDeps, row: MediaRow): Promise<'done' | 'faile
       { mediaId: row.id, language: transcript.language, lines: transcript.segments.length },
       'speech recognised',
     );
+    if (taskId)
+      await pool.query(`update tasks set state = 'done', progress = 1, finished_at = now() where id = $1`, [taskId]);
+    await pool.query(`select pg_notify('paiban_events', '{"type":"task"}')`);
     await notify(pool, row.torrent_id, true);
     return 'done';
   } catch (err) {
-    if (err instanceof Cancelled) return 'skipped';
+    if (err instanceof Cancelled) {
+      if (taskId)
+        await pool.query(
+          `update tasks set state = 'cancelled', finished_at = now() where id = $1 and state in ('queued', 'running')`,
+          [taskId],
+        );
+      return 'skipped';
+    }
     log.warn({ err, mediaId: row.id }, 'speech recognition failed');
+    if (taskId)
+      await pool.query(
+        `update tasks set state = 'failed', error_code = 'ASR_FAILED', finished_at = now() where id = $1 and state = 'running'`,
+        [taskId],
+      );
+    await pool.query(`select pg_notify('paiban_events', '{"type":"task"}')`);
     await pool.query(
       `update media_files set asr_state = 'failed', error = coalesce(error, '{}'::jsonb) || '{"asr": "ASR_FAILED"}'::jsonb, updated_at = now()
         where id = $1 and asr_state = 'running'`,

@@ -24,7 +24,7 @@ type TaskRow = {
   finished_at: Date | null;
 };
 
-const RETRYABLE: TaskKind[] = ['analyze', 'preview', 'rescan'];
+const RETRYABLE: TaskKind[] = ['analyze', 'asr', 'preview', 'rescan'];
 
 export function toTask(r: TaskRow): Task {
   return {
@@ -79,14 +79,23 @@ export function systemRoutes(app: FastifyInstance, deps: Deps): void {
     const t = await one<TaskRow>(pool, `${TASKS} where id = $1`, [id]);
     if (!t) throw new ApiError('NOT_FOUND', 'no such task');
     if (t.state !== 'failed' || !RETRYABLE.includes(t.kind))
-      throw new ApiError('VALIDATION', 'only failed analysis, preview and recalculation tasks can be retried', {
-        fields: { id: 'NOT_RETRYABLE' },
-      });
+      throw new ApiError(
+        'VALIDATION',
+        'only failed analysis, recognition, preview and recalculation tasks can be retried',
+        {
+          fields: { id: 'NOT_RETRYABLE' },
+        },
+      );
     const mediaId = t.input.mediaId;
     if (t.kind === 'analyze' && mediaId) {
       await pool.query(
         `update media_files set analysis_state = 'pending', error = error - 'analysis',
                 probe_state = case when probe_state = 'failed' then 'pending' else probe_state end where id = $1 and analysis_state in ('none', 'failed')`,
+        [mediaId],
+      );
+    } else if (t.kind === 'asr' && mediaId) {
+      await pool.query(
+        `update media_files set asr_state = 'pending', error = error - 'asr' where id = $1 and asr_state = 'failed'`,
         [mediaId],
       );
     } else if (t.kind === 'preview' && mediaId) {

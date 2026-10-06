@@ -383,7 +383,7 @@ create index audit_log_actor on audit_log (actor_id, id desc);
 -- is what the UI reads, what a retry starts from, and how a job hands its answer back to the API.
 create table tasks (
   id          uuid primary key default gen_random_uuid(),
-  kind        text not null check (kind in ('analyze', 'preview', 'align', 'rank', 'export', 'rescan')),
+  kind        text not null check (kind in ('analyze', 'asr', 'preview', 'align', 'rank', 'export', 'rescan')),
   torrent_id  uuid references torrents (id) on delete set null,
   subject     jsonb not null default '{}'::jsonb,       -- what the UI needs to name it: {movieTitle, version, language, fileName}
   input       jsonb not null default '{}'::jsonb,       -- ids and options the job was started with; never subtitle text

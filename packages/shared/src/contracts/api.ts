@@ -580,7 +580,7 @@ export type SourceHealth = {
   data: Record<string, string | number>;
 };
 
-export type TaskKind = 'analyze' | 'preview' | 'align' | 'rank' | 'export' | 'rescan';
+export type TaskKind = 'analyze' | 'asr' | 'preview' | 'align' | 'rank' | 'export' | 'rescan';
 
 export type Task = {
   id: Id;
