@@ -24,10 +24,10 @@ export const t = {
   },
 
   theme: {
-    label: '外觀',
     light: '淺色',
     dark: '深色',
     system: '跟隨系統',
+    toggle: (now: string, next: string) => `外觀：${now}。按一下切換成${next}`,
   },
 
   auth: {
@@ -1053,8 +1053,6 @@ export const t = {
     displayName: '顯示名稱',
     saveName: '儲存名稱',
     nameSaved: '名稱已儲存。',
-    appearance: '外觀',
-    appearanceHelp: '只影響這台裝置。',
     subtitles: '字幕偏好',
     langs: '預設要找的語言',
     keepOneLang: '至少要保留一種語言。',

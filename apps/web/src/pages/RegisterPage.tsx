@@ -2,6 +2,7 @@ import { type Me, SITE_NAME } from '@paiban/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
+import { ThemeToggle } from '../components/ThemeToggle';
 import { useToast } from '../components/Toasts';
 import { t } from '../copy/zh-TW';
 import { ApiFailure, get, post } from '../lib/api';
@@ -131,6 +132,7 @@ export function RegisterPage() {
 
   return (
     <div className="auth">
+      <ThemeToggle className="corner" />
       <form className="box" onSubmit={submit} noValidate ref={formRef}>
         <div className="mark">
           <i aria-hidden="true" />

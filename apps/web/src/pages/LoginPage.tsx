@@ -2,7 +2,7 @@ import { type Me, SITE_NAME } from '@paiban/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { type FormEvent, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
-import { ThemePicker } from '../components/ThemePicker';
+import { ThemeToggle } from '../components/ThemeToggle';
 import { t } from '../copy/zh-TW';
 import { ApiFailure, post } from '../lib/api';
 import { keys } from '../lib/queries';
@@ -58,6 +58,7 @@ export function LoginPage() {
 
   return (
     <div className="auth">
+      <ThemeToggle className="corner" />
       <form className="box" onSubmit={submit} noValidate>
         <div className="mark">
           <i aria-hidden="true" />
@@ -99,9 +100,6 @@ export function LoginPage() {
           <Link to="/invite">{t.auth.inviteHint}</Link>
         </p>
         <p className="alt">{t.auth.forgotHint}</p>
-        <div className="auth-foot">
-          <ThemePicker />
-        </div>
       </form>
     </div>
   );

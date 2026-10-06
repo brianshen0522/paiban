@@ -3,7 +3,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { type FormEvent, useState } from 'react';
 import { useOutletContext } from 'react-router';
 import { Banner, Chip, Field, PageHead, Skeleton, Switch } from '../components/Bits';
-import { ThemePicker } from '../components/ThemePicker';
 import { useToast } from '../components/Toasts';
 import { t } from '../copy/zh-TW';
 import { ApiFailure, del, get, patch, post } from '../lib/api';
@@ -19,11 +18,6 @@ export function ProfilePage() {
     <>
       <PageHead title={t.profile.title} lead={t.profile.lead} />
       <NameCard me={me} />
-      <section className="card">
-        <h2>{t.profile.appearance}</h2>
-        <ThemePicker hideLegend />
-        <p className="sub">{t.profile.appearanceHelp}</p>
-      </section>
       <PrefsCard prefs={me.user.prefs} />
       <PasswordCard />
       <DevicesCard />

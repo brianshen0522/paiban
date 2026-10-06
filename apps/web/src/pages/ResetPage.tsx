@@ -2,6 +2,7 @@ import { SITE_NAME } from '@paiban/shared';
 import { useQuery } from '@tanstack/react-query';
 import { type FormEvent, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
+import { ThemeToggle } from '../components/ThemeToggle';
 import { useToast } from '../components/Toasts';
 import { t } from '../copy/zh-TW';
 import { ApiFailure, get, post } from '../lib/api';
@@ -43,6 +44,7 @@ export function ResetPage() {
 
   return (
     <div className="auth">
+      <ThemeToggle className="corner" />
       <form className="box" onSubmit={submit} noValidate>
         <div className="mark">
           <i aria-hidden="true" />

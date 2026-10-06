@@ -7,7 +7,7 @@ import { post } from '../lib/api';
 import { useServerEvents } from '../lib/events';
 import { bytes } from '../lib/format';
 import { keys, useNotifications, useStorage, useTorrents } from '../lib/queries';
-import { ThemePicker } from './ThemePicker';
+import { ThemeToggle } from './ThemeToggle';
 import { useToast } from './Toasts';
 import { meterLevel } from './Usage';
 
@@ -174,6 +174,7 @@ export function Shell({ me }: { me: Me }) {
               {usage ? `${bytes(usage.usedBytes)} / ${bytes(usage.limitBytes)}` : t.shell.usageUnknown}
             </span>
           </Link>
+          <ThemeToggle />
           <div className="popwrap" ref={notesRef}>
             <button
               type="button"
@@ -230,9 +231,6 @@ export function Shell({ me }: { me: Me }) {
                   <span>
                     <strong>{me.user.displayName}</strong> <span className="sub">{t.shell.role[me.user.role]}</span>
                   </span>
-                </div>
-                <div className="pad">
-                  <ThemePicker />
                 </div>
                 <Link className="pop-item" to="/profile">
                   <span>{t.shell.profile}</span>

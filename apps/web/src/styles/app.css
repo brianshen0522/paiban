@@ -375,6 +375,7 @@ label.chk {
 
 /* sign-in */
 .auth {
+  position: relative;
   min-height: 100%;
   display: grid;
   place-items: center;
@@ -423,10 +424,6 @@ label.chk {
 .auth .alt {
   color: var(--ink-3);
   font-size: 13px;
-}
-.auth-foot {
-  border-top: 1px dashed var(--line-strong);
-  padding-top: 14px;
 }
 .field {
   display: grid;
@@ -1380,6 +1377,10 @@ fieldset.field > legend {
   .top .right {
     margin-left: auto;
   }
+  /* Room for the appearance button: the numbers stay, the little bar goes. */
+  .top .meter .bar {
+    display: none;
+  }
 }
 
 /* Phones: a wide table becomes one small card per row (the versions table), each value labelled. */
@@ -1564,4 +1565,38 @@ fieldset.field > legend {
 }
 #view .feed small {
   color: var(--ink-3);
+}
+
+/* The appearance button (Brian, 2026-10-06): one icon in a corner; each press rolls to the next. */
+.theme-toggle {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 50%;
+  flex: none;
+}
+.theme-toggle .theme-roll {
+  display: grid;
+  transition: transform 0.45s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+.theme-toggle svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.theme-toggle.corner {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .theme-toggle .theme-roll {
+    transition: none;
+  }
 }
