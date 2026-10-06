@@ -16,6 +16,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { llmHeard } from '../asr/align.js';
 import { audit } from '../audit.js';
+import { AttemptLimiter } from '../auth/ratelimit.js';
 import { prefsOf } from '../auth/users.js';
 import { one, pgCode, tx, UNIQUE_VIOLATION } from '../db/pool.js';
 import { NOTIFICATION_JSON, publishCandidates, publishSubtitle } from '../events/publish.js';
@@ -168,6 +169,8 @@ const langTag = (l: string) => (l === 'zh-Hant' || l === 'zh' ? 'zh-TW' : l === 
 /* ---------------------------------------------------------------- routes */
 
 export function subtitleRoutes(app: FastifyInstance, deps: Deps): void {
+  /** Auto-align presses per person: 20 in any 10 minutes. */
+  const alignLimiter = new AttemptLimiter(20, 10 * 60_000);
   const { pool, config, events } = deps;
   const worker = new SubtitleWorker(deps);
   app.decorate('subtitleWorker', worker);
@@ -563,6 +566,10 @@ export function subtitleRoutes(app: FastifyInstance, deps: Deps): void {
   /** Computed in the media service; the stored document is not touched (docs/09, "自動對齊"). */
   app.post('/api/subtitles/:id/auto-align', async (req) => {
     const user = requireUser(req);
+    // Each press may ask a paid language model a dozen questions (docs/08, "語言模型").
+    const wait = alignLimiter.retryAfter(user.id);
+    if (wait > 0) throw new ApiError('RATE_LIMITED', 'too many alignments', { retryAfterSeconds: wait });
+    alignLimiter.record(user.id);
     const { id } = parse(IdParams, req.params);
     const { allowSplit } = parse(z.object({ allowSplit: z.boolean() }), req.body);
     const { s, t } = await holderSubtitle(user, id);

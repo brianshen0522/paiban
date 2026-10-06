@@ -859,6 +859,8 @@ export const t = {
         TIMEOUT: '等太久沒有回應',
       } as Record<string, string>,
       alignFailed: '自動對齊沒有成功。可以再試一次，或用對齊點手動對。',
+      alignTooOften: (minutes: number) =>
+        `自動對齊按得太頻繁了，請 ${minutes} 分鐘後再試。這段時間可以用吸附、位移或對齊點手動調。`,
       alignNoSpeech: '還沒有人聲資料，不能自動對齊。分析完成後再試，或用對齊點手動對。',
       snapNone: '已經貼齊人聲，沒有移動。',
       snapped: (earlier: boolean, ms: number, off: string) =>

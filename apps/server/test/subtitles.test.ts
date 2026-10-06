@@ -723,3 +723,29 @@ describe('permissions (docs/12-auth.md, "誰能做什麼")', () => {
     expect(w.exportNeedBytes).toBe(Math.ceil(1000 * 1.01) + 1024 * 1024);
   });
 });
+
+describe('auto-align limit (docs/08, "語言模型")', () => {
+  it('lets one person press auto-align 20 times in ten minutes, then says how long to wait', async () => {
+    await createUser(db.pool, 'busy_aligner');
+    const cookie = await login(t.app, 'busy_aligner');
+    const press = () =>
+      call(t.app, 'POST', '/api/subtitles/00000000-0000-4000-8000-00000000abcd/auto-align', {
+        cookie,
+        body: { allowSplit: true },
+      });
+    for (let i = 0; i < 20; i++) expect((await press()).statusCode).toBe(404);
+    const blocked = await press();
+    expect(blocked.statusCode).toBe(429);
+    expect(blocked.json().error).toMatchObject({ code: 'RATE_LIMITED' });
+    expect(blocked.json().error.details.retryAfterSeconds).toBeGreaterThan(500);
+    // Someone else is not affected.
+    expect(
+      (
+        await call(t.app, 'POST', '/api/subtitles/00000000-0000-4000-8000-00000000abcd/auto-align', {
+          cookie: mei,
+          body: { allowSplit: true },
+        })
+      ).statusCode,
+    ).toBe(404);
+  });
+});

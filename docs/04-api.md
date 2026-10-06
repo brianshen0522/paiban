@@ -111,7 +111,7 @@
 | `GET /api/torrents/:id/subtitles` | 持有人 | 這部片已加入的字幕 |
 | `GET /api/subtitles/:id` | 持有人 | 字幕、句子清單、同步文件 |
 | `PUT /api/subtitles/:id/doc` | 持有人 | 儲存同步文件。`rev` 和資料庫裡的不一樣就回 `REVISION_CONFLICT`，`details` 帶目前的 `rev`、`doc` 和最後修改的人。`segments` 或 `edits` 和資料庫裡的不同時，狀態變回草稿；只動到對齊點或檢查點不會。每次儲存都重算分數，並通知其他持有人的畫面。帶 `reason`（`auto-align` 或 `reset`）時另外存一份歷史 |
-| `POST /api/subtitles/:id/auto-align` | 持有人 | 算出建議的分段並回傳，**不會改動儲存的文件**（由前端套用後再存，這樣才能復原）。沒有人聲資料回 `MEDIA_NOT_READY`。字幕和片中語言不同、而且設定了語言模型時，先用語言模型配對辨識結果（最多 45 秒，見 08 的「語言模型」）。工作通常 1 到 5 秒，端點等它完成才回應；兩種方法都失敗、或 60 秒內沒有結果，回 `ALIGN_FAILED`。結果的 `heard` 說語音辨識貢獻了什麼 |
+| `POST /api/subtitles/:id/auto-align` | 持有人 | 算出建議的分段並回傳，**不會改動儲存的文件**（由前端套用後再存，這樣才能復原）。沒有人聲資料回 `MEDIA_NOT_READY`。字幕和片中語言不同、而且設定了語言模型時，先用語言模型配對辨識結果（最多 45 秒，見 08 的「語言模型」）。工作通常 1 到 5 秒，端點等它完成才回應；兩種方法都失敗、或 60 秒內沒有結果，回 `ALIGN_FAILED`。結果的 `heard` 說語音辨識貢獻了什麼。每人每 10 分鐘最多 20 次，超過回 `RATE_LIMITED`（`details.retryAfterSeconds`） |
 | `POST /api/subtitles/:id/confirm` | 持有人 | `rev` 要是最新的（不是的話回 `REVISION_CONFLICT`）。還有檢查點沒通過時，要帶 `force: true` 才接受（前端會先問使用者）；沒帶就回 `VALIDATION`，`details.fields` 是 `{force: 'CHECKPOINTS_PENDING'}`。成功後狀態是已確認，存一份歷史，通知其他持有人 |
 | `GET /api/subtitles/:id/file` | 持有人 | 下載字幕檔（SRT、UTF-8）。`synced=true` 是套用同步文件之後的版本，否則是原始時間 |
 | `DELETE /api/subtitles/:id` | 持有人 | 刪掉這條字幕和它的同步結果。已經匯出的 MKV 不受影響 |

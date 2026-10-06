@@ -559,9 +559,13 @@ function Bench({ ws, detail }: { ws: Workspace; detail: SubtitleDetail }) {
       say(
         f.code === 'MEDIA_NOT_READY'
           ? t.bench.msg.alignNoSpeech
-          : f.code === 'NETWORK'
-            ? t.common.offline
-            : t.bench.msg.alignFailed,
+          : f.code === 'RATE_LIMITED'
+            ? t.bench.msg.alignTooOften(
+                f.details && 'retryAfterSeconds' in f.details ? Math.ceil(f.details.retryAfterSeconds / 60) : 1,
+              )
+            : f.code === 'NETWORK'
+              ? t.common.offline
+              : t.bench.msg.alignFailed,
       );
     } finally {
       setAligning(false);
