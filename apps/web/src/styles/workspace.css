@@ -110,6 +110,19 @@ button[aria-pressed="true"] {
   color: var(--ink);
   border-bottom-color: var(--line-strong);
 }
+/* Phones: one row that scrolls sideways rather than tabs stacked on two lines. */
+@media (max-width: 480px) {
+  #view .tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  #view .tabs button {
+    flex: none;
+    padding-right: 10px;
+    margin-right: 6px;
+  }
+}
 #view .tabs button small {
   font-size: 12px;
   color: var(--ink-3);

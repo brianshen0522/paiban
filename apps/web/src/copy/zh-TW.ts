@@ -405,6 +405,16 @@ export const t = {
     sources: {
       title: '來源設定',
       lead: '電影搜尋、字幕各來源和自動對齊的連線設定。金鑰儲存後不會再顯示。',
+      tabsLabel: '設定分類',
+      tabs: { movies: '電影資料', subtitles: '字幕來源', align: '自動對齊' },
+      tabNotes: {
+        ok: '都正常',
+        untested: '還有沒測試的',
+        down: (n: number) => `${n} 個連不上`,
+        warn: (n: number) => `${n} 個有狀況`,
+        align: (asr: boolean, llm: string) => `語音辨識${asr ? '開' : '關'} · ${llm}`,
+        llm: { none: '不用語言模型', anthropic: 'Claude', openai: 'OpenAI 相容' } as Record<string, string>,
+      },
       yts: 'YTS（電影搜尋）',
       ytsUrl: 'YTS 網址',
       ytsHelp: 'YTS 的網域常常更換。程式不會自己找新網域，換了之後在這裡改。',

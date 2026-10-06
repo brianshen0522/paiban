@@ -1,6 +1,7 @@
 import type { AlignModelCheck, Lang, SecretName, Settings, SourceCheck, SourceHealth, SourceId } from '@paiban/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { type FormEvent, type ReactNode, useEffect, useState } from 'react';
+import { type FormEvent, type KeyboardEvent, type ReactNode, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { Banner, Chip, Field, PageHead, Skeleton, Switch } from '../../components/Bits';
 import { useToast } from '../../components/Toasts';
 import { t } from '../../copy/zh-TW';
@@ -11,7 +12,7 @@ import { fieldMessage } from './fieldMessages';
 
 const c = () => t.admin.sources;
 
-/** docs/11-pages.md, "來源設定": one card per source, then the shared settings and auto-align. */
+/** docs/11-pages.md, "來源設定": three tabs (Brian, 2026-10-06: one long page was too long). */
 export function SourcesPage() {
   const s = useAdminSettings();
   return (
@@ -33,69 +34,130 @@ export function SourcesPage() {
   );
 }
 
+const TABS = ['movies', 'subtitles', 'align'] as const;
+type Tab = (typeof TABS)[number];
+const isTab = (v: string | null): v is Tab => TABS.includes(v as Tab);
+
+/** One line under a tab: the worst state among its sources, so a problem shows without opening it. */
+function healthNote(states: (SourceHealth | undefined)[]): string {
+  const down = states.filter((h) => h?.state === 'down').length;
+  const warn = states.filter((h) => h?.state === 'warn').length;
+  if (down) return c().tabNotes.down(down);
+  if (warn) return c().tabNotes.warn(warn);
+  if (states.some((h) => !h?.checkedAt && h?.state !== 'off')) return c().tabNotes.untested;
+  return c().tabNotes.ok;
+}
+
 function Cards({ data }: { data: AdminSettings }) {
+  const [params, setParams] = useSearchParams();
+  const asked = params.get('tab');
+  const tab: Tab = isTab(asked) ? asked : 'movies';
+  const go = (k: Tab) => setParams({ tab: k }, { replace: true });
   const health = (id: SourceHealth['id']) => data.sources.find((x) => x.id === id);
   const p = data.settings.providers;
   const secrets = data.info.secrets;
+  const llm = data.settings.align.llm.provider;
+  const notes: Record<Tab, string> = {
+    movies: healthNote([health('yts'), health('tmdb')]),
+    subtitles: healthNote(
+      (['justsubtitles', 'yify', 'assrt'] as const).filter((id) => p[id].enabled).map((id) => health(id)),
+    ),
+    align: c().tabNotes.align(data.settings.align.asr, c().tabNotes.llm[llm] ?? llm),
+  };
+  const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    const i = TABS.indexOf(tab);
+    const next = TABS[(i + (e.key === 'ArrowRight' ? 1 : TABS.length - 1)) % TABS.length] ?? tab;
+    e.preventDefault();
+    go(next);
+    requestAnimationFrame(() => document.getElementById(`src-tab-${next}`)?.focus());
+  };
   return (
-    <div className="stackwide">
-      <YtsCard baseUrl={data.settings.yts.baseUrl} health={health('yts')} />
-      <SourceCard title={c().tmdb} health={health('tmdb')}>
-        <p className="sub">{c().tmdbLead}</p>
-        <SecretField
-          name="tmdbKey"
-          label={c().tmdbKey}
-          keyName={c().tmdbKeyName}
-          help={c().tmdbHelp}
-          isSet={secrets.tmdbKey}
-        />
-        <div className="frow">
-          <TestButton id="tmdb" />
-        </div>
-      </SourceCard>
-      <JustSubtitlesCard data={data} health={health('justsubtitles')} />
-      <SourceCard title={c().yify} health={health('yify')}>
-        <EnableSwitch path={['yify']} checked={p.yify.enabled} />
-        <UrlForm
-          settingKey="providers.yify.baseUrl"
-          body={(v) => ({ providers: { yify: { baseUrl: v } } })}
-          value={p.yify.baseUrl}
-          label={c().yifyUrl}
-          help={c().yifyHelp}
-          placeholder="https://"
-        >
-          <TestButton id="yify" />
-        </UrlForm>
-      </SourceCard>
-      <SourceCard title={c().assrt} health={health('assrt')}>
-        <EnableSwitch path={['assrt']} checked={p.assrt.enabled} />
-        <SecretField
-          name="assrtToken"
-          label={c().assrtToken}
-          keyName={c().assrtKeyName}
-          help={c().assrtHelp}
-          isSet={secrets.assrtToken}
-          saveLabel={c().saveToken}
-        />
-        <p className="sub">{c().assrtNote}</p>
-        <div className="frow">
-          <TestButton id="assrt" />
-        </div>
-      </SourceCard>
-      <SourceCard title={c().zimuku} chip={<Chip tone="">{c().status.manual}</Chip>}>
-        <EnableSwitch path={['zimuku']} checked={p.zimuku.enabled} label={c().zimukuEnable} />
-        <UrlForm
-          settingKey="providers.zimuku.searchUrl"
-          body={(v) => ({ providers: { zimuku: { searchUrl: v } } })}
-          value={p.zimuku.searchUrl}
-          label={c().zimukuUrl}
-          help={c().zimukuHelp}
-          placeholder="https://…{q}…"
-        />
-      </SourceCard>
-      <CommonCard settings={data.settings} />
-      <AlignCard settings={data.settings} llmKeySet={secrets.llmKey} />
-    </div>
+    <>
+      <div className="tabs" role="tablist" aria-label={c().tabsLabel} onKeyDown={onKey}>
+        {TABS.map((k) => (
+          <button
+            key={k}
+            id={`src-tab-${k}`}
+            type="button"
+            role="tab"
+            aria-selected={tab === k}
+            aria-controls="src-panel"
+            tabIndex={tab === k ? 0 : -1}
+            onClick={() => go(k)}
+          >
+            {c().tabs[k]}
+            <small>{notes[k]}</small>
+          </button>
+        ))}
+      </div>
+      <div id="src-panel" role="tabpanel" aria-labelledby={`src-tab-${tab}`} className="src-grid">
+        {tab === 'movies' && (
+          <>
+            <YtsCard baseUrl={data.settings.yts.baseUrl} health={health('yts')} />
+            <SourceCard title={c().tmdb} health={health('tmdb')}>
+              <p className="sub">{c().tmdbLead}</p>
+              <SecretField
+                name="tmdbKey"
+                label={c().tmdbKey}
+                keyName={c().tmdbKeyName}
+                help={c().tmdbHelp}
+                isSet={secrets.tmdbKey}
+              />
+              <div className="frow">
+                <TestButton id="tmdb" />
+              </div>
+            </SourceCard>
+          </>
+        )}
+        {tab === 'subtitles' && (
+          <>
+            <JustSubtitlesCard data={data} health={health('justsubtitles')} />
+            <SourceCard title={c().yify} health={health('yify')}>
+              <EnableSwitch path={['yify']} checked={p.yify.enabled} />
+              <UrlForm
+                settingKey="providers.yify.baseUrl"
+                body={(v) => ({ providers: { yify: { baseUrl: v } } })}
+                value={p.yify.baseUrl}
+                label={c().yifyUrl}
+                help={c().yifyHelp}
+                placeholder="https://"
+              >
+                <TestButton id="yify" />
+              </UrlForm>
+            </SourceCard>
+            <SourceCard title={c().assrt} health={health('assrt')}>
+              <EnableSwitch path={['assrt']} checked={p.assrt.enabled} />
+              <SecretField
+                name="assrtToken"
+                label={c().assrtToken}
+                keyName={c().assrtKeyName}
+                help={c().assrtHelp}
+                isSet={secrets.assrtToken}
+                saveLabel={c().saveToken}
+              />
+              <p className="sub">{c().assrtNote}</p>
+              <div className="frow">
+                <TestButton id="assrt" />
+              </div>
+            </SourceCard>
+            <SourceCard title={c().zimuku} chip={<Chip tone="">{c().status.manual}</Chip>}>
+              <EnableSwitch path={['zimuku']} checked={p.zimuku.enabled} label={c().zimukuEnable} />
+              <UrlForm
+                settingKey="providers.zimuku.searchUrl"
+                body={(v) => ({ providers: { zimuku: { searchUrl: v } } })}
+                value={p.zimuku.searchUrl}
+                label={c().zimukuUrl}
+                help={c().zimukuHelp}
+                placeholder="https://…{q}…"
+              />
+            </SourceCard>
+            <CommonCard settings={data.settings} />
+          </>
+        )}
+        {tab === 'align' && <AlignCard settings={data.settings} llmKeySet={secrets.llmKey} />}
+      </div>
+    </>
   );
 }
 

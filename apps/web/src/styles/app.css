@@ -837,6 +837,16 @@ fieldset.field > legend {
   gap: 12px;
   max-width: 620px;
 }
+/* The settings tabs (來源設定): cards side by side when there is room, each as tall as it needs. */
+#view .src-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 440px), 1fr));
+  align-items: start;
+}
+#view .src-grid > .card {
+  max-width: none;
+}
 #view .stackwide {
   display: grid;
   gap: 16px;
