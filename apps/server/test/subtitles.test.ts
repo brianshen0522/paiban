@@ -582,6 +582,36 @@ describe('alignment', () => {
     expect(task).toEqual({ state: 'done', subject: { movieTitle: 'Inception', language: 'zh-Hant' } });
   });
 
+  it('aligns one subtitle to another of the same film, without any sound analysis', async () => {
+    const f = await film('Two Subs', 'tt0000101', 2004);
+    const enC = await uploaded(f.tid, 'truth.en.srt');
+    const en = (await call(t.app, 'POST', `/api/candidates/${enC.id}/add`, { cookie: mei, body: {} })).json();
+    const zhC = await uploaded(f.tid, 'late.zh-TW.srt');
+    const zh = (await call(t.app, 'POST', `/api/candidates/${zhC.id}/add`, { cookie: mei, body: {} })).json();
+    const kick = setInterval(() => void media.reconcile(), 200);
+    const res = await call(t.app, 'POST', `/api/subtitles/${zh.id}/auto-align`, {
+      cookie: mei,
+      body: { allowSplit: true, referenceId: en.id },
+    });
+    clearInterval(kick);
+    expect(res.statusCode).toBe(200);
+    const r = res.json();
+    expect(r.method).toMatch(/^reference/);
+    expect(r.reference).toMatchObject({ subtitleId: en.id, via: 'timing' });
+    expect(r.segments).toHaveLength(1);
+    expect(Math.abs(r.segments[0].offset + 2.4)).toBeLessThan(0.15);
+    expect(r.extraLines).toEqual([]);
+    // Not to itself, and not to a subtitle of another film.
+    const self = await call(t.app, 'POST', `/api/subtitles/${zh.id}/auto-align`, {
+      cookie: mei,
+      body: { allowSplit: true, referenceId: zh.id },
+    });
+    expect(self.json().error).toMatchObject({
+      code: 'VALIDATION',
+      details: { fields: { referenceId: 'NOT_SAME_FILM' } },
+    });
+  });
+
   it('says MEDIA_NOT_READY without speech data', async () => {
     const f = await film('No Speech', 'tt0000100', 2003);
     const c = await uploaded(f.tid, 'truth.en.srt');

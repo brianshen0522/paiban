@@ -571,17 +571,35 @@ export function subtitleRoutes(app: FastifyInstance, deps: Deps): void {
     if (wait > 0) throw new ApiError('RATE_LIMITED', 'too many alignments', { retryAfterSeconds: wait });
     alignLimiter.record(user.id);
     const { id } = parse(IdParams, req.params);
-    const { allowSplit } = parse(z.object({ allowSplit: z.boolean() }), req.body);
+    const { allowSplit, referenceId } = parse(
+      z.object({ allowSplit: z.boolean(), referenceId: z.uuid().optional() }),
+      req.body,
+    );
     const { s, t } = await holderSubtitle(user, id);
-    const sp = await speechFor(pool, config.dataDir, s.torrent_id);
-    if (!sp) throw new ApiError('MEDIA_NOT_READY', 'no speech data for this film');
-    // A subtitle in another language than the one spoken is paired by the language model here,
-    // where the key is; the media service does the rest (docs/08, "語言模型").
-    const heard = await llmHeard(deps, sp.mediaId, await readCues(config.dataDir, s.rel_dir), s.language);
+    let input: Record<string, unknown>;
+    if (referenceId) {
+      // Aligning to another subtitle of the same film: no sound and no language model needed.
+      const ref = await one<{ id: string }>(pool, 'select id from subtitles where id = $1 and torrent_id = $2', [
+        referenceId,
+        s.torrent_id,
+      ]);
+      if (!ref || referenceId === id)
+        throw new ApiError('VALIDATION', 'the reference must be another subtitle of the same film', {
+          fields: { referenceId: 'NOT_SAME_FILM' },
+        });
+      input = { subtitleId: id, allowSplit, referenceId };
+    } else {
+      const sp = await speechFor(pool, config.dataDir, s.torrent_id);
+      if (!sp) throw new ApiError('MEDIA_NOT_READY', 'no speech data for this film');
+      // A subtitle in another language than the one spoken is paired by the language model here,
+      // where the key is; the media service does the rest (docs/08, "語言模型").
+      const heard = await llmHeard(deps, sp.mediaId, await readCues(config.dataDir, s.rel_dir), s.language);
+      input = { subtitleId: id, allowSplit, heard };
+    }
     const task = await one<{ id: string }>(
       pool,
       `insert into tasks (kind, torrent_id, subject, input, created_by) values ('align', $1, $2, $3, $4) returning id`,
-      [s.torrent_id, { movieTitle: t.title, language: s.language }, { subtitleId: id, allowSplit, heard }, user.id],
+      [s.torrent_id, { movieTitle: t.title, language: s.language }, input, user.id],
     );
     const taskId = task?.id as string;
     await pool.query(`select pg_notify('paiban_media', '{}')`);

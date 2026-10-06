@@ -16,6 +16,14 @@
 
 ---
 
+## 2026-10-06 依另一條字幕對齊
+
+- 原本：自動對齊只依片子的聲音（人聲偵測、語音辨識）。
+- 改成：可以選同一部片的另一條字幕當參考來對齊。`POST /api/subtitles/:id/auto-align` 多一個選填的 `referenceId`；`AlignResult` 多 `reference`、`extraLines`，`method` 多 `reference`、`reference-text`、`reference-llm`（最後一個目前不會出現，保留給以後）。開頭結尾的製作資訊不參與計算，對齊後列出來讓使用者決定要不要刪；拆句、併句不影響。
+- 原因：Brian 在對話裡要求（對好一條字幕之後，可以幫其他字幕對齊；要考慮開頭與電影無關的資訊、一句對兩句）。
+- 改了哪些檔案：packages/shared/src/contracts/api.ts、docs/04-api.md、docs/08-media-pipeline.md、docs/09-sync-workbench.md
+- Brian 是否已確認：是（他提出的）
+
 ## 2026-10-06 版面改成視窗不捲動，列表在自己的框裡捲動
 
 - 原本：整頁一起捲動。

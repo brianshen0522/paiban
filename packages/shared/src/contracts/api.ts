@@ -426,7 +426,15 @@ export type AlignResult = {
   segments: Segment[];
   scoreBefore: number;
   score: number;
-  method: 'ffsubsync-linear' | 'ffsubsync-split' | 'core' | 'asr' | 'asr-llm';
+  method:
+    | 'ffsubsync-linear'
+    | 'ffsubsync-split'
+    | 'core'
+    | 'asr'
+    | 'asr-llm'
+    | 'reference'
+    | 'reference-text'
+    | 'reference-llm';
   /** Two independent engines put every line within 0.15 s of each other. */
   agree: boolean;
   /**
@@ -442,6 +450,20 @@ export type AlignResult = {
     via: 'text' | 'llm' | 'none';
     llmError: LlmErrorCode | null;
   } | null;
+  /**
+   * Aligned to another subtitle of the same film (docs/08, "依另一條字幕對齊"); null otherwise.
+   * `via`: lines paired by text (same language), by the language model, or none paired and the
+   * timing of the reference's lines decided (`timing`).
+   */
+  reference: {
+    subtitleId: Id;
+    pairs: number;
+    support: number;
+    via: 'text' | 'llm' | 'timing';
+    llmError: LlmErrorCode | null;
+  } | null;
+  /** Ids of lines at the start or end that match nothing in the reference and look like credits: offered for deletion. */
+  extraLines: number[];
 };
 
 /** A tiny fixed pairing question sent to the configured model (docs/13-settings.md, "測試連線"). */
@@ -848,7 +870,8 @@ export interface Endpoints {
     body: { rev: number; doc: SyncDoc; reason?: 'auto-align' | 'reset' };
     ok: { rev: number; status: 'draft' | 'confirmed'; score: number | null };
   };
-  'POST /api/subtitles/:id/auto-align': { body: { allowSplit: boolean }; ok: AlignResult };
+  /** With `referenceId`: align to that subtitle of the same film instead of to the film's sound. */
+  'POST /api/subtitles/:id/auto-align': { body: { allowSplit: boolean; referenceId?: Id }; ok: AlignResult };
   'POST /api/subtitles/:id/confirm': { body: { rev: number; force?: boolean }; ok: Subtitle };
   'GET /api/subtitles/:id/file': { query: { synced?: boolean }; ok: 'application/x-subrip, attachment' };
   'DELETE /api/subtitles/:id': { ok: null };

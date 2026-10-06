@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { type AlignResult, type Cue, type SpeechData, SyncCore, type SyncDoc } from '@paiban/shared';
 import type { HeardPairs } from '../asr/align.js';
 import { fitPairs, pickWithPairs } from '../asr/fit.js';
+import { creditIndexes, extraLines, foldEdgeSegments, type RefLine, referenceSpeech } from './reference.js';
 import { parseSrt } from './text.js';
 
 /**
@@ -66,6 +67,89 @@ export function computeAlignment(
           llmError: heard.llmError,
         }
       : null,
+    reference: null,
+    extraLines: [],
+  };
+}
+
+const AS_REFERENCE: Record<string, AlignResult['method']> = {
+  asr: 'reference-text',
+  'asr-llm': 'reference-llm',
+};
+
+/**
+ * Aligning to another subtitle already aligned (docs/08, "依另一條字幕對齊"). The reference's lines
+ * stand in for the film: their spans are the speech track the core searches and scores against,
+ * their starts are where sentences begin (the timing referee when nothing pairs), and their words
+ * pair with this subtitle's by text or through the language model (`pairs`). Scores are then
+ * given against the film's own detected speech when there is any, like every other alignment.
+ */
+export function computeReferenceAlignment(
+  ref: { subtitleId: string; lines: readonly RefLine[] },
+  cues: readonly Cue[],
+  opts: {
+    allowSplit: boolean;
+    before?: Pick<SyncDoc, 'segments' | 'edits'>;
+    pairs?: HeardPairs | null;
+    filmSpeech?: SpeechData | null;
+  },
+): AlignResult {
+  const refSpeech = referenceSpeech(ref.lines);
+  const heardAt = ref.lines.map((l) => l.start);
+  const given = opts.pairs ?? null;
+  const heard: HeardPairs = given
+    ? { ...given, heardAt }
+    : { language: 'und', pairs: [], heardAt, via: 'none', llmError: null };
+  // Credits at either end are left out of the search; they follow their neighbours afterwards.
+  const credits = creditIndexes(cues);
+  const kept = cues.map((_, i) => i).filter((i) => !credits.has(i));
+  const keptCues = kept.map((i) => cues[i] as Cue);
+  const back = new Map(kept.map((orig, k) => [orig, k]));
+  const keptHeard: HeardPairs = {
+    ...heard,
+    pairs: heard.pairs.flatMap((p) => (back.has(p.cue) ? [{ cue: back.get(p.cue) as number, y: p.y }] : [])),
+  };
+  // A one-segment answer too, so the timing referee has a plain alternative to any cut the search finds.
+  const single: SyncCore.AlignCandidate[] = opts.allowSplit
+    ? [
+        {
+          method: 'single-core',
+          segments: SyncCore.autoAlign(SyncCore.makeSpeech(refSpeech), keptCues, {
+            allowSplit: false,
+            radius: MAX_OFFSET_SECONDS,
+          }).segments,
+        },
+      ]
+    : [];
+  const r = computeAlignment(refSpeech, keptCues, { allowSplit: opts.allowSplit, heard: keptHeard }, single);
+  // Segment starts go back to the full list's indexes; a short segment at either end is folded away.
+  const segments = foldEdgeSegments(
+    r.segments.map((s, k) => ({ ...s, from: k === 0 ? 0 : (kept[s.from] ?? s.from) })),
+    cues.length,
+  );
+  // Scored like any alignment: against the film's detected speech when there is some, else the reference.
+  const sp = SyncCore.makeSpeech(opts.filmSpeech ?? refSpeech);
+  const edits = opts.before?.edits ?? {};
+  const score = SyncCore.round3(SyncCore.totalScore(sp, SyncCore.applyDoc(cues, { segments, edits })));
+  const scoreBefore = SyncCore.round3(
+    SyncCore.totalScore(sp, SyncCore.applyDoc(cues, opts.before ?? SyncCore.identityDoc())),
+  );
+  const pairs = heard.pairs.length;
+  return {
+    segments,
+    scoreBefore,
+    score,
+    method: AS_REFERENCE[r.method] ?? 'reference',
+    agree: r.agree,
+    heard: null,
+    reference: {
+      subtitleId: ref.subtitleId,
+      pairs,
+      support: r.heard?.support ?? 0,
+      via: pairs ? (heard.via === 'llm' ? 'llm' : 'text') : 'timing',
+      llmError: heard.llmError,
+    },
+    extraLines: extraLines(cues, segments, ref.lines),
   };
 }
 

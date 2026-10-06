@@ -2,11 +2,17 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, open, readdir, readFile, rename, stat, writeFile } from 'node:fs/promises';
 import { extname, join } from 'node:path';
 import type { AlignResult, Lang, SyncDoc } from '@paiban/shared';
-import { type HeardPairs, localPairs, readTranscript } from '../asr/align.js';
+import { type HeardPairs, localPairs, readTranscript, sameLanguage, sameLanguagePairs } from '../asr/align.js';
 import { many, one, type Pool } from '../db/pool.js';
 import { removeOwnSubtitleOutput, removeStaging, removeWorkDir } from '../storage/remove.js';
-import { computeAlignment, ffsubsyncCandidates, runFfsubsyncEngines } from '../subtitles/align.js';
+import {
+  computeAlignment,
+  computeReferenceAlignment,
+  ffsubsyncCandidates,
+  runFfsubsyncEngines,
+} from '../subtitles/align.js';
 import { ArchiveError, archiveKind, extractSubtitles } from '../subtitles/archive.js';
+import { baseLanguage, referenceLines, referenceTranscript } from '../subtitles/reference.js';
 import { candidateDir, candidateRel, readCues, type StagedFile, speechFor, stagingDir } from '../subtitles/store.js';
 import { type ParsedSubtitle, parseSubtitleFile } from '../subtitles/text.js';
 import type { JobDeps } from './jobs.js';
@@ -350,7 +356,9 @@ export async function rankJob(d: JobDeps, candidateId: string): Promise<void> {
  */
 export async function alignJob(d: JobDeps, taskId: string): Promise<void> {
   const { pool, config } = d;
-  const t = await one<{ input: { subtitleId?: string; allowSplit?: boolean; heard?: HeardPairs | null } }>(
+  const t = await one<{
+    input: { subtitleId?: string; allowSplit?: boolean; heard?: HeardPairs | null; referenceId?: string };
+  }>(
     pool,
     `update tasks set state = 'running', started_at = now() where id = $1 and kind = 'align' and state = 'queued' returning input`,
     [taskId],
@@ -371,6 +379,37 @@ export async function alignJob(d: JobDeps, taskId: string): Promise<void> {
       throw new Error('subtitle gone');
     }
     const sp = await speechFor(pool, config.dataDir, s.torrent_id);
+    if (t.input.referenceId) {
+      // Aligning to another subtitle of the same film (docs/08, "依另一條字幕對齊"): no sound needed.
+      const ref = await one<{ rel_dir: string; doc: SyncDoc; language: string }>(
+        pool,
+        'select rel_dir, doc, language from subtitles where id = $1 and torrent_id = $2',
+        [t.input.referenceId, s.torrent_id],
+      );
+      if (!ref) {
+        code = 'SUBJECT_GONE';
+        throw new Error('reference gone');
+      }
+      const cues = await readCues(config.dataDir, s.rel_dir);
+      const lines = referenceLines(await readCues(config.dataDir, ref.rel_dir), ref.doc);
+      // Same language: paired by text, free and instant. Another language: the timing of the
+      // reference's lines alone, which measured as precise as the model's pairs at a fraction of the time.
+      const pairs = sameLanguage(s.language, baseLanguage(ref.language))
+        ? sameLanguagePairs(cues, referenceTranscript(lines, ref.language))
+        : [];
+      const result = computeReferenceAlignment({ subtitleId: t.input.referenceId, lines }, cues, {
+        allowSplit: t.input.allowSplit !== false,
+        before: s.doc,
+        pairs: pairs.length ? { language: baseLanguage(ref.language), pairs, via: 'text', llmError: null } : null,
+        filmSpeech: sp?.speech ?? null,
+      });
+      await pool.query(
+        `update tasks set state = 'done', result = $2, progress = 1, finished_at = now() where id = $1 and state = 'running'`,
+        [taskId, result],
+      );
+      await pool.query(`select pg_notify('paiban_events', $1)`, [JSON.stringify({ type: 'task', id: taskId })]);
+      return;
+    }
     if (!sp) {
       code = 'NO_SPEECH';
       throw new Error('no speech data');
