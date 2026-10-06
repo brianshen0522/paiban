@@ -1008,6 +1008,8 @@ export const t = {
     spaceShort: (need: string, free: string, short: string) => `匯出檔約 ${need}，目前只剩 ${free}，還差 ${short}。`,
     start: '開始匯出',
     starting: '開始中…',
+    packing: '匯出中…',
+    packingNote: '這部片正在匯出，完成後才能再開始一個。進度在下面的列表。',
     keepNote: '匯出檔不會自動刪除，會一直算在容量上限裡，直到有人手動刪掉。',
     started: '開始封裝。影音不重新編碼，通常不到一分鐘。',
     list: '這部片的匯出檔',

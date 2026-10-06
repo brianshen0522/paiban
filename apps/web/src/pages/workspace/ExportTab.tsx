@@ -60,10 +60,13 @@ export function ExportTab({ ws }: { ws: Workspace }) {
   const need = ws.exportNeedBytes;
   const free = ws.usage.freeBytes;
   const fits = !ws.usage.over && need <= free;
+  // One export of this film at a time: a second press while one is packing would only queue a copy.
+  const packing = ws.exports.some((e) => e.state === 'queued' || e.state === 'running');
 
   const start = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
+    if (packing) return;
     if (!on.length) {
       setTrackError(true);
       return;
@@ -234,10 +237,10 @@ export function ExportTab({ ws }: { ws: Workspace }) {
             </div>
           )}
           <div className="frow">
-            <button type="submit" className="primary" disabled={busy || !confirmed.length || !fits}>
-              {busy ? t.exportTab.starting : t.exportTab.start}
+            <button type="submit" className="primary" disabled={busy || packing || !confirmed.length || !fits}>
+              {busy ? t.exportTab.starting : packing ? t.exportTab.packing : t.exportTab.start}
             </button>
-            <span className="sub">{t.exportTab.keepNote}</span>
+            <span className="sub">{packing ? t.exportTab.packingNote : t.exportTab.keepNote}</span>
           </div>
         </form>
       </section>
