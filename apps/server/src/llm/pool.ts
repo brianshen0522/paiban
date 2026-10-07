@@ -34,6 +34,7 @@ export const DEFAULT_PARAMS: LlmParams = {
   timeoutSeconds: 120,
   concurrency: 3,
   noReasoning: true,
+  contextLength: 16_384,
 };
 
 const COOL_MS: Partial<Record<LlmErrorCode, number>> = {

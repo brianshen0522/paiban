@@ -16,6 +16,14 @@
 
 ---
 
+## 2026-10-07 Ollama 從「自架」分出來
+
+- 原本：「自架」一種涵蓋 Ollama 和其他 OpenAI 相容的服務，都走 `/v1/chat/completions`。
+- 改成：多一種供應商「Ollama」，走 Ollama 自己的 `/api/chat`，可以設長度上限（`num_ctx`，預設 16384）、用 `think: false` 關閉推理、用 JSON schema 限制回答；模型清單從 `/api/tags` 取。「自架」改名為「OpenAI 相容的自架服務（vLLM、LM Studio 等）」。合約 `LlmProvider` 多 `ollama`、`LlmParams` 多 `contextLength`；遷移 `0006_llm_ollama.sql`。已經存的「自架」設定檔不受影響。
+- 原因：Brian 問為什麼兩個是同一個選項；Ollama 預設的上下文很小，透過相容介面調不了，翻譯會悄悄少句。Brian 同意拆開。
+- 改了哪些檔案：docs/18-llm.md、docs/08-media-pipeline.md、db/schema.sql、packages/shared/src/contracts/api.ts
+- Brian 是否已確認：是
+
 ## 2026-10-07 LLM 設定頁與字幕翻譯
 
 - 原本：語言模型只用在自動對齊，設定在「來源設定 → 自動對齊」，只有一個（Claude 或 OpenAI 相容），金鑰是 `llmKey`。沒有字幕翻譯。

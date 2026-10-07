@@ -71,4 +71,14 @@ describe('the profile form', () => {
     fireEvent.change(screen.getByLabelText('供應商'), { target: { value: 'azure-openai' } });
     expect((screen.getByLabelText('API 版本') as HTMLInputElement).value).toBe('2024-10-21');
   });
+
+  it('Ollama: needs its address and offers the context window, which the others do not', () => {
+    render(<LlmProfileDialog profile={null} onClose={() => {}} onSaved={() => {}} />);
+    expect(screen.queryByLabelText('長度上限（num_ctx）')).toBeNull();
+    fireEvent.change(screen.getByLabelText('供應商'), { target: { value: 'ollama' } });
+    expect(screen.getByLabelText('服務網址')).toBeTruthy();
+    expect((screen.getByLabelText('長度上限（num_ctx）') as HTMLInputElement).value).toBe('16384');
+    fireEvent.change(screen.getByLabelText('供應商'), { target: { value: 'self-hosted' } });
+    expect(screen.queryByLabelText('長度上限（num_ctx）')).toBeNull();
+  });
 });

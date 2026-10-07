@@ -337,7 +337,8 @@ Tears of Steel 的法文、德文、俄文官方字幕，各弄錯四種（晚 2
 | 供應商 | 怎麼呼叫 |
 | --- | --- |
 | Claude（Anthropic） | Anthropic 官方 SDK，預設 `claude-opus-5-5`，effort `low`，回答用結構化輸出（JSON schema）限制。用 Opus 5.5 等支援的模型時開啟伺服器端的拒答備援（`fallbacks: "default"`） |
-| OpenAI、OpenRouter、自架（Ollama、vLLM、通義千問的相容模式） | `POST <服務網址>/chat/completions`，`response_format: json_object`，帶設定檔的 temperature 和最大輸出長度（OpenAI 用 `max_completion_tokens`）。伺服器回 400 時依序拿掉 `reasoning_effort`、`response_format`、`temperature` 再試，記住這個網址不支援。回答裡的 `<think>` 和 code fence 會去掉再解析 |
+| OpenAI、OpenRouter、OpenAI 相容的自架服務（vLLM、LM Studio、通義千問的相容模式） | `POST <服務網址>/chat/completions`，`response_format: json_object`，帶設定檔的 temperature 和最大輸出長度（OpenAI 用 `max_completion_tokens`）。伺服器回 400 時依序拿掉 `reasoning_effort`、`response_format`、`temperature` 再試，記住這個網址不支援。回答裡的 `<think>` 和 code fence 會去掉再解析 |
+| Ollama | `POST <服務網址>/api/chat`，`stream: false`，帶 `options.num_ctx`（長度上限）、`think: false`、回答的 JSON schema（`format`）。見 [18-llm.md](18-llm.md) 的「為什麼 Ollama 是自己一種」 |
 | Azure OpenAI | `POST <服務網址>/openai/deployments/<部署名稱>/chat/completions?api-version=…`，金鑰放 `api-key` 標頭 |
 | Azure AI Foundry | `POST <服務網址>/models/chat/completions?api-version=…`，帶模型名稱，金鑰放 `api-key` 標頭 |
 

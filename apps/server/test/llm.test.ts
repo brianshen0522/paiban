@@ -17,7 +17,11 @@ import { call, createUser, login, setSetting, type TestApp, testApp, testDb } fr
  * LLM profiles and subtitle translation (docs/18-llm.md). The models are local stand-ins that
  * speak the OpenAI chat-completions protocol; nothing leaves the machine.
  */
-type Seen = { url: string; auth: string | undefined; body: { model?: string; messages?: { content: string }[] } };
+type Seen = {
+  url: string;
+  auth: string | undefined;
+  body: { model?: string; messages?: { content: string }[]; [k: string]: unknown };
+};
 type Mode = 'ok' | 'rate' | 'auth' | 'english' | 'drop-once' | 'slow';
 
 /** A model server: translates "N: text" into "譯N", or misbehaves as told. */
@@ -38,6 +42,7 @@ async function fakeModel(): Promise<{ url: string; seen: Seen[]; mode: { value: 
         res.end(JSON.stringify(payload));
       };
       if (req.url?.endsWith('/models')) return send(200, { data: [{ id: 'model-b' }, { id: 'model-a' }] });
+      if (req.url === '/api/tags') return send(200, { models: [{ name: 'qwen3:8b' }, { name: 'gemma3:4b' }] });
       if (mode.value === 'rate') return send(429, { error: 'slow down' });
       if (mode.value === 'auth') return send(401, { error: 'no' });
       if (mode.value === 'slow') await new Promise((r) => setTimeout(r, 400));
@@ -49,6 +54,13 @@ async function fakeModel(): Promise<{ url: string; seen: Seen[]; mode: { value: 
         ids = ids.slice(0, -1);
       }
       const lines = ids.map((id) => ({ id, text: mode.value === 'english' ? `Line ${id}` : `譯${id}` }));
+      // Ollama's own API answers in `message`, the OpenAI protocol in `choices`.
+      if (req.url === '/api/chat')
+        return send(200, {
+          model: body.model,
+          message: { role: 'assistant', content: JSON.stringify({ lines }) },
+          done: true,
+        });
       return send(200, { model: body.model ?? 'fake', choices: [{ message: { content: JSON.stringify({ lines }) } }] });
     });
   });
@@ -276,6 +288,47 @@ describe('the LLM settings page', () => {
     const usage = (await db.pool.query(`select purpose, profile_id, profile_name from llm_usage`)).rows;
     expect(usage).toHaveLength(3);
     expect(usage.every((u) => u.purpose === 'test' && u.profile_id === null && u.profile_name === 'Local')).toBe(true);
+  });
+
+  it("speaks Ollama's own API: the context window, thinking off, a schema for the answer", async () => {
+    // Pasted with the /v1 of Ollama's OpenAI-compatible door: stored without it.
+    const p = await create({ name: 'Ollama', provider: 'ollama', baseUrl: a.url, model: 'qwen3:8b' });
+    expect(p.baseUrl).toBe(a.url.replace(/\/v1$/, ''));
+    expect(p.params.contextLength).toBe(16384);
+    const models = await call(t.app, 'POST', '/api/admin/llm/models', {
+      cookie: boss,
+      body: { provider: 'ollama', baseUrl: a.url, apiVersion: '' },
+    });
+    expect(models.json()).toEqual({ models: ['gemma3:4b', 'qwen3:8b'] });
+    const check = await call(t.app, 'POST', '/api/admin/llm/test', {
+      cookie: boss,
+      body: profile({ provider: 'ollama', model: 'qwen3:8b', params: { ...DEFAULT_PARAMS, contextLength: 32768 } }),
+    });
+    expect(check.json()).toMatchObject({ ok: true, reply: '譯1／譯2' });
+    const sent = a.seen.at(-1);
+    expect(sent?.url).toBe('/api/chat');
+    expect(sent?.body).toMatchObject({
+      model: 'qwen3:8b',
+      stream: false,
+      think: false,
+      options: { num_ctx: 32768, num_predict: DEFAULT_PARAMS.maxTokens },
+      format: { type: 'object', properties: { lines: { type: 'array' } } },
+    });
+    // A profile saved before the context window existed reads with the default.
+    const bare = { ...DEFAULT_PARAMS } as Record<string, unknown>;
+    delete bare.contextLength;
+    expect(
+      (await call(t.app, 'POST', '/api/admin/llm/profiles', { cookie: boss, body: profile({ params: bare }) })).json()
+        .params.contextLength,
+    ).toBe(16384);
+    expect(
+      (
+        await call(t.app, 'POST', '/api/admin/llm/profiles', {
+          cookie: boss,
+          body: profile({ provider: 'ollama', baseUrl: '' }),
+        })
+      ).json().error.details.fields,
+    ).toEqual({ baseUrl: 'REQUIRED' });
   });
 
   it('moves the one model of before into the first profile, its key sealed again', async () => {

@@ -335,7 +335,7 @@ create index subtitles_torrent on subtitles (torrent_id);
 create table llm_profiles (
   id             uuid primary key default gen_random_uuid(),
   name           text not null check (char_length(name) between 1 and 60),
-  provider       text not null check (provider in ('openai', 'anthropic', 'azure-openai', 'azure-foundry', 'openrouter', 'self-hosted')),
+  provider       text not null check (provider in ('openai', 'anthropic', 'azure-openai', 'azure-foundry', 'openrouter', 'ollama', 'self-hosted')),
   base_url       text not null default '',
   api_version    text not null default '',
   model          text not null default '',

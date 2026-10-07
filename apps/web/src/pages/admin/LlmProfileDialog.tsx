@@ -13,10 +13,11 @@ export const PROVIDERS: LlmProvider[] = [
   'azure-openai',
   'azure-foundry',
   'openrouter',
+  'ollama',
   'self-hosted',
 ];
 /** These need the address of the service; for the others it is an optional proxy. */
-const NEEDS_URL = new Set<LlmProvider>(['self-hosted', 'azure-openai', 'azure-foundry']);
+const NEEDS_URL = new Set<LlmProvider>(['ollama', 'self-hosted', 'azure-openai', 'azure-foundry']);
 const AZURE_VERSION: Partial<Record<LlmProvider, string>> = {
   'azure-openai': '2024-10-21',
   'azure-foundry': '2024-05-01-preview',
@@ -27,6 +28,7 @@ export const DEFAULT_PARAMS: LlmParams = {
   timeoutSeconds: 120,
   concurrency: 3,
   noReasoning: true,
+  contextLength: 16384,
 };
 
 type Form = Omit<LlmProfileInput, 'key'>;
@@ -244,7 +246,7 @@ export function LlmProfileDialog({
     </Field>
   );
   const paramNum = (
-    k: 'temperature' | 'maxTokens' | 'timeoutSeconds' | 'concurrency',
+    k: 'temperature' | 'maxTokens' | 'timeoutSeconds' | 'concurrency' | 'contextLength',
     label: string,
     help: string,
     min: number,
@@ -398,6 +400,8 @@ export function LlmProfileDialog({
             {paramNum('maxTokens', c().maxTokens, c().maxTokensHelp, 256, 32000, 256)}
             {paramNum('timeoutSeconds', c().timeout, c().timeoutHelp, 10, 600, 10)}
             {paramNum('concurrency', c().concurrency, c().concurrencyHelp, 1, 16, 1)}
+            {form.provider === 'ollama' &&
+              paramNum('contextLength', c().contextLength, c().contextLengthHelp, 2048, 131072, 1024)}
           </div>
           <label className="chk">
             <input

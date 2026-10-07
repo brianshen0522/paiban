@@ -10,7 +10,7 @@ import { openSecret } from '../settings/secrets.js';
 import { readSettings, writeSettings } from '../settings/settings.js';
 import { holderTorrent } from '../torrents/routes.js';
 import { DEFAULT_PARAMS, LlmPool, type ProfileRow, sealKey } from './pool.js';
-import { type Connection, checkBaseUrl, DEFAULT_API_VERSION, LlmError, listModels } from './providers.js';
+import { type Connection, checkBaseUrl, DEFAULT_API_VERSION, LlmError, listModels, ollamaBase } from './providers.js';
 import { CHUNK, testQuestion } from './translate.js';
 import { TRANSLATION_SELECT, type TranslationRow, TranslationWorker, toTranslation, translationRow } from './worker.js';
 
@@ -20,9 +20,17 @@ declare module 'fastify' {
   }
 }
 
-const PROVIDERS = ['openai', 'anthropic', 'azure-openai', 'azure-foundry', 'openrouter', 'self-hosted'] as const;
+const PROVIDERS = [
+  'openai',
+  'anthropic',
+  'azure-openai',
+  'azure-foundry',
+  'openrouter',
+  'ollama',
+  'self-hosted',
+] as const;
 /** The kinds with no official address: the administrator has to give one. */
-const NEEDS_URL = new Set<LlmProvider>(['self-hosted', 'azure-openai', 'azure-foundry']);
+const NEEDS_URL = new Set<LlmProvider>(['self-hosted', 'ollama', 'azure-openai', 'azure-foundry']);
 
 const Params = z.object({
   temperature: z.number().min(0).max(2),
@@ -30,6 +38,8 @@ const Params = z.object({
   timeoutSeconds: z.number().int().min(10).max(600),
   concurrency: z.number().int().min(1).max(16),
   noReasoning: z.boolean(),
+  // Profiles saved before Ollama had its own kind have no value: the default fills it.
+  contextLength: z.number().int().min(2048).max(131_072).default(DEFAULT_PARAMS.contextLength),
 });
 
 const ProfileBody = z.object({
@@ -68,7 +78,7 @@ const ModelsBody = z.object({
 
 function normalised(b: ProfileInput) {
   return {
-    baseUrl: checkBaseUrl(b.baseUrl) ?? '',
+    baseUrl: b.provider === 'ollama' ? ollamaBase(checkBaseUrl(b.baseUrl) ?? '') : (checkBaseUrl(b.baseUrl) ?? ''),
     apiVersion: b.provider.startsWith('azure') ? b.apiVersion || (DEFAULT_API_VERSION[b.provider] ?? '') : '',
   };
 }

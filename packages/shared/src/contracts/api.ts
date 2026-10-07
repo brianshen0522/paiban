@@ -502,7 +502,15 @@ export type AlignResult = {
 /** A tiny fixed pairing question sent to the configured model (docs/13-settings.md, "測試連線"). */
 /* ------------------------------------------------------------------ language models (docs/18-llm.md) */
 
-export type LlmProvider = 'openai' | 'anthropic' | 'azure-openai' | 'azure-foundry' | 'openrouter' | 'self-hosted';
+/** `self-hosted`: any server speaking the OpenAI protocol (vLLM, LM Studio…); `ollama`: Ollama's own API. */
+export type LlmProvider =
+  | 'openai'
+  | 'anthropic'
+  | 'azure-openai'
+  | 'azure-foundry'
+  | 'openrouter'
+  | 'ollama'
+  | 'self-hosted';
 
 export type LlmParams = {
   /** 0 to 2. */
@@ -515,6 +523,11 @@ export type LlmParams = {
   concurrency: number;
   /** Ask reasoning models not to think first (OpenAI-compatible `reasoning_effort: "none"`; dropped when refused). */
   noReasoning: boolean;
+  /**
+   * Ollama only: the context window in tokens (`num_ctx`), 2048 to 131072. Ollama's default is
+   * small and it cuts longer prompts silently, which loses lines of a translation chunk.
+   */
+  contextLength: number;
 };
 
 export type LlmProfile = {

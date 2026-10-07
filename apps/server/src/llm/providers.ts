@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
 import type { LlmErrorCode, LlmParams, LlmProvider } from '@paiban/shared';
-import type { z } from 'zod';
+import { z } from 'zod';
 
 /**
  * One request to one language-model service (docs/18-llm.md): the providers the LLM settings page
@@ -213,6 +213,75 @@ async function openAiStyle<T>(
   }
 }
 
+/* ------------------------------------------------------------------ Ollama's own API */
+
+/** Ollama's address without a trailing /v1 (people often paste the OpenAI-compatible one). */
+export const ollamaBase = (u: string) => trim(u).replace(/\/v1$/, '');
+
+/**
+ * Ollama's /api/chat (docs/18-llm.md): unlike its OpenAI-compatible door it takes the context
+ * window (`num_ctx`; the default is small and longer prompts are cut without a word), a reliable
+ * `think: false`, and a JSON schema the answer must follow. An older server that refuses a field
+ * is asked again without it, step by step, and remembered.
+ */
+async function ollama<T>(
+  c: Connection,
+  req: JsonRequest<T>,
+  signal?: AbortSignal,
+): Promise<{ value: T; model: string }> {
+  const base = ollamaBase(c.baseUrl);
+  if (!base.startsWith('http')) throw new LlmError('NOT_CONFIGURED', 'no service address');
+  const url = `${base}/api/chat`;
+  let step = refused.get(url) ?? 0;
+  for (;;) {
+    const format = step < 2 ? z.toJSONSchema(req.schema) : step < 3 ? 'json' : undefined;
+    const res = await call(
+      url,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...(c.key ? { authorization: `Bearer ${c.key}` } : {}) },
+        body: JSON.stringify({
+          model: c.model,
+          stream: false,
+          messages: [
+            { role: 'system', content: req.system },
+            { role: 'user', content: req.user },
+          ],
+          ...(format ? { format } : {}),
+          ...(step < 1 && c.params.noReasoning ? { think: false } : {}),
+          options: {
+            temperature: c.params.temperature,
+            num_ctx: c.params.contextLength,
+            num_predict: c.params.maxTokens,
+          },
+        }),
+      },
+      c.params.timeoutSeconds * 1000,
+      signal,
+    );
+    if (res.status === 400 && step < STEPS - 1) {
+      await res.body?.cancel();
+      step++;
+      refused.set(url, step);
+      continue;
+    }
+    if (res.status === 404) {
+      await res.body?.cancel();
+      throw new LlmError('BAD_RESPONSE', `Ollama has no model ${c.model}`);
+    }
+    if (!res.ok) {
+      await res.body?.cancel();
+      throw statusError(res.status);
+    }
+    const body = (await readCapped(res)) as { message?: { content?: unknown }; model?: unknown } | null;
+    const content = body?.message?.content;
+    if (typeof content !== 'string') throw new LlmError('BAD_RESPONSE', 'unexpected response shape');
+    const parsed = req.schema.safeParse(extractJson(content));
+    if (!parsed.success) throw new LlmError('BAD_RESPONSE', 'the answer does not follow the format');
+    return { value: parsed.data, model: typeof body?.model === 'string' ? body.model : c.model };
+  }
+}
+
 /* ------------------------------------------------------------------ Anthropic */
 
 async function anthropic<T>(
@@ -270,7 +339,9 @@ export function askJson<T>(
   req: JsonRequest<T>,
   signal?: AbortSignal,
 ): Promise<{ value: T; model: string }> {
-  return c.provider === 'anthropic' ? anthropic(c, req, signal) : openAiStyle(c, req, signal);
+  if (c.provider === 'anthropic') return anthropic(c, req, signal);
+  if (c.provider === 'ollama') return ollama(c, req, signal);
+  return openAiStyle(c, req, signal);
 }
 
 /* ------------------------------------------------------------------ model lists */
@@ -304,6 +375,20 @@ export async function listModels(c: Omit<Connection, 'model' | 'params'>, timeou
       if (err instanceof Anthropic.APIConnectionError) throw new LlmError('UNREACHABLE', 'cannot reach the API');
       throw new LlmError('BAD_RESPONSE', 'the model list could not be read');
     }
+  }
+  if (c.provider === 'ollama') {
+    const base = ollamaBase(c.baseUrl);
+    if (!base.startsWith('http')) throw new LlmError('NOT_CONFIGURED', 'no service address');
+    const res = await call(`${base}/api/tags`, { headers: key ? { authorization: `Bearer ${key}` } : {} }, timeoutMs);
+    if (!res.ok) {
+      await res.body?.cancel();
+      throw statusError(res.status);
+    }
+    const models = ((await readCapped(res, 2 * 1024 * 1024)) as { models?: { name?: unknown }[] } | null)?.models;
+    return (Array.isArray(models) ? models : [])
+      .map((m) => m?.name)
+      .filter((n): n is string => typeof n === 'string' && n.length > 0 && n.length < 200)
+      .sort((a, b) => a.localeCompare(b));
   }
   const url =
     c.provider === 'azure-openai'

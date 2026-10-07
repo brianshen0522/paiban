@@ -9,15 +9,25 @@ Brian，2026-10-07：搜尋字幕常常只有英文的，想用語言模型翻�
 | 欄位 | 說明 |
 | --- | --- |
 | 名稱 | 1 到 60 字，給人看的 |
-| 供應商 | OpenAI、Anthropic、Azure OpenAI、Azure AI Foundry、OpenRouter、自架（Ollama、vLLM 等 OpenAI 相容的服務） |
-| 服務網址 | 自架、Azure OpenAI、Azure AI Foundry 必填；OpenAI、Anthropic、OpenRouter 選填（留空用官方網址，填了是前面的代理） |
+| 供應商 | OpenAI、Anthropic、Azure OpenAI、Azure AI Foundry、OpenRouter、Ollama、OpenAI 相容的自架服務（vLLM、LM Studio 等） |
+| 服務網址 | Ollama、自架、Azure OpenAI、Azure AI Foundry 必填；OpenAI、Anthropic、OpenRouter 選填（留空用官方網址，填了是前面的代理）。Ollama 填到埠號為止（`http://192.168.1.10:11434`），貼成 `…/v1` 也會自動去掉 |
 | API 版本 | 只有 Azure 兩種有，預設 `2024-10-21`（Azure OpenAI）、`2024-05-01-preview`（Azure AI Foundry） |
 | 金鑰 | 選填（自架常常沒有）。加密存放（AES-256-GCM，附加資料是 `llm:<設定檔 id>`，搬不到別的設定檔），存了之後不再顯示，只說「已設定」 |
 | 模型 | Azure OpenAI 填部署名稱（deployment） |
 | 優先順序 | 1 到 9，1 先用 |
 | 權重 | 1 到 100，同一個優先順序裡分攤請求的比例 |
 | 啟用 | 停用的不會被選到 |
-| 參數 | temperature（0 到 2，預設 0.2）、最大輸出長度（256 到 32000，預設 8000）、逾時（10 到 600 秒，預設 120）、同時送出的請求數（1 到 16，預設 3）、關閉推理（預設開：對 OpenAI 相容的服務送 `reasoning_effort: "none"`，被拒時自動不帶） |
+| 參數 | temperature（0 到 2，預設 0.2）、最大輸出長度（256 到 32000，預設 8000）、逾時（10 到 600 秒，預設 120）、同時送出的請求數（1 到 16，預設 3）、關閉推理（預設開：對 OpenAI 相容的服務送 `reasoning_effort: "none"`、對 Ollama 送 `think: false`，被拒時自動不帶）、長度上限（只有 Ollama，`num_ctx`，2048 到 131072，預設 16384） |
+
+### 為什麼 Ollama 是自己一種（Brian，2026-10-07）
+
+Ollama 也有 OpenAI 相容的介面，但翻譯走它自己的 `/api/chat`：
+
+- 長度上限：Ollama 預設的上下文很小，超過的部分會被悄悄截掉、不報錯；翻譯一段（50 句加前後 20 句參考、簡介和回答）很容易超過，結果是少句。相容介面不能調，原生介面每次帶 `options.num_ctx`。
+- `think: false` 比 `reasoning_effort` 可靠，舊版 Ollama 不一定認得後者。
+- `format` 直接給回答的 JSON schema，模型比較不會漏句或多句。
+- 模型清單從 `/api/tags` 取。
+- 舊一點的 Ollama 拒絕某個欄位（400）時，依序拿掉 `think`、把 `format` 換成 `"json"`、再拿掉 `format` 重試，並記住。
 
 ### 分配：負載平衡與備援
 
