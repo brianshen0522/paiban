@@ -6,6 +6,7 @@ import { FillPage, ScrollList } from '../../components/FillPage';
 import { t } from '../../copy/zh-TW';
 import { get } from '../../lib/api';
 import { bytes } from '../../lib/format';
+import { langName } from '../workspace/SubtitlesTab';
 
 /** docs/11-pages.md, "操作紀錄": time, who (as named then), action and target, 50 per page. */
 export function AuditPage() {
@@ -101,6 +102,7 @@ export function actionText(e: AuditEntry): string {
     if (keys.includes('providers.yify.baseUrl')) return s.yify;
     if (keys.includes('providers.justsubtitles.mode')) return s.jsMode;
     if (keys.includes('providers.cacheHours')) return s.cache;
+    if (keys.includes('llm.translatePerHour')) return s.translateLimit;
     return s.other;
   }
   return t.audit.actions[e.action] ?? e.action;
@@ -111,7 +113,12 @@ export function targetText(e: AuditEntry): string {
   const join = (...p: unknown[]) => p.filter((v) => v !== undefined && v !== '').join(' · ');
   if (e.action === 'admin.storage.delete')
     return join(t.itemKinds[String(x.itemKind)] ?? x.itemKind, x.fileName ?? x.movieTitle);
-  if (x.movieTitle !== undefined) return join(x.movieTitle, x.version ?? x.language ?? x.releaseName ?? x.fileName);
+  // Languages by name, not code ("English", not "en"); a translation also says which form.
+  const lang = x.language !== undefined ? langName(String(x.language)) : undefined;
+  const form = x.mode !== undefined ? t.translate.modeTag[String(x.mode)] : undefined;
+  if (x.movieTitle !== undefined)
+    return join(x.movieTitle, x.version ?? (lang && form ? `${lang}（${form}）` : lang) ?? x.releaseName ?? x.fileName);
+  if (lang) return join(form ? `${lang}（${form}）` : lang);
   if (e.action === 'auth.login' || e.action === 'auth.session.revoke')
     return x.os || x.browser ? join(x.os, x.browser) : t.profile.unknownDevice;
   if (e.action === 'admin.user.role') return `${x.name} → ${t.shell.role[x.role as 'admin' | 'member'] ?? x.role}`;

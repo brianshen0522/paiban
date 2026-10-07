@@ -503,6 +503,8 @@ label.chk {
   display: grid;
   gap: 4px;
   min-width: 0;
+  /* A field in a row of taller ones keeps its label and box at the top, not stretched apart. */
+  align-content: start;
 }
 .field > label,
 fieldset.field > legend {
@@ -671,6 +673,10 @@ fieldset.field > legend {
 }
 .pop .pop-item:hover {
   background: var(--panel-2);
+}
+.pop .pop-when {
+  color: var(--ink-3);
+  font-size: 11.5px;
 }
 .pop .pop-item.unread span {
   font-weight: 600;
@@ -1738,6 +1744,15 @@ fieldset.field > legend {
   bottom: 0;
   background: var(--bg);
   padding-block: 10px;
+  /* Reads as a bar over the page, not a slice cut out of the card behind it. */
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -8px 16px -12px rgba(10, 12, 20, 0.25);
+  z-index: 2;
+}
+/* A short number with a long help line: the button sits next to the box, not after the help text. */
+#view form.align-end .field:has(.narrow-input),
+#view form.limit .field:has(.narrow-input) {
+  flex: 0 1 19em;
 }
 #view .radios {
   border: 0;

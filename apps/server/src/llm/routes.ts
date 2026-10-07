@@ -369,11 +369,11 @@ export function translationRoutes(app: FastifyInstance, deps: Deps): void {
   app.decorate('translationWorker', worker);
   app.addHook('onClose', async () => worker.stop());
 
-  const mine = async (user: AuthedUser, id: string): Promise<TranslationRow> => {
+  const mine = async (user: AuthedUser, id: string): Promise<TranslationRow & { movieTitle: string }> => {
     const t = await translationRow(pool, id);
     if (!t) throw new ApiError('NOT_FOUND', 'no such translation');
-    await holderTorrent(deps, user, t.torrent_id);
-    return t;
+    const film = await holderTorrent(deps, user, t.torrent_id);
+    return { ...t, movieTitle: film.title };
   };
   const view = async (id: string) => {
     const r = await translationRow(pool, id);
@@ -391,7 +391,7 @@ export function translationRoutes(app: FastifyInstance, deps: Deps): void {
       [id],
     );
     if (!s) throw new ApiError('NOT_FOUND', 'no such subtitle');
-    await holderTorrent(deps, user, s.torrent_id);
+    const film = await holderTorrent(deps, user, s.torrent_id);
     if (!(await app.llm.hasProfiles())) throw new ApiError('LLM_NOT_CONFIGURED', 'no language model is set up');
     // The same translation pressed again after it failed or was cancelled carries on that one,
     // from where it stopped, rather than starting a second (Brian, 2026-10-07). Not counted.
@@ -427,7 +427,13 @@ export function translationRoutes(app: FastifyInstance, deps: Deps): void {
       throw err;
     }
     if (!created) throw new ApiError('NOT_FOUND', 'the film is being removed');
-    await audit(pool, user, 'subtitle.translate.start', { language: body.targetLanguage, mode: body.mode }, req.ip);
+    await audit(
+      pool,
+      user,
+      'subtitle.translate.start',
+      { movieTitle: film.title, language: body.targetLanguage, mode: body.mode },
+      req.ip,
+    );
     // The answer is what this request started: read before the first chunk can come back.
     const answer = await view(created.id);
     worker.kick(created.id);
@@ -463,7 +469,13 @@ export function translationRoutes(app: FastifyInstance, deps: Deps): void {
         [id],
       );
       worker.cancel(id);
-      await audit(pool, user, 'subtitle.translate.cancel', { language: t.target_language }, req.ip);
+      await audit(
+        pool,
+        user,
+        'subtitle.translate.cancel',
+        { movieTitle: t.movieTitle, language: t.target_language, mode: t.mode },
+        req.ip,
+      );
     }
     return view(id);
   });
@@ -490,7 +502,13 @@ export function translationRoutes(app: FastifyInstance, deps: Deps): void {
       if (pgCode(err) === UNIQUE_VIOLATION) throw new ApiError('TRANSLATION_RUNNING', 'already being translated');
       throw err;
     }
-    await audit(pool, user, 'subtitle.translate.resume', { language: t.target_language }, ip);
+    await audit(
+      pool,
+      user,
+      'subtitle.translate.resume',
+      { movieTitle: t.movieTitle, language: t.target_language, mode: t.mode },
+      ip,
+    );
     const answer = await view(id);
     worker.kick(id);
     return answer;

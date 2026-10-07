@@ -5,8 +5,9 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
 import { t } from '../copy/zh-TW';
 import { post } from '../lib/api';
 import { useServerEvents } from '../lib/events';
-import { bytes } from '../lib/format';
+import { bytes, relative } from '../lib/format';
 import { keys, useNotifications, useStorage, useTorrents } from '../lib/queries';
+import { langName } from '../pages/workspace/SubtitlesTab';
 import { SuggestInput } from './SuggestInput';
 import { ThemeToggle } from './ThemeToggle';
 import { useToast } from './Toasts';
@@ -32,7 +33,7 @@ export function notificationText(n: Notification): string {
     case 'export.failed':
       return t.notifications['export.failed'](title);
     case 'subtitle.confirmed':
-      return t.notifications['subtitle.confirmed'](d.actor ?? '', title, d.language ?? '');
+      return t.notifications['subtitle.confirmed'](d.actor ?? '', title, langName(d.language ?? ''));
     case 'item.deleted':
       return t.notifications['item.deleted'](d.actor ?? '', t.itemKinds[d.itemKind ?? ''] ?? d.itemKind ?? '', title);
     default:
@@ -217,6 +218,7 @@ export function Shell({ me }: { me: Me }) {
                     onClick={() => openNote(n)}
                   >
                     <span>{notificationText(n)}</span>
+                    <small className="pop-when">{relative(n.createdAt)}</small>
                   </button>
                 ))}
               </div>

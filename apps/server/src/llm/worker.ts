@@ -282,11 +282,17 @@ export class TranslationWorker {
     } finally {
       await removeWorkDir(config.dataDir, work);
     }
+    const title = await one<{ title: string }>(
+      pool,
+      'select m.title from torrents t join movies m on m.id = t.movie_id where t.id = $1',
+      [t.torrent_id],
+    );
     await audit(
       pool,
       t.created_by ? { id: t.created_by, displayName: t.creator_name ?? '' } : null,
       'subtitle.translate',
       {
+        movieTitle: title?.title ?? '',
         language: t.target_language,
         mode: t.mode,
       },
