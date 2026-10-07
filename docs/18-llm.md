@@ -19,6 +19,11 @@ Brian，2026-10-07：搜尋字幕常常只有英文的，想用語言模型翻�
 | 啟用 | 停用的不會被選到 |
 | 參數 | temperature（0 到 2，預設 0.2）、最大輸出長度（256 到 32000，預設 8000）、逾時（10 到 600 秒，預設 120）、同時送出的請求數（1 到 16，預設 3）、關閉推理（預設開：對 OpenAI 相容的服務送 `reasoning_effort: "none"`、對 Ollama 送 `think: false`，被拒時自動不帶）、長度上限（只有 Ollama，`num_ctx`，2048 到 131072，預設 16384） |
 
+### 不照規矩回答的服務
+
+- 送出時一律帶 `stream: false`。有些轉接多家模型的閘道仍然回 `text/event-stream`：一整段 JSON 後面接 `data: [DONE]`，或一段一段的 `data:`（`delta`）。兩種都照樣讀（Brian，2026-10-07 實際遇到）。
+- 有些閘道會把 `response_format: json_object` 換成自己的指示（要模型回 `{"answer": …}`），蓋掉我們要的格式。回答不符格式時，拿掉 `response_format` 再問一次，並記住這個網址不要帶。
+
 ### 為什麼 Ollama 是自己一種（Brian，2026-10-07）
 
 Ollama 也有 OpenAI 相容的介面，但翻譯走它自己的 `/api/chat`：

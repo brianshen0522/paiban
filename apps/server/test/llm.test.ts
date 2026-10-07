@@ -22,7 +22,7 @@ type Seen = {
   auth: string | undefined;
   body: { model?: string; messages?: { content: string }[]; [k: string]: unknown };
 };
-type Mode = 'ok' | 'rate' | 'auth' | 'english' | 'drop-once' | 'slow';
+type Mode = 'ok' | 'rate' | 'auth' | 'english' | 'drop-once' | 'slow' | 'gateway' | 'sse';
 
 /** A model server: translates "N: text" into "譯N", or misbehaves as told. */
 async function fakeModel(): Promise<{ url: string; seen: Seen[]; mode: { value: Mode }; close: () => Promise<void> }> {
@@ -54,6 +54,23 @@ async function fakeModel(): Promise<{ url: string; seen: Seen[]; mode: { value: 
         ids = ids.slice(0, -1);
       }
       const lines = ids.map((id) => ({ id, text: mode.value === 'english' ? `Line ${id}` : `譯${id}` }));
+      // A gateway seen in the wild: "event-stream" holding one JSON answer then `data: [DONE]`,
+      // and its own {"answer": …} format whenever response_format is sent.
+      if (mode.value === 'gateway') {
+        const content = body.response_format ? JSON.stringify({ answer: 'ok' }) : JSON.stringify({ lines });
+        res.writeHead(200, { 'content-type': 'text/event-stream' });
+        return res.end(
+          `${JSON.stringify({ model: 'glm-test', choices: [{ message: { content } }] })}\n\ndata: [DONE]\n\n`,
+        );
+      }
+      if (mode.value === 'sse') {
+        const content = JSON.stringify({ lines });
+        const half = Math.floor(content.length / 2);
+        res.writeHead(200, { 'content-type': 'text/event-stream' });
+        for (const piece of [content.slice(0, half), content.slice(half)])
+          res.write(`data: ${JSON.stringify({ model: 'sse-test', choices: [{ delta: { content: piece } }] })}\n\n`);
+        return res.end('data: [DONE]\n\n');
+      }
       // Ollama's own API answers in `message`, the OpenAI protocol in `choices`.
       if (req.url === '/api/chat')
         return send(200, {
@@ -329,6 +346,22 @@ describe('the LLM settings page', () => {
         })
       ).json().error.details.fields,
     ).toEqual({ baseUrl: 'REQUIRED' });
+  });
+
+  it('reads answers a gateway wraps as events, and drops response_format when it gets in the way', async () => {
+    b.mode.value = 'gateway';
+    const first = await call(t.app, 'POST', '/api/admin/llm/test', { cookie: boss, body: profile({ baseUrl: b.url }) });
+    expect(first.json()).toMatchObject({ ok: true, reply: '譯1／譯2' });
+    expect(b.seen.map((x) => 'response_format' in x.body)).toEqual([true, false]);
+    expect(b.seen.every((x) => x.body.stream === false)).toBe(true);
+    // Remembered: the next question goes without it straight away.
+    await call(t.app, 'POST', '/api/admin/llm/test', { cookie: boss, body: profile({ baseUrl: b.url }) });
+    expect(b.seen).toHaveLength(3);
+    expect('response_format' in (b.seen[2]?.body ?? {})).toBe(false);
+    b.mode.value = 'sse';
+    expect(
+      (await call(t.app, 'POST', '/api/admin/llm/test', { cookie: boss, body: profile({ baseUrl: b.url }) })).json(),
+    ).toMatchObject({ ok: true, reply: '譯1／譯2' });
   });
 
   it('moves the one model of before into the first profile, its key sealed again', async () => {

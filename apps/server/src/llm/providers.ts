@@ -71,6 +71,17 @@ export function extractJson(text: string): unknown {
 
 /** The body as JSON, or null when it is not JSON; refuses to read past `cap` bytes. */
 async function readCapped(res: Response, cap = MAX_ANSWER_BYTES): Promise<unknown> {
+  const text = await readText(res, cap);
+  if (text === null) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+/** The body as text; refuses to read past `cap` bytes. */
+async function readText(res: Response, cap = MAX_ANSWER_BYTES): Promise<string | null> {
   const reader = res.body?.getReader();
   if (!reader) return null;
   const chunks: Uint8Array[] = [];
@@ -85,11 +96,59 @@ async function readCapped(res: Response, cap = MAX_ANSWER_BYTES): Promise<unknow
     }
     chunks.push(value);
   }
-  try {
-    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
-  } catch {
-    return null;
+  return Buffer.concat(chunks).toString('utf8');
+}
+
+/**
+ * A chat-completions answer however it came: plain JSON, or server-sent events, which some
+ * gateways send even when asked not to stream. Seen in the wild (Brian, 2026-10-07): one whole
+ * JSON answer followed by `data: [DONE]`; also handled: proper `data:` chunks with deltas.
+ */
+export function readChatAnswer(text: string): { text: string; model: string | null } | null {
+  const whole = (() => {
+    try {
+      return ChatAnswer.parse(JSON.parse(text));
+    } catch {
+      return null;
+    }
+  })();
+  if (whole) return whole;
+  const events = text
+    .split(/\r?\n/)
+    .filter((l) => l.startsWith('data:'))
+    .map((l) => l.slice(5).trim())
+    .filter((d) => d && d !== '[DONE]');
+  // A JSON answer with event lines after it: the part before the first event line.
+  const head = text.split(/\r?\n?data:/)[0]?.trim() ?? '';
+  if (head.startsWith('{')) {
+    try {
+      const a = ChatAnswer.parse(JSON.parse(head));
+      if (a) return a;
+    } catch {
+      // not one JSON answer; try the events
+    }
   }
+  let content = '';
+  let model: string | null = null;
+  let seen = false;
+  for (const d of events) {
+    let e: { model?: unknown; choices?: { message?: { content?: unknown }; delta?: { content?: unknown } }[] };
+    try {
+      e = JSON.parse(d);
+    } catch {
+      continue;
+    }
+    if (typeof e.model === 'string') model ??= e.model;
+    const choice = e.choices?.[0];
+    if (typeof choice?.message?.content === 'string') {
+      content = choice.message.content;
+      seen = true;
+    } else if (typeof choice?.delta?.content === 'string') {
+      content += choice.delta.content;
+      seen = true;
+    }
+  }
+  return seen ? { text: content, model } : null;
 }
 
 /** fetch with the profile's time limit and the caller's abort; an API is never followed through a redirect with the key. */
@@ -155,6 +214,7 @@ function chatBody(c: Connection, t: ChatTarget, system: string, user: string, st
   const tokensField = c.provider === 'openai' ? 'max_completion_tokens' : 'max_tokens';
   return {
     ...(t.bodyModel ? { model: c.model } : {}),
+    stream: false,
     messages: [
       { role: 'system', content: system },
       { role: 'user', content: user },
@@ -205,11 +265,25 @@ async function openAiStyle<T>(
       await res.body?.cancel();
       throw statusError(res.status);
     }
-    const answer = ChatAnswer.parse(await readCapped(res));
+    const text = await readText(res);
+    const answer = text === null ? null : readChatAnswer(text);
     if (!answer) throw new LlmError('BAD_RESPONSE', 'unexpected response shape');
-    const parsed = req.schema.safeParse(extractJson(answer.text));
-    if (!parsed.success) throw new LlmError('BAD_RESPONSE', 'the answer does not follow the format');
-    return { value: parsed.data, model: answer.model ?? c.model };
+    let value: unknown = null;
+    try {
+      value = extractJson(answer.text);
+    } catch {
+      value = null;
+    }
+    const parsed = req.schema.safeParse(value);
+    if (parsed.success) return { value: parsed.data, model: answer.model ?? c.model };
+    // Some gateways turn `response_format` into instructions of their own ("answer as
+    // {"answer": …}"), which override ours. Asked once more without it, and remembered.
+    if (step < 2) {
+      step = 2;
+      refused.set(t.url, step);
+      continue;
+    }
+    throw new LlmError('BAD_RESPONSE', 'the answer does not follow the format');
   }
 }
 
