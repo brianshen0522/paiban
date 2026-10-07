@@ -25,7 +25,7 @@ const AZURE_VERSION: Partial<Record<LlmProvider, string>> = {
 export const DEFAULT_PARAMS: LlmParams = {
   temperature: 0.2,
   maxTokens: 8000,
-  timeoutSeconds: 120,
+  timeoutSeconds: 300,
   concurrency: 3,
   noReasoning: true,
   contextLength: 16384,

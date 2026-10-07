@@ -1606,7 +1606,8 @@ export const t = {
       REFUSED: '模型拒絕回答',
       BAD_RESPONSE: '模型的回答格式不對，重試幾次都一樣',
       UNREACHABLE: '連不上語言模型',
-      TIMEOUT: '語言模型太久沒有回答',
+      TIMEOUT:
+        '語言模型太久沒有回答。一段 50 句，會先「思考」的模型可能要好幾分鐘：請管理員到「LLM 設定」把這個設定檔的逾時調長，或換一個可以關閉推理、回答比較快的模型，再按「繼續」',
     } as Record<string, string>,
     actionFailed: '沒有成功，請再試一次。',
   },

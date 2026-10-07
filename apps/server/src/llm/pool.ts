@@ -31,7 +31,9 @@ export type ProfileRow = {
 export const DEFAULT_PARAMS: LlmParams = {
   temperature: 0.2,
   maxTokens: 8000,
-  timeoutSeconds: 120,
+  // A translation chunk is 50 lines; a model that reasons first can take minutes (Brian's
+  // gateway, 2026-10-07: 264 s with reasoning on, 24 s with it off).
+  timeoutSeconds: 300,
   concurrency: 3,
   noReasoning: true,
   contextLength: 16_384,
