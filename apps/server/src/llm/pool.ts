@@ -163,8 +163,18 @@ export class LlmPool {
 
   /** A profile to try: first layer with a free one, weighted; null when all usable ones are busy; 'none' when none is usable at all. */
   private pick(live: ProfileRow[], tried: Set<string>): ProfileRow | null | 'none' {
-    const usable = live.filter((r) => !tried.has(r.id) && !this.coolingNow(r.id));
-    if (!usable.length) return 'none';
+    const untried = live.filter((r) => !tried.has(r.id));
+    const usable = untried.filter((r) => !this.coolingNow(r.id));
+    if (!usable.length) {
+      // Only cooling down after a passing trouble (rate limit, timeout, unreachable): worth
+      // waiting for, so that pressing "carry on" a minute after a timeout does not fail at once.
+      // A refused key or a missing setting will not mend by waiting.
+      const passing = untried.some((r) => {
+        const code = this.cooling.get(r.id)?.code;
+        return code === 'RATE_LIMITED' || code === 'TIMEOUT' || code === 'UNREACHABLE';
+      });
+      return passing ? null : 'none';
+    }
     const priorities = [...new Set(usable.map((r) => r.priority))].sort((a, b) => a - b);
     for (const p of priorities) {
       const free = usable.filter(
@@ -230,7 +240,14 @@ export class LlmPool {
       const live = (await this.rows()).filter((r) => r.enabled);
       if (!live.length) throw new LlmError('NOT_CONFIGURED', 'no language model is set up');
       const r = this.pick(live, tried);
-      if (r === 'none') break;
+      if (r === 'none') {
+        // Every untried profile is cooling for a reason waiting will not fix: say which.
+        if (!last) {
+          const code = live.map((x) => this.cooling.get(x.id)?.code).find((c) => c);
+          if (code) last = new LlmError(code, 'every profile is cooling down after a failure');
+        }
+        break;
+      }
       if (r === null) {
         if (Date.now() > deadline) throw new LlmError('TIMEOUT', 'every profile stayed busy');
         await this.waitForSlot(caller.signal);

@@ -1583,6 +1583,8 @@ export const t = {
     starting: '開始中…',
     cancel: '取消',
     started: '開始翻譯了。進度在這一頁的「翻譯」區。',
+    resumed: (done: number, total: number) =>
+      `這條字幕之前翻到一半，接著從第 ${done + 1} 段翻（共 ${total} 段），已翻好的不重翻。`,
     notConfigured: '管理員還沒有設定語言模型，所以不能翻譯。',
     toLlm: '前往 LLM 設定',
     running: '這條字幕已經有一筆一樣的翻譯在進行。',

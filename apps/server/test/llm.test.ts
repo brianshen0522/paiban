@@ -543,6 +543,77 @@ describe('translating a subtitle', () => {
     expect(a.seen.length - askedBefore).toBe(3 - after.done_chunks);
   });
 
+  it('starting the same translation again carries on the one that failed, instead of a second', async () => {
+    await create({ baseUrl: a.url });
+    expect(
+      (await call(t.app, 'PUT', '/api/admin/llm/settings', { cookie: boss, body: { translatePerHour: 1 } })).statusCode,
+    ).toBe(204);
+    a.mode.value = 'auth';
+    const s = await source();
+    const first = (await translate(s.sid)).json();
+    await t.app.translationWorker.idle();
+    expect((await db.pool.query('select state from translations where id = $1', [first.id])).rows[0].state).toBe(
+      'failed',
+    );
+    a.mode.value = 'ok';
+    // The administrator fixes the key: editing the profile ends its cooling down.
+    const p = (await call(t.app, 'GET', '/api/admin/llm', { cookie: boss })).json().profiles[0];
+    await call(t.app, 'PUT', `/api/admin/llm/profiles/${p.id}`, {
+      cookie: boss,
+      body: profile({ key: 'fixed-key-not-real' }),
+    });
+    // Pressed again from the subtitle, not "carry on": the same row, and not another one off the hourly limit.
+    const again = await translate(s.sid);
+    expect(again.statusCode).toBe(200);
+    expect(again.json()).toMatchObject({ id: first.id, state: 'running' });
+    await t.app.translationWorker.idle();
+    const list = (await call(t.app, 'GET', `/api/torrents/${s.tid}/translations`, { cookie: mei })).json();
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({ id: first.id, state: 'done' });
+    // Another language is another translation.
+    expect((await translate(s.sid, { targetLanguage: 'ja', mode: 'plain' })).statusCode).toBe(429);
+  });
+
+  it('waits out a short cooling down instead of failing at once', async () => {
+    await create({ baseUrl: a.url });
+    const { Answer } = await import('../src/llm/translate.js');
+    const p = t.app.llm;
+    const row = (await p.rows())[0];
+    if (!row) throw new Error('no profile');
+    // As if the last request had timed out a moment ago: cooling for another 300 ms.
+    (p as unknown as { cooling: Map<string, { until: number; code: string }> }).cooling.set(row.id, {
+      until: Date.now() + 300,
+      code: 'TIMEOUT',
+    });
+    const r = await p.ask(
+      { system: 's', user: 'Translate these lines:\n1: "x"', schema: Answer },
+      { purpose: 'test', userId: null },
+    );
+    expect(r.profile).toBe('Local');
+    // A refused key is not waited for.
+    (p as unknown as { cooling: Map<string, { until: number; code: string }> }).cooling.set(row.id, {
+      until: Date.now() + 600_000,
+      code: 'AUTH',
+    });
+    await expect(
+      p.ask({ system: 's', user: 'x', schema: Answer }, { purpose: 'test', userId: null }),
+    ).rejects.toMatchObject({ code: 'AUTH' });
+    p.reset(row.id);
+  });
+
+  it('lists one row per subtitle, language and form: the latest', async () => {
+    await create({ baseUrl: a.url });
+    const s = await source();
+    for (const state of ['failed', 'done'])
+      await db.pool.query(
+        `insert into translations (torrent_id, source_id, target_language, mode, state, total_chunks, created_at)
+         values ($1, $2, 'zh-Hant', 'plain', $3, 3, now() - interval '1 minute' * $4)`,
+        [s.tid, s.sid, state, state === 'failed' ? 10 : 1],
+      );
+    const list = (await call(t.app, 'GET', `/api/torrents/${s.tid}/translations`, { cookie: mei })).json();
+    expect(list.map((x: { state: string }) => x.state)).toEqual(['done']);
+  });
+
   it('fails with the reason when every profile fails, and only holders may translate', async () => {
     await create({ baseUrl: a.url });
     a.mode.value = 'auth';

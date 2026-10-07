@@ -12,7 +12,7 @@ import { holderTorrent } from '../torrents/routes.js';
 import { DEFAULT_PARAMS, LlmPool, type ProfileRow, sealKey } from './pool.js';
 import { type Connection, checkBaseUrl, DEFAULT_API_VERSION, LlmError, listModels, ollamaBase } from './providers.js';
 import { CHUNK, testQuestion } from './translate.js';
-import { TRANSLATION_SELECT, type TranslationRow, TranslationWorker, toTranslation, translationRow } from './worker.js';
+import { type TranslationRow, TranslationWorker, toTranslation, translationRow } from './worker.js';
 
 declare module 'fastify' {
   interface FastifyInstance {
@@ -393,6 +393,15 @@ export function translationRoutes(app: FastifyInstance, deps: Deps): void {
     if (!s) throw new ApiError('NOT_FOUND', 'no such subtitle');
     await holderTorrent(deps, user, s.torrent_id);
     if (!(await app.llm.hasProfiles())) throw new ApiError('LLM_NOT_CONFIGURED', 'no language model is set up');
+    // The same translation pressed again after it failed or was cancelled carries on that one,
+    // from where it stopped, rather than starting a second (Brian, 2026-10-07). Not counted.
+    const earlier = await one<{ id: string }>(
+      pool,
+      `select id from translations where source_id = $1 and target_language = $2 and mode = $3
+          and state in ('failed', 'cancelled') order by created_at desc limit 1`,
+      [id, body.targetLanguage, body.mode],
+    );
+    if (earlier) return resume(user, earlier.id, req.ip);
     const limit = (await readSettings(pool)).llm.translatePerHour;
     const recent = await many<{ created_at: Date }>(
       pool,
@@ -429,9 +438,16 @@ export function translationRoutes(app: FastifyInstance, deps: Deps): void {
     const user = requireUser(req);
     const { id } = parse(IdParams, req.params);
     await holderTorrent(deps, user, id);
+    // One row per subtitle, language and form: the latest. An older failed one that a later
+    // press replaced (before presses carried on) is not shown next to it.
     const rows = await many<TranslationRow>(
       pool,
-      `${TRANSLATION_SELECT} where t.torrent_id = $1 order by t.created_at desc limit 30`,
+      `select * from (
+         select distinct on (t.source_id, t.target_language, t.mode) t.*, u.display_name as creator_name
+           from translations t left join users u on u.id = t.created_by
+          where t.torrent_id = $1
+          order by t.source_id, t.target_language, t.mode, t.created_at desc
+       ) latest order by created_at desc limit 30`,
       [id],
     );
     return rows.map(toTranslation);
@@ -455,6 +471,10 @@ export function translationRoutes(app: FastifyInstance, deps: Deps): void {
   app.post('/api/translations/:id/resume', async (req): Promise<Translation> => {
     const user = requireUser(req);
     const { id } = parse(IdParams, req.params);
+    return resume(user, id, req.ip);
+  });
+
+  async function resume(user: AuthedUser, id: string, ip: string): Promise<Translation> {
     const t = await mine(user, id);
     if (t.state !== 'failed' && t.state !== 'cancelled')
       throw new ApiError('VALIDATION', 'only a failed or cancelled translation carries on', {
@@ -470,8 +490,9 @@ export function translationRoutes(app: FastifyInstance, deps: Deps): void {
       if (pgCode(err) === UNIQUE_VIOLATION) throw new ApiError('TRANSLATION_RUNNING', 'already being translated');
       throw err;
     }
+    await audit(pool, user, 'subtitle.translate.resume', { language: t.target_language }, ip);
     const answer = await view(id);
     worker.kick(id);
     return answer;
-  });
+  }
 }

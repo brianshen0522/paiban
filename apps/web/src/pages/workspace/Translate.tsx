@@ -50,8 +50,9 @@ export function TranslateDialog({ s, onClose }: { s: Subtitle; onClose: () => vo
     setBusy(true);
     setError(null);
     try {
-      await post<Translation>(`/api/subtitles/${s.id}/translate`, { targetLanguage: lang, mode });
-      toast(c().started);
+      const r = await post<Translation>(`/api/subtitles/${s.id}/translate`, { targetLanguage: lang, mode });
+      // The same translation that failed before carries on rather than starting over.
+      toast(r.doneChunks > 0 ? c().resumed(r.doneChunks, r.totalChunks) : c().started);
       void qc.invalidateQueries({ queryKey: keys.translations(s.torrentId) });
       onClose();
     } catch (err) {
