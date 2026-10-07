@@ -3,17 +3,24 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { SyncCore } from '@paiban/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { DEFAULT_PARAMS } from '../llm/pool.js';
+import { type Connection, extractJson, LlmError } from '../llm/providers.js';
 import { fitPairs, MIN_PAIRS, type Pair, pairSupport, pickWithPairs } from './fit.js';
-import {
-  anthropicMatcher,
-  extractJson,
-  LlmError,
-  llmPairs,
-  type Matcher,
-  type MatchRequest,
-  openAiCompatibleMatcher,
-  renderRequest,
-} from './llm.js';
+import { connectionMatcher, llmPairs, type Matcher, type MatchRequest, renderRequest } from './llm.js';
+
+/** The OpenAI-compatible and Claude clients, as the LLM profiles build them (docs/18-llm.md). */
+const openAiCompatibleMatcher = (baseUrl: string, key: string | null, model: string) =>
+  connectionMatcher({ provider: 'self-hosted', baseUrl, apiVersion: '', model, key, params: DEFAULT_PARAMS });
+const anthropicMatcher = (key: string, model: string, baseUrl: string) =>
+  connectionMatcher({
+    provider: 'anthropic',
+    baseUrl,
+    apiVersion: '',
+    model,
+    key,
+    params: DEFAULT_PARAMS,
+  } satisfies Connection);
+
 import { type AsrTranscript, covered, pickWindows, similarity, textPairs, tokens } from './text.js';
 
 type Cue = SyncCore.Cue;

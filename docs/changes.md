@@ -16,6 +16,14 @@
 
 ---
 
+## 2026-10-07 LLM 設定頁與字幕翻譯
+
+- 原本：語言模型只用在自動對齊，設定在「來源設定 → 自動對齊」，只有一個（Claude 或 OpenAI 相容），金鑰是 `llmKey`。沒有字幕翻譯。
+- 改成：管理頁新增「LLM 設定」（`/admin/llm`），可以建立多個設定檔（OpenAI、Anthropic、Azure OpenAI、Azure AI Foundry、OpenRouter、自架），依優先順序和權重做負載平衡與備援；翻譯和自動對齊共用。工作區的字幕可以翻成任何語言（純譯文或雙語），結果是一條沿用原字幕同步結果的新字幕。舊設定在升級時搬成第一個設定檔。新資料表（遷移 `0005_llm.sql`）、新端點、`SubtitleLang`、`ProviderId` 多 `translated`、錯誤碼 `LLM_NOT_CONFIGURED`、`TRANSLATION_RUNNING`；`Settings.align.llm`、`llmKey`、`POST /api/admin/align/test` 移除。
+- 原因：Brian 在對話裡要求（翻譯常常只有英文的字幕；設定檔要能負載平衡和備援；浮動視窗、取得模型清單、測試按鈕；翻譯帶 TMDB 簡介、分段並帶重疊的參考句）。範圍是他在選項裡選的。
+- 改了哪些檔案：docs/18-llm.md（新）、docs/03-data-model.md、docs/04-api.md、docs/08-media-pipeline.md、docs/11-pages.md、docs/13-settings.md、db/schema.sql、packages/shared/src/contracts/api.ts
+- Brian 是否已確認：是（他提出的）
+
 ## 2026-10-06 下載頁整理
 
 - 原本：每列只有百分比，沒有大小；沒有總覽；細節頁只能點片名進去（看不出來）；手機上縮圖自己佔一列；有圖片的縮圖多一圈色框。

@@ -596,7 +596,14 @@ export function subtitleRoutes(app: FastifyInstance, deps: Deps): void {
       if (!sp) throw new ApiError('MEDIA_NOT_READY', 'no speech data for this film');
       // A subtitle in another language than the one spoken is paired by the language model here,
       // where the key is; the media service does the rest (docs/08, "語言模型").
-      const heard = await llmHeard(deps, sp.mediaId, await readCues(config.dataDir, s.rel_dir), s.language);
+      const heard = await llmHeard(
+        deps,
+        app.llm,
+        sp.mediaId,
+        await readCues(config.dataDir, s.rel_dir),
+        s.language,
+        user.id,
+      );
       input = { subtitleId: id, allowSplit, heard };
     }
     const task = await one<{ id: string }>(

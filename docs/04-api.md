@@ -118,6 +118,10 @@
 | `POST /api/subtitles/:id/confirm` | 持有人 | `rev` 要是最新的（不是的話回 `REVISION_CONFLICT`）。還有檢查點沒通過時，要帶 `force: true` 才接受（前端會先問使用者）；沒帶就回 `VALIDATION`，`details.fields` 是 `{force: 'CHECKPOINTS_PENDING'}`。成功後狀態是已確認，存一份歷史，通知其他持有人 |
 | `GET /api/subtitles/:id/file` | 持有人 | 下載字幕檔（SRT、UTF-8）。`synced=true` 是套用同步文件之後的版本，否則是原始時間 |
 | `DELETE /api/subtitles/:id` | 持有人 | 刪掉這條字幕和它的同步結果。已經匯出的 MKV 不受影響 |
+| `POST /api/subtitles/:id/translate` | 持有人 | 開始翻譯這條字幕（[18-llm.md](18-llm.md)）：`{targetLanguage, mode: 'plain' | 'bilingual'}`，回 `Translation`（`running`）。沒有可用的設定檔回 `LLM_NOT_CONFIGURED`；同一條字幕、同一個目標語言和形式已經在翻回 `TRANSLATION_RUNNING`；超過每人每小時的次數回 `RATE_LIMITED`（`retryAfterSeconds`） |
+| `GET /api/torrents/:id/translations` | 持有人 | 這部片最近 30 筆翻譯 |
+| `POST /api/translations/:id/cancel` | 持有人 | 取消進行中的翻譯；已翻好的段落保留，不寫出字幕 |
+| `POST /api/translations/:id/resume` | 持有人 | 失敗或取消的翻譯從斷掉的那一段繼續；不算次數 |
 
 來源的細節在 [07-subtitle-providers.md](07-subtitle-providers.md)，同步文件在 [09-sync-workbench.md](09-sync-workbench.md)。
 
@@ -164,6 +168,13 @@
 | `PUT /api/admin/secrets/:name` | 寫入一把金鑰。之後不會再顯示 |
 | `DELETE /api/admin/secrets/:name` | 清除 |
 | `POST /api/admin/sources/:id/test` | 實際連一次那個來源。**一律回 200**：連不上是測試的結果，不是這個端點的錯誤。回 `{ok, code, data, ms}`，並更新那個來源的狀況 |
+| `GET /api/admin/llm` | LLM 設定頁：設定檔（含冷卻狀態，不含金鑰）、最近 50 筆用量、`translatePerHour` |
+| `POST /api/admin/llm/profiles` | 新增設定檔。`key` 有值才存；欄位不對回 `VALIDATION`（`baseUrl`：`REQUIRED`、`URL_FORMAT`；`model`：`REQUIRED`） |
+| `PUT /api/admin/llm/profiles/:id` | 修改。`key` 不帶是不變、`null` 是清除、字串是換新；存了之後清掉它的冷卻 |
+| `DELETE /api/admin/llm/profiles/:id` | 刪除 |
+| `POST /api/admin/llm/models` | 用表單的網址和金鑰（沒填時用 `profileId` 存著的）向服務要模型清單。要不到回 `VALIDATION`，`fields.model` 是原因（`AUTH`、`UNREACHABLE`…） |
+| `POST /api/admin/llm/test` | 用表單目前的值（存了沒存都可以）送一題小翻譯，回 `LlmCheck`；記一筆用途「測試」的用量 |
+| `PUT /api/admin/llm/settings` | `{translatePerHour}` |
 | `GET /api/admin/system` | 各服務的心跳、最近 50 個背景工作、磁碟資訊 |
 | `POST /api/admin/tasks/:id/retry` | 重跑一個失敗的工作。只適用於分析、預覽資產、重新計算（`Task.retryable`）；預覽資產要重新通過 admission，不夠回 `STORAGE_LIMIT`。對齊、排名、匯出不能這樣重跑（回 `VALIDATION`）：對齊和排名由使用者再按一次，匯出重新建立一個 |
 | `GET /api/admin/audit` | 操作紀錄，每頁 50 筆，用 `before` 往前翻 |
@@ -220,6 +231,8 @@
 | `MEDIA_NOT_READY` | 409 | 下載還沒完成；或需要的分析資料還沒有（還在分析，或分析失敗了） | 顯示進度、「稍後再試」，或說明分析失敗並給「重新分析」 |
 | `SUBTITLE_DUPLICATE` | 409 | 內容相同的字幕已經加入過 | 「這條字幕已經加入過了。」 |
 | `REVISION_CONFLICT` | 409 | 別人先存了 | 見 [09-sync-workbench.md](09-sync-workbench.md) 的「兩個人同時改」 |
+| `LLM_NOT_CONFIGURED` | 409 | 沒有啟用的 LLM 設定檔 | 翻譯視窗說「管理員還沒有設定語言模型」，管理員多一個前往 LLM 設定的連結 |
+| `TRANSLATION_RUNNING` | 409 | 同一筆翻譯已經在進行 | 翻譯視窗說明 |
 | `YTS_NOT_CONFIGURED` | 409 | 還沒有設定 YTS 的網址 | 搜尋頁的引導，見 [11-pages.md](11-pages.md) |
 | `UPLOAD_TOO_LARGE` | 413 | | 說明上限 |
 | `UNSUPPORTED_FILE` | 415 | | 「不支援這種檔案。請上傳 .srt、.ass、.vtt，或 .zip、.rar、.7z 壓縮檔。」 |

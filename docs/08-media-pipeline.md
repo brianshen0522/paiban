@@ -332,17 +332,19 @@ Tears of Steel 的法文、德文、俄文官方字幕，各弄錯四種（晚 2
 
 ## 語言模型
 
-字幕和片中的語言不同時（例如英文片配繁體中文字幕），用語言模型判斷「哪句辨識結果和哪句字幕是同一句話」。管理員在來源設定選擇（`align.llm`，[13-settings.md](13-settings.md)）：
+字幕和片中的語言不同時（例如英文片配繁體中文字幕），用語言模型判斷「哪句辨識結果和哪句字幕是同一句話」。用哪個模型由 LLM 設定頁的設定檔決定（2026-10-07 起，負載平衡和備援見 [18-llm.md](18-llm.md)；原本在來源設定的 `align.llm` 已經搬過去）。各供應商怎麼呼叫：
 
-| 選項 | 怎麼呼叫 |
+| 供應商 | 怎麼呼叫 |
 | --- | --- |
-| Claude | Anthropic 官方 SDK，預設 `claude-opus-5-5`，effort `low`，回答用結構化輸出（JSON schema）限制。用 Opus 5.5 等支援的模型時開啟伺服器端的拒答備援（`fallbacks: "default"`） |
-| OpenAI 相容 | `POST <baseUrl>/chat/completions`，`response_format: json_object`、`temperature: 0`。通義千問（DashScope 的相容模式）、本機的 Ollama、vLLM 都是這種。回答裡的 `<think>` 和 code fence 會去掉再解析 |
+| Claude（Anthropic） | Anthropic 官方 SDK，預設 `claude-opus-5-5`，effort `low`，回答用結構化輸出（JSON schema）限制。用 Opus 5.5 等支援的模型時開啟伺服器端的拒答備援（`fallbacks: "default"`） |
+| OpenAI、OpenRouter、自架（Ollama、vLLM、通義千問的相容模式） | `POST <服務網址>/chat/completions`，`response_format: json_object`，帶設定檔的 temperature 和最大輸出長度（OpenAI 用 `max_completion_tokens`）。伺服器回 400 時依序拿掉 `reasoning_effort`、`response_format`、`temperature` 再試，記住這個網址不支援。回答裡的 `<think>` 和 code fence 會去掉再解析 |
+| Azure OpenAI | `POST <服務網址>/openai/deployments/<部署名稱>/chat/completions?api-version=…`，金鑰放 `api-key` 標頭 |
+| Azure AI Foundry | `POST <服務網址>/models/chat/completions?api-version=…`，帶模型名稱，金鑰放 `api-key` 標頭 |
 
-- **在 `api` 裡呼叫**，因為只有 `api` 有 `SECRET_KEY`、能讀出金鑰（`llmKey`）。`POST /api/subtitles/:id/auto-align` 在排入工作前先配對（最多 45 秒），配好的對放進 `tasks.input.heard`，`media` 接著算。逾時或失敗時照樣排入，結果的 `heard.llmError` 說原因（`NOT_CONFIGURED`、`AUTH`、`RATE_LIMITED`、`REFUSED`、`BAD_RESPONSE`、`UNREACHABLE`、`TIMEOUT`）。
-- 每個聆聽窗一個請求，同時送出的數量：Claude 六個，OpenAI 相容的服務三個（常是一台機器上的模型）。每個請求是那個窗的辨識結果，加上時間上可能對得到的字幕句子（最多 300 句）。題目明說字幕的時間不可靠、看意思和順序；只回有把握的配對、不配語助詞和歌聲、每句最多用一次、保持順序。回答裡不在題目中的編號一律丟掉。部分窗失敗照樣用其他窗的配對。
+- **在 `api` 裡呼叫**，因為只有 `api` 有 `SECRET_KEY`、能讀出設定檔的金鑰。`POST /api/subtitles/:id/auto-align` 在排入工作前先配對（最多 45 秒），配好的對放進 `tasks.input.heard`，`media` 接著算。逾時或失敗時照樣排入，結果的 `heard.llmError` 說原因（`NOT_CONFIGURED`、`AUTH`、`RATE_LIMITED`、`REFUSED`、`BAD_RESPONSE`、`UNREACHABLE`、`TIMEOUT`）。
+- 每個聆聽窗一個請求，同時送出的數量是第一層設定檔的「同時請求數」加起來（最多 16）。每個請求是那個窗的辨識結果，加上時間上可能對得到的字幕句子（最多 300 句）。題目明說字幕的時間不可靠、看意思和順序；只回有把握的配對、不配語助詞和歌聲、每句最多用一次、保持順序。回答裡不在題目中的編號一律丟掉。部分窗失敗照樣用其他窗的配對。
 - 送出去的只有台詞文字和秒數，不送影片、聲音、片名或使用者資料。
-- 金鑰被拒（`AUTH`）就不再送剩下的窗。
+- 金鑰被拒（`AUTH`）就不再送剩下的窗。設定檔失敗時的冷卻和換設定檔由設定檔池處理（[18-llm.md](18-llm.md)），用量記在 `llm_usage`（用途「自動對齊」）。
 - 每個人每 10 分鐘最多按 20 次自動對齊（不論有沒有用到語言模型），超過回 `RATE_LIMITED`，帶要等幾秒；工作台說「自動對齊按得太頻繁了，請 N 分鐘後再試。」
 
 **實測（2026-10-06，Brian 提供的 Ollama 伺服器，Qwen 3.8 27B Q4_K_M）**：Tears of Steel 的法文、德文、俄文官方字幕，各弄錯五種（原樣、晚 2.4 秒、晚 23.7 秒、影格率不同、剪輯差 12 秒），英文辨識結果交給模型配對：15 次全部在 0.04 秒以內。每份字幕配出 21 到 23 對（16 到 20 對正確），比英文字幕的純文字比對（19 對、15 對正確）還多，因為模型看得懂意譯。一次對齊花在模型上約 25 秒（10 個窗、同時 3 個請求）。

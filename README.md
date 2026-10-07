@@ -60,6 +60,7 @@
 | 16 | [13-settings.md](docs/13-settings.md) | 設定項目與驗證 |
 | 17 | [15-testing.md](docs/15-testing.md) | 測試策略、離線的完整流程 |
 | 18 | [17-ui.md](docs/17-ui.md) | 顏色、字、元件、文案規則 |
+| 19 | [18-llm.md](docs/18-llm.md) | 語言模型設定檔（負載平衡、備援）與字幕翻譯 |
 
 實作過程中會新增三樣東西：`docs/agent-notes.md`（疑問與判斷）、`docs/changes.md`（偏離規格的地方）、`docs/reports/`（每個階段的報告）。格式見各自的檔案。
 

@@ -73,13 +73,15 @@ describe('deleting files', () => {
       // when its final update found the row gone or cancelled, a staged upload or download once the
       // job that uses it ends.
       cleanScratchOnStart: ['media/service.ts'],
-      removeWorkDir: ['media/jobs.ts', 'media/subtitle-jobs.ts', 'subtitles/routes.ts'],
+      // llm/worker.ts: a finished translation's work folder (docs/18-llm.md), like adding a subtitle.
+      removeWorkDir: ['llm/worker.ts', 'media/jobs.ts', 'media/subtitle-jobs.ts', 'subtitles/routes.ts'],
       removeOwnMediaOutput: ['media/jobs.ts'],
       // An export's subtitle tracks once it has its outcome: the mux job, and the torrent loop for
       // the waiting exports of a film a person removed. The mux job's own .part or MKV.
       removeExportTracks: ['media/export-job.ts', 'torrent/worker.ts'],
       removeOwnExportOutput: ['media/export-job.ts'],
-      removeOwnSubtitleOutput: ['media/subtitle-jobs.ts', 'subtitles/routes.ts'],
+      // llm/worker.ts: the translated subtitle's own folder, when its row could not be added (cancelled at the last moment).
+      removeOwnSubtitleOutput: ['llm/worker.ts', 'media/subtitle-jobs.ts', 'subtitles/routes.ts'],
       removeStaging: ['media/subtitle-jobs.ts', 'subtitles/routes.ts', 'subtitles/worker.ts'],
     };
     const exported = [

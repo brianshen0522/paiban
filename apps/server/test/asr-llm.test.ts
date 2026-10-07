@@ -7,8 +7,7 @@ import pino from 'pino';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { llmHeard } from '../src/asr/align.js';
 import type { Pool } from '../src/db/pool.js';
-import { sealSecret } from '../src/settings/secrets.js';
-import { writeSettings } from '../src/settings/settings.js';
+import { DEFAULT_PARAMS, LlmPool, sealKey } from '../src/llm/pool.js';
 import { testConfig, testDb } from './helpers.js';
 
 /**
@@ -64,51 +63,59 @@ describe('asking the language model from the api', () => {
   beforeEach(async () => {
     asked = 0;
     status = 200;
-    await pool.query('delete from settings');
-    await pool.query('delete from secrets');
+    await pool.query('delete from llm_profiles');
   });
 
-  const configure = (provider: string, model = 'qwen-test') =>
-    writeSettings(
-      pool,
-      [
-        ['align.llm.provider', provider],
-        ['align.llm.model', model],
-        ['align.llm.baseUrl', base],
-      ],
-      null,
+  /** One LLM profile (docs/18-llm.md), as the settings page would make it. */
+  const configure = async (provider: 'self-hosted' | 'anthropic', model = 'qwen-test', key?: string) => {
+    const r = await pool.query<{ id: string }>(
+      `insert into llm_profiles (name, provider, base_url, model, params) values ('test', $1, $2, $3, $4) returning id`,
+      [provider, provider === 'self-hosted' ? base : '', model, DEFAULT_PARAMS],
+    );
+    const id = r.rows[0]?.id ?? '';
+    if (key) {
+      const { nonce, ciphertext } = sealKey(config.secretKey, id, key);
+      await pool.query('update llm_profiles set key_nonce = $2, key_ciphertext = $3 where id = $1', [
+        id,
+        nonce,
+        ciphertext,
+      ]);
+    }
+  };
+  // A fresh pool each time: cooling after a failure is kept in memory.
+  const heard = (mediaIdArg: string, language: string, l = log) =>
+    llmHeard(
+      { pool, config, log: l },
+      new LlmPool({ pool, secretKey: config.secretKey, log: l }),
+      mediaIdArg,
+      cues,
+      language,
     );
 
   it('does nothing without a model, or for a subtitle in the language heard', async () => {
-    expect(await llmHeard({ pool, config, log }, mediaId, cues, 'fr')).toBeNull();
-    await configure('openai');
-    expect(await llmHeard({ pool, config, log }, mediaId, cues, 'en')).toBeNull();
+    expect(await heard(mediaId, 'fr')).toBeNull();
+    await configure('self-hosted');
+    expect(await heard(mediaId, 'en')).toBeNull();
     expect(asked).toBe(0);
   });
 
   it('pairs through an OpenAI-compatible server, with no key needed', async () => {
-    await configure('openai');
-    const r = await llmHeard({ pool, config, log }, mediaId, cues, 'fr');
+    await configure('self-hosted');
+    const r = await heard(mediaId, 'fr');
     expect(r).toEqual({ language: 'en', pairs: [{ cue: 0, y: 11 }], heardAt: [11], via: 'llm', llmError: null });
     expect(asked).toBe(1);
   });
 
   it('reports a refused key instead of failing the alignment', async () => {
-    await configure('openai');
-    const { nonce, ciphertext } = sealSecret(config.secretKey, 'llmKey', 'test-key-not-real');
-    await pool.query('insert into secrets (name, nonce, ciphertext) values ($1, $2, $3)', [
-      'llmKey',
-      nonce,
-      ciphertext,
-    ]);
+    await configure('self-hosted', 'qwen-test', 'test-key-not-real');
     status = 401;
-    const r = await llmHeard({ pool, config, log }, mediaId, cues, 'fr');
+    const r = await heard(mediaId, 'fr');
     expect(r).toMatchObject({ via: 'none', pairs: [], llmError: 'AUTH' });
   });
 
   it('says Claude is not configured when its key is missing, without calling anything', async () => {
     await configure('anthropic', '');
-    const r = await llmHeard({ pool, config, log }, mediaId, cues, 'fr');
+    const r = await heard(mediaId, 'fr');
     expect(r).toMatchObject({ via: 'none', llmError: 'NOT_CONFIGURED' });
     expect(asked).toBe(0);
   });
@@ -116,16 +123,10 @@ describe('asking the language model from the api', () => {
   it('never writes the key to the log, whether the model answers or refuses it', async () => {
     const lines: string[] = [];
     const captured = pino({ level: 'debug' }, { write: (l: string) => void lines.push(l) });
-    await configure('openai');
-    const { nonce, ciphertext } = sealSecret(config.secretKey, 'llmKey', 'test-key-not-real');
-    await pool.query('insert into secrets (name, nonce, ciphertext) values ($1, $2, $3)', [
-      'llmKey',
-      nonce,
-      ciphertext,
-    ]);
-    await llmHeard({ pool, config, log: captured }, mediaId, cues, 'fr');
+    await configure('self-hosted', 'qwen-test', 'test-key-not-real');
+    await heard(mediaId, 'fr', captured);
     status = 401;
-    await llmHeard({ pool, config, log: captured }, mediaId, cues, 'fr');
+    await heard(mediaId, 'fr', captured);
     expect(lines.length).toBeGreaterThanOrEqual(2);
     for (const l of lines) {
       expect(l).not.toContain('test-key-not-real');
@@ -134,7 +135,7 @@ describe('asking the language model from the api', () => {
   });
 
   it('does nothing for a film without recognition', async () => {
-    await configure('openai');
-    expect(await llmHeard({ pool, config, log }, '00000000-0000-4000-8000-000000000002', cues, 'fr')).toBeNull();
+    await configure('self-hosted');
+    expect(await heard('00000000-0000-4000-8000-000000000002', 'fr')).toBeNull();
   });
 });

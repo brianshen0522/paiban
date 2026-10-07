@@ -14,15 +14,18 @@ import { parse, requireAdmin } from '../http/guards.js';
  * associated data so a value cannot be moved to another name. Only the api has SECRET_KEY. The
  * API says whether a key is set and never what it is; values never reach a log.
  */
-export const SECRET_NAMES = ['tmdbKey', 'subdlKey', 'assrtToken', 'llmKey'] as const satisfies readonly SecretName[];
+export const SECRET_NAMES = ['tmdbKey', 'subdlKey', 'assrtToken'] as const satisfies readonly SecretName[];
 
 function keyFrom(secretKey: string): Buffer {
   if (!secretKey) throw new ApiError('INTERNAL', 'SECRET_KEY is not set');
   return Buffer.from(hkdfSync('sha256', secretKey, 'paiban', 'paiban secrets v1', 32));
 }
 
-/** nonce and ciphertext (with the 16-byte tag at the end), as stored. */
-export function sealSecret(secretKey: string, name: SecretName, value: string): { nonce: Buffer; ciphertext: Buffer } {
+/**
+ * nonce and ciphertext (with the 16-byte tag at the end), as stored. `name` is the associated
+ * data: a secret's name, or `llm:<profile id>` for a language-model profile's key (docs/18-llm.md).
+ */
+export function sealSecret(secretKey: string, name: string, value: string): { nonce: Buffer; ciphertext: Buffer } {
   const nonce = randomBytes(12);
   const c = createCipheriv('aes-256-gcm', keyFrom(secretKey), nonce);
   c.setAAD(Buffer.from(name));
@@ -30,7 +33,7 @@ export function sealSecret(secretKey: string, name: SecretName, value: string): 
   return { nonce, ciphertext: Buffer.concat([body, c.getAuthTag()]) };
 }
 
-export function openSecret(secretKey: string, name: SecretName, nonce: Buffer, ciphertext: Buffer): string {
+export function openSecret(secretKey: string, name: string, nonce: Buffer, ciphertext: Buffer): string {
   const d = createDecipheriv('aes-256-gcm', keyFrom(secretKey), nonce);
   d.setAAD(Buffer.from(name));
   d.setAuthTag(ciphertext.subarray(ciphertext.length - 16));

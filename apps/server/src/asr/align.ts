@@ -1,20 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { AlignResult, Lang, SyncCore } from '@paiban/shared';
+import type { AlignResult, Lang, LlmErrorCode, SyncCore } from '@paiban/shared';
 import type { Deps } from '../http/context.js';
-import { readSecret } from '../settings/secrets.js';
-import { readSettings } from '../settings/settings.js';
+import type { LlmPool } from '../llm/pool.js';
 import { toTraditional } from '../subtitles/text.js';
 import type { Pair } from './fit.js';
-import {
-  anthropicMatcher,
-  CONCURRENCY,
-  DEFAULT_ANTHROPIC_MODEL,
-  LlmError,
-  type LlmErrorCode,
-  llmPairs,
-  openAiCompatibleMatcher,
-} from './llm.js';
+import { LlmError, llmPairs, poolMatcher } from './llm.js';
 import { type AsrTranscript, textPairs } from './text.js';
 
 type Cue = SyncCore.Cue;
@@ -81,44 +72,34 @@ export const LLM_BUDGET_MS = 45_000;
 
 /**
  * Pairs through the language model for a subtitle in another language than the one spoken
- * (docs/08, "語言模型"). Runs in the api, the only service that holds keys. Null when there is
- * nothing to ask: no recognition, the same language (the media service pairs by text), or no
- * model configured. A failure is reported in `llmError` and the alignment goes on without pairs.
+ * (docs/08, "語言模型"). Runs in the api, the only service that holds keys; the model is whichever
+ * LLM profile the pool picks (docs/18-llm.md). Null when there is nothing to ask: no recognition,
+ * the same language (the media service pairs by text), or no profile set up. A failure is
+ * reported in `llmError` and the alignment goes on without pairs.
  */
 export async function llmHeard(
   deps: Pick<Deps, 'pool' | 'config' | 'log'>,
+  llm: LlmPool,
   mediaId: string,
   cues: readonly Cue[],
   language: string,
+  userId: string | null = null,
 ): Promise<HeardPairs | null> {
-  const { llm } = (await readSettings(deps.pool)).align;
-  if (llm.provider === 'none') return null;
+  if (!(await llm.hasProfiles())) return null;
   const transcript = await readTranscript(deps.config.dataDir, mediaId);
   if (!transcript || sameLanguage(language, transcript.language)) return null;
-  const none = (llmError: LlmErrorCode): HeardPairs => ({
-    language: transcript.language,
-    pairs: [],
-    via: 'none',
-    llmError,
-  });
-  const key = await readSecret(deps, 'llmKey');
-  if (llm.provider === 'anthropic' && !key) return none('NOT_CONFIGURED');
-  const matcher =
-    llm.provider === 'anthropic'
-      ? anthropicMatcher(key ?? '', llm.model || DEFAULT_ANTHROPIC_MODEL)
-      : openAiCompatibleMatcher(llm.baseUrl, key, llm.model, LLM_BUDGET_MS);
   const started = Date.now();
   try {
     const r = await llmPairs(
-      matcher,
+      poolMatcher(llm, { purpose: 'align', userId }),
       cues,
       transcript,
       language,
       AbortSignal.timeout(LLM_BUDGET_MS),
-      llm.provider === 'anthropic' ? CONCURRENCY.cloud : CONCURRENCY.local,
+      await llm.capacity(),
     );
     deps.log.info(
-      { mediaId, provider: llm.provider, pairs: r.pairs.length, failedWindows: r.failed, ms: Date.now() - started },
+      { mediaId, pairs: r.pairs.length, failedWindows: r.failed, ms: Date.now() - started },
       'language model paired recognised speech',
     );
     return {
@@ -135,7 +116,7 @@ export async function llmHeard(
         : err instanceof Error && /abort|timeout/i.test(err.name)
           ? 'TIMEOUT'
           : 'BAD_RESPONSE';
-    deps.log.warn({ mediaId, provider: llm.provider, code, ms: Date.now() - started }, 'language model pairing failed');
-    return none(code);
+    deps.log.warn({ mediaId, code, ms: Date.now() - started }, 'language model pairing failed');
+    return { language: transcript.language, pairs: [], via: 'none', llmError: code };
   }
 }

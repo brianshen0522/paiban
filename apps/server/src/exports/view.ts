@@ -21,8 +21,45 @@ export function trackTag(language: string): { language: string; title: string } 
   if (language === 'zh-Hant' || language === 'zh') return { language: 'chi', title: '繁體中文' };
   if (language === 'zh-Hans') return { language: 'chi', title: '简体中文' };
   if (language === 'en') return { language: 'eng', title: 'English' };
-  return { language: 'und', title: language };
+  // Languages a translation can be made into (docs/18-llm.md): the three-letter code ffmpeg wants,
+  // titled in the language itself ("日本語").
+  const base = language.split('-')[0] ?? language;
+  const code = ISO639_2[base];
+  if (!code) return { language: 'und', title: language };
+  let title = language;
+  try {
+    title = new Intl.DisplayNames([language], { type: 'language' }).of(language) ?? language;
+  } catch {
+    // an odd tag keeps its code as the title
+  }
+  return { language: code, title };
 }
+
+/** BCP 47 base → ISO 639-2/B, for the languages the translation dialog offers and a few more. */
+const ISO639_2: Record<string, string> = {
+  zh: 'chi',
+  en: 'eng',
+  ja: 'jpn',
+  ko: 'kor',
+  fr: 'fre',
+  de: 'ger',
+  es: 'spa',
+  it: 'ita',
+  pt: 'por',
+  ru: 'rus',
+  th: 'tha',
+  vi: 'vie',
+  id: 'ind',
+  ms: 'may',
+  nl: 'dut',
+  sv: 'swe',
+  pl: 'pol',
+  tr: 'tur',
+  ar: 'ara',
+  he: 'heb',
+  hi: 'hin',
+  uk: 'ukr',
+};
 
 export type ExportRow = {
   id: string;

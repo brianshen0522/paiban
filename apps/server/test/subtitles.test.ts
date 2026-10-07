@@ -182,7 +182,8 @@ describe('keys (docs/13-settings.md, "金鑰")', () => {
     expect(row.nonce.length).toBe(12);
     expect(row.ciphertext.toString('latin1')).not.toContain('tmdb-test-key');
     const settings = (await call(t.app, 'GET', '/api/admin/settings', { cookie: boss })).json();
-    expect(settings.info.secrets).toEqual({ tmdbKey: true, subdlKey: false, assrtToken: false, llmKey: false });
+    // The language-model key moved into the LLM profiles (docs/18-llm.md).
+    expect(settings.info.secrets).toEqual({ tmdbKey: true, subdlKey: false, assrtToken: false });
     expect(JSON.stringify(settings)).not.toContain('tmdb-test-key');
     expect(
       (await call(t.app, 'PUT', '/api/admin/secrets/nope', { cookie: boss, body: { value: 'x' } })).statusCode,

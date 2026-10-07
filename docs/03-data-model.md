@@ -196,7 +196,8 @@ API 回給前端的 `TorrentStatus` 是算出來的，不是存起來的：
 ## 設定與金鑰
 
 - `settings`：一項一列，`value` 是 JSON。鍵的清單和驗證規則在 [13-settings.md](13-settings.md)。
-- `secrets`：四把金鑰（`tmdbKey`、`subdlKey`、`assrtToken`、`llmKey`），用 `SECRET_KEY` 以 AES-256-GCM 加密。API 只回報「有沒有設定」，永遠不回傳內容。
+- `secrets`：三把金鑰（`tmdbKey`、`subdlKey`、`assrtToken`），用 `SECRET_KEY` 以 AES-256-GCM 加密。API 只回報「有沒有設定」，永遠不回傳內容。（原本的 `llmKey` 在升級時搬進第一個 LLM 設定檔後刪除。）
+- `llm_profiles`、`llm_usage`、`translations`：語言模型的設定檔（金鑰同樣加密，附加資料是 `llm:<id>`）、每次呼叫的紀錄、字幕翻譯的進度（已翻好的句子存在 `lines`，完成才寫出字幕）。見 [18-llm.md](18-llm.md)；遷移 `0005_llm.sql`。字幕的 `provider` 多一種 `translated`（AI 翻譯），`language` 可以是任何 BCP 47 語言代碼。
 
 ## 活動
 

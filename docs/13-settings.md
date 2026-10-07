@@ -32,9 +32,7 @@ API 的形狀是 `packages/shared/src/contracts/api.ts` 的 `Settings`、`Settin
 | `providers.zimuku.searchUrl` | 字串 | 空 | 空的，或 `https://` 開頭而且含有 `{q}` | 來源設定（原型沒有這個欄位） |
 | `subtitles.defaultLangs` | 語言陣列 | `zh-Hant`、`en` | 至少一項 | 來源設定的「共用設定」。原型只顯示、不能改；正式版做成可以勾選 |
 | `align.asr` | 布林 | true | 之後分析的片子要不要做語音辨識（[08-media-pipeline.md](08-media-pipeline.md) 的「語音辨識」）。關掉不影響已經做好的 | 來源設定的「自動對齊」（新） |
-| `align.llm.provider` | `none` / `anthropic` / `openai` | `none` | `openai` 指任何 OpenAI 相容的服務（通義千問 DashScope、Ollama、vLLM…） | 同上（新） |
-| `align.llm.model` | 字串 | 空 | 最多 200 字。`anthropic` 留空用 Claude Opus 5.5（`claude-opus-5-5`）；`openai` 必填 | 同上（新） |
-| `align.llm.baseUrl` | 字串 | 空 | 只有 `openai` 用，而且必填。`http://` 或 `https://` 開頭；**可以**是內部位址（管理員自己的模型伺服器常在區網裡）。儲存時去掉結尾斜線 | 同上（新） |
+| `llm.translatePerHour` | 整數 | 5 | 0 到 100。每人每小時最多開始幾次字幕翻譯（[18-llm.md](18-llm.md)）；0 表示不能開始新的翻譯 | LLM 設定頁（新） |
 
 ### 介面上的錯誤訊息
 
@@ -61,7 +59,8 @@ API 的形狀是 `packages/shared/src/contracts/api.ts` 的 `Settings`、`Settin
 | `tmdbKey` | 搜尋和電影頁的中文片名、中文簡介、海報、評分（Brian，2026-10-06）；IMDb 編號換 TMDB 編號（JustSubtitles 需要）；射手網搜尋用的中文片名 | 片名、簡介是 YTS 的英文，海報是 YTS 的，評分是 YTS 給的 IMDb 評分（標「IMDb」）；JustSubtitles 改用片名比對（可能對不到）；射手網只用英文片名查 |
 | `subdlKey` | JustSubtitles 的備援模式 | 備援模式不能用 |
 | `assrtToken` | 射手網（偽） | 這個來源顯示「還沒設定」，其他來源不受影響 |
-| `llmKey` | 自動對齊用的語言模型（`align.llm`）：Anthropic 的 API 金鑰，或 OpenAI 相容服務的金鑰 | Claude：字幕和片中語言不同時不配對，自動對齊照舊只看人聲。OpenAI 相容：不帶金鑰送出（本機的 Ollama 通常不需要） |
+
+語言模型的金鑰不在這裡：每個 LLM 設定檔有自己的金鑰，存在 `llm_profiles`（[18-llm.md](18-llm.md)）。原本的 `llmKey` 和 `align.llm.*` 在升級時搬成第一個設定檔後刪除。
 
 `PUT /api/admin/secrets/:name` 寫入，`DELETE` 清除。輸入框是密碼框；已經設定的顯示「已設定，留空表示不變」；儲存後提示「〈名稱〉已儲存。之後不會再顯示內容。」留空按儲存是「沒有輸入新的值，維持原設定。」
 

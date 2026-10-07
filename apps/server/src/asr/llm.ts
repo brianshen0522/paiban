@@ -1,7 +1,7 @@
-import Anthropic from '@anthropic-ai/sdk';
-import { betaZodOutputFormat } from '@anthropic-ai/sdk/helpers/beta/zod';
-import type { LlmErrorCode, SyncCore } from '@paiban/shared';
+import type { SyncCore } from '@paiban/shared';
 import { z } from 'zod';
+import type { Caller, LlmPool } from '../llm/pool.js';
+import { askJson, type Connection, LlmError } from '../llm/providers.js';
 import type { Pair } from './fit.js';
 import { type AsrTranscript, cuesBetween, sourceRange } from './text.js';
 
@@ -19,16 +19,9 @@ export type Match = { heard: number; line: number };
 /** One request to a language model: which heard lines and subtitle lines say the same thing. */
 export type Matcher = (req: MatchRequest, signal?: AbortSignal) => Promise<Match[]>;
 
-export type { LlmErrorCode };
-export class LlmError extends Error {
-  readonly code: LlmErrorCode;
-  constructor(code: LlmErrorCode, message: string) {
-    super(message);
-    this.code = code;
-  }
-}
+export { LlmError };
 
-const Matches = z.object({
+export const Matches = z.object({
   matches: z.array(z.object({ heard: z.number().int(), line: z.number().int() })),
 });
 
@@ -59,158 +52,23 @@ export function renderRequest(req: MatchRequest): string {
   ].join('\n');
 }
 
-/** Models that accept the server-side fallback on a refusal (docs/08-media-pipeline.md, "語言模型"). */
-const FALLBACK_MODELS = new Set(['claude-fable-5-1', 'claude-opus-5-5', 'claude-opus-5', 'claude-sonnet-5-5']);
-export const DEFAULT_ANTHROPIC_MODEL = 'claude-opus-5-5';
-
-/**
- * Claude through the Anthropic SDK, with a schema the answer has to follow. `baseUrl` is for a
- * proxy in front of the API; empty means Anthropic's own address.
- */
-export function anthropicMatcher(apiKey: string, model: string, baseUrl?: string): Matcher {
-  const client = new Anthropic({ apiKey, baseURL: baseUrl || undefined, maxRetries: 2, timeout: 50_000 });
-  return async (req, signal) => {
-    try {
-      const res = await client.beta.messages.parse(
-        {
-          model,
-          max_tokens: 8000,
-          system: SYSTEM,
-          messages: [{ role: 'user', content: renderRequest(req) }],
-          output_config: {
-            format: betaZodOutputFormat(Matches),
-            // Matching short lines needs little deliberation; Haiku does not take an effort level.
-            ...(model.startsWith('claude-haiku') ? {} : { effort: 'low' as const }),
-          },
-          ...(FALLBACK_MODELS.has(model)
-            ? { betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' as const }
-            : {}),
-        },
-        { signal },
-      );
-      if (res.stop_reason === 'refusal') throw new LlmError('REFUSED', 'the model declined');
-      if (!res.parsed_output) throw new LlmError('BAD_RESPONSE', `no parsable answer (${res.stop_reason})`);
-      return res.parsed_output.matches;
-    } catch (err) {
-      if (err instanceof LlmError) throw err;
-      if (err instanceof Anthropic.AuthenticationError || err instanceof Anthropic.PermissionDeniedError)
-        throw new LlmError('AUTH', 'the key was refused');
-      if (err instanceof Anthropic.RateLimitError) throw new LlmError('RATE_LIMITED', 'rate limited');
-      if (err instanceof Anthropic.APIConnectionError) throw new LlmError('UNREACHABLE', 'cannot reach the API');
-      if (err instanceof Anthropic.APIError) throw new LlmError('BAD_RESPONSE', `API error ${err.status}`);
-      throw err;
-    }
-  };
+/** Pairs through one profile (tests, and anything that holds a connection already). */
+export function connectionMatcher(c: Connection): Matcher {
+  return async (req, signal) =>
+    (await askJson(c, { system: SYSTEM, user: renderRequest(req), schema: Matches }, signal)).value.matches;
 }
 
-const ChatResponse = z.object({
-  choices: z.array(z.object({ message: z.object({ content: z.string().nullable() }) })).min(1),
-});
-
-/** Pull the JSON object out of a chat answer: thinking tags, code fences and chatter around it go. */
-export function extractJson(text: string): unknown {
-  const body = text.replace(/<think>[\s\S]*?<\/think>/g, '');
-  const a = body.indexOf('{');
-  const b = body.lastIndexOf('}');
-  if (a < 0 || b <= a) throw new LlmError('BAD_RESPONSE', 'no JSON object in the answer');
-  try {
-    return JSON.parse(body.slice(a, b + 1));
-  } catch {
-    throw new LlmError('BAD_RESPONSE', 'the answer is not valid JSON');
-  }
-}
-
-/** A pairing answer is a few kilobytes; anything near this is not one. */
-const MAX_ANSWER_BYTES = 1024 * 1024;
-
-/** The body as JSON, or null when it is not JSON or grows past `cap` bytes. */
-async function readCapped(res: Response, cap: number): Promise<unknown> {
-  const reader = res.body?.getReader();
-  if (!reader) return null;
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    size += value.byteLength;
-    if (size > cap) {
-      await reader.cancel();
-      throw new LlmError('BAD_RESPONSE', 'the answer is too large');
-    }
-    chunks.push(value);
-  }
-  try {
-    return JSON.parse(Buffer.concat(chunks).toString('utf8'));
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Any server that speaks the OpenAI chat-completions protocol: Qwen through DashScope, a local
- * Ollama or vLLM, and so on. The administrator sets the address, so it may be on the local
- * network; the key is optional because local servers often have none.
- */
-export function openAiCompatibleMatcher(
-  baseUrl: string,
-  apiKey: string | null,
-  model: string,
-  timeoutMs = 120_000,
-): Matcher {
-  const url = `${baseUrl.replace(/\/+$/, '')}/chat/completions`;
-  // Reasoning models (Qwen 3, DeepSeek R1…) think before answering by default, which only costs
-  // time here. `reasoning_effort: "none"` switches that off on Ollama and others; a server that
-  // rejects the field gets the request again without it, and is asked without it from then on.
-  let noThinking = true;
-  const send = (req: MatchRequest, signal?: AbortSignal) =>
-    fetch(url, {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}),
-      },
-      body: JSON.stringify({
-        model,
-        temperature: 0,
-        response_format: { type: 'json_object' },
-        ...(noThinking ? { reasoning_effort: 'none' } : {}),
-        messages: [
-          { role: 'system', content: SYSTEM },
-          { role: 'user', content: renderRequest(req) },
-        ],
-      }),
-      signal: AbortSignal.any([AbortSignal.timeout(timeoutMs), ...(signal ? [signal] : [])]),
-      // An API answers where it was asked; a redirect is not followed with the key attached.
-      redirect: 'manual',
-    });
-  return async (req, signal) => {
-    let res: Response;
-    try {
-      res = await send(req, signal);
-      if (res.status === 400 && noThinking) {
-        noThinking = false;
-        res = await send(req, signal);
-      }
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'TimeoutError')
-        throw new LlmError('TIMEOUT', `no answer within ${Math.round(timeoutMs / 1000)} s`);
-      throw new LlmError('UNREACHABLE', `cannot reach ${new URL(url).host}`);
-    }
-    if (res.status === 401 || res.status === 403) throw new LlmError('AUTH', 'the key was refused');
-    if (res.status === 429) throw new LlmError('RATE_LIMITED', 'rate limited');
-    if (!res.ok) throw new LlmError('BAD_RESPONSE', `HTTP ${res.status}`);
-    const parsed = ChatResponse.safeParse(await readCapped(res, MAX_ANSWER_BYTES));
-    if (!parsed.success) throw new LlmError('BAD_RESPONSE', 'unexpected response shape');
-    const answer = Matches.safeParse(extractJson(parsed.data.choices[0].message.content ?? ''));
-    if (!answer.success) throw new LlmError('BAD_RESPONSE', 'the answer does not follow the format');
-    return answer.data.matches;
-  };
+/** Pairs through the LLM profiles (docs/18-llm.md): load balancing and fallback are the pool's. */
+export function poolMatcher(pool: LlmPool, caller: Omit<Caller, 'signal'>): Matcher {
+  return async (req, signal) =>
+    (await pool.ask({ system: SYSTEM, user: renderRequest(req), schema: Matches }, { ...caller, signal })).value
+      .matches;
 }
 
 /** Most subtitle lines shown with one window; a dense film at an unknown speed could offer more. */
 const MAX_LINES = 300;
-/** Requests at once: a local model server is usually one GPU or CPU; a cloud API takes more. */
-export const CONCURRENCY = { local: 3, cloud: 6 } as const;
+/** Requests at once when the caller does not say: a local model server is usually one GPU or CPU. */
+export const CONCURRENCY = { local: 3 } as const;
 
 /**
  * Pairs through a language model, one request per listening window: the recognised lines of

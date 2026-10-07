@@ -25,7 +25,6 @@ export async function settingsInfo(deps: Deps): Promise<SettingsInfo> {
       tmdbKey: names.has('tmdbKey'),
       subdlKey: names.has('subdlKey'),
       assrtToken: names.has('assrtToken'),
-      llmKey: names.has('llmKey'),
     },
     torrentPort: deps.config.torrentPort,
     torrentDhtPort: deps.config.torrentDhtPort,

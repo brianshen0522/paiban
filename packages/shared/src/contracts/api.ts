@@ -49,6 +49,8 @@ export const ERROR_STATUS = {
   SUBTITLE_DUPLICATE: 409,
   REVISION_CONFLICT: 409,
   YTS_NOT_CONFIGURED: 409,
+  LLM_NOT_CONFIGURED: 409,
+  TRANSLATION_RUNNING: 409,
   INVITE_EXPIRED: 410,
   INVITE_USED: 410,
   RESET_INVALID: 410,
@@ -368,7 +370,7 @@ export type Workspace = {
 
 /* ------------------------------------------------------------------ subtitles */
 
-export type ProviderId = 'justsubtitles' | 'yify' | 'assrt' | 'zimuku' | 'upload';
+export type ProviderId = 'justsubtitles' | 'yify' | 'assrt' | 'zimuku' | 'upload' | 'translated';
 
 export type ProviderStatus = {
   id: ProviderId;
@@ -423,12 +425,15 @@ export type CandidateList = {
   zimukuUrl: string | null;
 };
 
+/** A subtitle's language: what detection says, or any language a translation was made into (a BCP 47 code such as "ja"). */
+export type SubtitleLang = DetectedLang | (string & {});
+
 export type Subtitle = {
   id: Id;
   torrentId: Id;
   provider: ProviderId;
   releaseName: string;
-  language: DetectedLang;
+  language: SubtitleLang;
   /** Format of the original file; .ssa is reported as 'ass'. */
   format: 'srt' | 'ass' | 'vtt';
   cueCount: number;
@@ -495,7 +500,91 @@ export type AlignResult = {
 };
 
 /** A tiny fixed pairing question sent to the configured model (docs/13-settings.md, "測試連線"). */
-export type AlignModelCheck = { ok: boolean; code: 'OK' | 'WRONG_ANSWER' | LlmErrorCode; ms: number };
+/* ------------------------------------------------------------------ language models (docs/18-llm.md) */
+
+export type LlmProvider = 'openai' | 'anthropic' | 'azure-openai' | 'azure-foundry' | 'openrouter' | 'self-hosted';
+
+export type LlmParams = {
+  /** 0 to 2. */
+  temperature: number;
+  /** 256 to 32000. */
+  maxTokens: number;
+  /** 10 to 600. */
+  timeoutSeconds: number;
+  /** Requests at once to this profile, 1 to 16. */
+  concurrency: number;
+  /** Ask reasoning models not to think first (OpenAI-compatible `reasoning_effort: "none"`; dropped when refused). */
+  noReasoning: boolean;
+};
+
+export type LlmProfile = {
+  id: Id;
+  name: string;
+  provider: LlmProvider;
+  /** Required for self-hosted and the two Azure kinds; for the others an optional proxy in front of the official address. */
+  baseUrl: string;
+  /** Azure only. */
+  apiVersion: string;
+  /** For Azure OpenAI, the deployment name. */
+  model: string;
+  /** 1 to 9; 1 is tried first. */
+  priority: number;
+  /** 1 to 100: its share of requests among the enabled profiles of the same priority. */
+  weight: number;
+  enabled: boolean;
+  params: LlmParams;
+  keySet: boolean;
+  /** Skipped until then after a failure (kept in memory; null when usable). */
+  coolingUntil: IsoTime | null;
+  lastError: LlmErrorCode | null;
+  updatedAt: IsoTime;
+};
+
+/** What the form sends. `key`: left out keeps the stored key, null clears it, a string replaces it. */
+export type LlmProfileInput = Pick<
+  LlmProfile,
+  'name' | 'provider' | 'baseUrl' | 'apiVersion' | 'model' | 'priority' | 'weight' | 'enabled' | 'params'
+> & { key?: string | null };
+
+export type LlmPurpose = 'translate' | 'align' | 'test';
+
+export type LlmUsage = {
+  id: number;
+  at: IsoTime;
+  profileId: Id | null;
+  profileName: string;
+  purpose: LlmPurpose;
+  user: UserRef | null;
+  ok: boolean;
+  errorCode: LlmErrorCode | null;
+  ms: number;
+};
+
+export type LlmCheck = { ok: boolean; code: 'OK' | 'WRONG_ANSWER' | LlmErrorCode; ms: number; reply: string | null };
+
+export type LlmSettings = { profiles: LlmProfile[]; usage: LlmUsage[]; translatePerHour: number };
+
+/* ------------------------------------------------------------------ translation (docs/18-llm.md, "字幕翻譯") */
+
+export type TranslationMode = 'plain' | 'bilingual';
+
+export type Translation = {
+  id: Id;
+  torrentId: Id;
+  sourceId: Id;
+  /** BCP 47, e.g. "zh-Hant", "ja". */
+  targetLanguage: string;
+  mode: TranslationMode;
+  state: 'running' | 'done' | 'failed' | 'cancelled';
+  doneChunks: number;
+  totalChunks: number;
+  errorCode: LlmErrorCode | 'SOURCE_GONE' | null;
+  /** The subtitle it made, once done. */
+  resultId: Id | null;
+  createdBy: UserRef | null;
+  createdAt: IsoTime;
+  finishedAt: IsoTime | null;
+};
 
 export type LlmErrorCode =
   | 'NOT_CONFIGURED'
@@ -635,7 +724,8 @@ export type ServerEvent =
   | { type: 'export.removed'; id: Id }
   | { type: 'usage'; usage: Usage }
   | { type: 'notification'; notification: Notification }
-  | { type: 'admin'; what: 'tasks' | 'users' | 'settings' | 'sources' | 'storage' };
+  | { type: 'translation'; translation: Translation }
+  | { type: 'admin'; what: 'tasks' | 'users' | 'settings' | 'sources' | 'storage' | 'llm' };
 
 /* ------------------------------------------------------------------ administration */
 
@@ -781,25 +871,22 @@ export type Settings = {
   subtitles: { defaultLangs: Lang[] };
   /**
    * Auto-align with recognised speech (docs/08, "語音辨識" and "語言模型"). `asr` switches
-   * recognition for newly analysed films. `llm` pairs recognised speech with a subtitle in
-   * another language; its key is the `llmKey` secret.
+   * recognition for newly analysed films; the language model that pairs it with a subtitle in
+   * another language comes from the LLM profiles (docs/18-llm.md).
    */
   align: {
     asr: boolean;
-    llm: {
-      provider: 'none' | 'anthropic' | 'openai';
-      /** Empty = the provider's default (Claude Opus 5.5 for Anthropic). Required for 'openai'. */
-      model: string;
-      /** Only for 'openai' (any OpenAI-compatible server: Qwen on DashScope, Ollama, vLLM); may be on the local network. */
-      baseUrl: string;
-    };
+  };
+  llm: {
+    /** Translations one person may start in an hour (docs/18-llm.md, "誰可以翻"). */
+    translatePerHour: number;
   };
 };
 
 /** Read-only facts shown next to the settings. */
 export type SettingsInfo = {
   /** Which secrets are set. Their values are write-only. */
-  secrets: { tmdbKey: boolean; subdlKey: boolean; assrtToken: boolean; llmKey: boolean };
+  secrets: { tmdbKey: boolean; subdlKey: boolean; assrtToken: boolean };
   /** From the environment; the published Docker ports have to match, so they are not editable here. */
   torrentPort: number;
   torrentDhtPort: number;
@@ -810,7 +897,7 @@ export type SettingsInfo = {
 /** The filesystem that holds /data: its size, what is free now, what the app always leaves free, and the highest limit that can be set. */
 export type DiskInfo = { totalBytes: Bytes; availableBytes: Bytes; reserveBytes: Bytes; maxLimitBytes: Bytes };
 
-export type SecretName = 'tmdbKey' | 'subdlKey' | 'assrtToken' | 'llmKey';
+export type SecretName = 'tmdbKey' | 'subdlKey' | 'assrtToken';
 
 type DeepPartial<T> = {
   [K in keyof T]?: T[K] extends (infer U)[] ? U[] : T[K] extends object ? DeepPartial<T[K]> : T[K];
@@ -953,7 +1040,26 @@ export interface Endpoints {
   /** Always 200: a source that cannot be reached is a result, not an error of this endpoint. */
   'POST /api/admin/sources/:id/test': { ok: SourceCheck };
   /** Always 200, like the source tests: a model that does not answer is a result. */
-  'POST /api/admin/align/test': { ok: AlignModelCheck };
+  /* language models (docs/18-llm.md) */
+  'GET /api/admin/llm': { ok: LlmSettings };
+  'POST /api/admin/llm/profiles': { body: LlmProfileInput; ok: LlmProfile };
+  'PUT /api/admin/llm/profiles/:id': { body: LlmProfileInput; ok: LlmProfile };
+  'DELETE /api/admin/llm/profiles/:id': { ok: null };
+  /** The models a service offers, with the form's values; the stored key of `profileId` when no key is given. */
+  'POST /api/admin/llm/models': {
+    body: { profileId?: Id; provider: LlmProvider; baseUrl: string; apiVersion: string; key?: string };
+    ok: { models: string[] };
+  };
+  /** One small translation with the form's values (saved or not). */
+  'POST /api/admin/llm/test': { body: LlmProfileInput & { profileId?: Id }; ok: LlmCheck };
+  'PUT /api/admin/llm/settings': { body: { translatePerHour: number }; ok: null };
+
+  /* translation */
+  'POST /api/subtitles/:id/translate': { body: { targetLanguage: string; mode: TranslationMode }; ok: Translation };
+  'GET /api/torrents/:id/translations': { ok: Translation[] };
+  'POST /api/translations/:id/cancel': { ok: Translation };
+  /** Carries on a failed or cancelled translation from the chunk where it stopped. */
+  'POST /api/translations/:id/resume': { ok: Translation };
   'GET /api/admin/system': { ok: { services: ServiceStatus[]; tasks: Task[]; disk: DiskInfo } };
   /** Answers with the task that was retried, unchanged. The new task shows up in GET /api/admin/system after the `admin` event. */
   'POST /api/admin/tasks/:id/retry': { ok: Task };

@@ -32,7 +32,8 @@ export const DEFAULTS: Settings = {
     zimuku: { enabled: true, searchUrl: '' },
   },
   subtitles: { defaultLangs: ['zh-Hant', 'en'] },
-  align: { asr: true, llm: { provider: 'none', model: '', baseUrl: '' } },
+  align: { asr: true },
+  llm: { translatePerHour: 5 },
 };
 
 type Leaf = string | number | boolean | string[];
@@ -89,9 +90,7 @@ const RULES: Record<string, z.ZodType> = {
   'providers.zimuku.searchUrl': z.string(),
   'subtitles.defaultLangs': z.array(z.enum(['zh-Hant', 'zh-Hans', 'en'])).min(1),
   'align.asr': z.boolean(),
-  'align.llm.provider': z.enum(['none', 'anthropic', 'openai']),
-  'align.llm.model': z.string().trim().max(200),
-  'align.llm.baseUrl': z.string().trim().max(500),
+  'llm.translatePerHour': int(0, 100),
 };
 
 const TRACKER = /^(udp|https?):\/\/[^\s/]+(:\d+)?(\/\S*)?$/i;
@@ -134,16 +133,6 @@ export async function validatePatch(
         value = v;
       }
     }
-    // The administrator's own model server: it may be on the local network (Ollama, vLLM), so
-    // only the form is checked, not where it points (docs/13-settings.md, "對齊").
-    if (key === 'align.llm.baseUrl') {
-      const v = String(value).replace(/\/+$/, '');
-      if (v !== '' && !/^https?:\/\/[^\s/]+(\/\S*)?$/i.test(v)) {
-        fields[key] = 'URL_FORMAT';
-        continue;
-      }
-      value = v;
-    }
     if (key === 'providers.zimuku.searchUrl') {
       const v = String(value).trim();
       if (v !== '' && (!/^https:\/\/[^\s]+$/.test(v) || !v.includes('{q}'))) {
@@ -169,16 +158,6 @@ export async function validatePatch(
   const maxPerUser = next('downloads.maxPerUser', current.downloads.maxPerUser);
   if (maxPerUser > maxActive && !fields['downloads.maxPerUser'] && !fields['downloads.maxActive']) {
     fields['downloads.maxPerUser'] = 'ABOVE_MAX_ACTIVE';
-  }
-  // An OpenAI-compatible server has no default address or model to fall back on.
-  const nextText = (k: string, fallback: string) =>
-    (out.find(([key]) => key === k)?.[1] as string | undefined) ?? fallback;
-  if (nextText('align.llm.provider', current.align.llm.provider) === 'openai') {
-    for (const [k, v] of [
-      ['align.llm.baseUrl', current.align.llm.baseUrl],
-      ['align.llm.model', current.align.llm.model],
-    ] as const)
-      if (!nextText(k, v) && !fields[k]) fields[k] = 'REQUIRED';
   }
   if (Object.keys(fields).length > 0) throw new ApiError('SETTING_INVALID', 'invalid settings', { fields });
   return out;
