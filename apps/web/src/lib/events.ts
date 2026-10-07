@@ -1,4 +1,4 @@
-import type { Export, LibraryItem, Notification, ServerEvent, Torrent, Workspace } from '@paiban/shared';
+import type { Export, LibraryItem, Notification, ServerEvent, Torrent, Translation, Workspace } from '@paiban/shared';
 import { type QueryClient, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { keys, type StorageView } from './queries';
@@ -141,6 +141,16 @@ export function apply(qc: QueryClient, e: ServerEvent, onNotification: (n: Notif
       );
       onNotification(e.notification);
       break;
+    case 'translation': {
+      const x = e.translation;
+      qc.setQueryData<Translation[]>(keys.translations(x.torrentId), (l) =>
+        l ? [x, ...l.filter((y) => y.id !== x.id)] : l,
+      );
+      void qc.invalidateQueries({ queryKey: keys.translations(x.torrentId) });
+      // A finished translation is a new subtitle of the film.
+      if (x.state === 'done') void qc.invalidateQueries({ queryKey: keys.workspace(x.torrentId) });
+      break;
+    }
     case 'admin':
       void qc.invalidateQueries({ queryKey: ['admin'] });
       break;

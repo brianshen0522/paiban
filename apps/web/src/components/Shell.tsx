@@ -134,6 +134,7 @@ export function Shell({ me }: { me: Me }) {
     { to: '/admin/users', label: t.shell.admin.users },
     { to: '/admin/storage', label: t.shell.admin.storage },
     { to: '/admin/sources', label: t.shell.admin.sources },
+    { to: '/admin/llm', label: t.shell.admin.llm },
     { to: '/admin/downloads', label: t.shell.admin.downloads },
     { to: '/admin/system', label: t.shell.admin.system },
     { to: '/admin/audit', label: t.shell.admin.audit },

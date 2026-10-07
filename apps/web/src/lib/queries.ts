@@ -40,6 +40,7 @@ export const keys = {
   peaks: (mediaId: string) => ['media', mediaId, 'peaks'] as const,
   speech: (mediaId: string) => ['media', mediaId, 'speech'] as const,
   exports: ['exports'] as const,
+  translations: (torrentId: string) => ['translations', torrentId] as const,
 };
 
 export type SearchResult = { items: MovieSummary[]; total: number; page: number; pageSize: number };

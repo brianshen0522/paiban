@@ -8,12 +8,28 @@ import { t } from '../../copy/zh-TW';
 import { type ApiFailure, asFailure, candidateReason, del, post, upload } from '../../lib/api';
 import { bytes } from '../../lib/format';
 import { keys, useCandidates, useMe } from '../../lib/queries';
+import { TranslateDialog, TranslationList } from './Translate';
 
 const LANGS: Lang[] = ['zh-Hant', 'zh-Hans', 'en'];
 const SEARCHED: ProviderStatus['id'][] = ['justsubtitles', 'yify', 'assrt'];
 const ACCEPT = ['srt', 'ass', 'ssa', 'vtt', 'zip', 'rar', '7z'];
 
-export const langName = (l: string): string => t.langs[l] ?? l;
+const names = (() => {
+  try {
+    return new Intl.DisplayNames(['zh-TW'], { type: 'language' });
+  } catch {
+    return null;
+  }
+})();
+/** Our own names for the languages detection knows; any other code (a translation's target) as the browser names it. */
+export const langName = (l: string): string => {
+  if (t.langs[l]) return t.langs[l];
+  try {
+    return (l && names?.of(l)) || l;
+  } catch {
+    return l;
+  }
+};
 export const providerName = (p: string): string => t.subs.providers[p] ?? p;
 const scorePct = (s: number | null) => (s == null ? null : Math.round(s * 100));
 
@@ -57,6 +73,7 @@ function AddedSubtitles({ ws }: { ws: Workspace }) {
           <p className="sub">{t.subs.sharedNote}</p>
         </>
       )}
+      <TranslationList torrentId={ws.item.torrent.id} subtitles={subs} />
     </section>
   );
 }
@@ -67,6 +84,7 @@ function AddedRow({ s, torrentId }: { s: Subtitle; torrentId: string }) {
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
+  const [translating, setTranslating] = useState(false);
   const remove = async () => {
     setBusy(true);
     setError(false);
@@ -103,9 +121,18 @@ function AddedRow({ s, torrentId }: { s: Subtitle; torrentId: string }) {
           <Link className="btn strong" to={`/library/${torrentId}/sync/${s.id}`}>
             {s.status === 'confirmed' ? t.subs.resync : t.subs.sync}
           </Link>
+          <button
+            type="button"
+            aria-haspopup="dialog"
+            aria-label={t.translate.buttonLabel(langName(s.language))}
+            onClick={() => setTranslating(true)}
+          >
+            {t.translate.button}
+          </button>
           <button type="button" aria-expanded={confirm} onClick={() => setConfirm(true)}>
             {t.subs.remove}
           </button>
+          {translating && <TranslateDialog s={s} onClose={() => setTranslating(false)} />}
         </td>
       </tr>
       {(confirm || error) && (

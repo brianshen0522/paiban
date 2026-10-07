@@ -1,7 +1,7 @@
-import type { AlignModelCheck, Lang, SecretName, Settings, SourceCheck, SourceHealth, SourceId } from '@paiban/shared';
+import type { Lang, SecretName, Settings, SourceCheck, SourceHealth, SourceId } from '@paiban/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { type FormEvent, type KeyboardEvent, type ReactNode, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { Banner, Chip, Field, PageHead, Skeleton, Switch } from '../../components/Bits';
 import { useToast } from '../../components/Toasts';
 import { t } from '../../copy/zh-TW';
@@ -56,13 +56,12 @@ function Cards({ data }: { data: AdminSettings }) {
   const health = (id: SourceHealth['id']) => data.sources.find((x) => x.id === id);
   const p = data.settings.providers;
   const secrets = data.info.secrets;
-  const llm = data.settings.align.llm.provider;
   const notes: Record<Tab, string> = {
     movies: healthNote([health('yts'), health('tmdb')]),
     subtitles: healthNote(
       (['justsubtitles', 'yify', 'assrt'] as const).filter((id) => p[id].enabled).map((id) => health(id)),
     ),
-    align: c().tabNotes.align(data.settings.align.asr, c().tabNotes.llm[llm] ?? llm),
+    align: c().tabNotes.align(data.settings.align.asr),
   };
   const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
     if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
@@ -155,7 +154,7 @@ function Cards({ data }: { data: AdminSettings }) {
             <CommonCard settings={data.settings} />
           </>
         )}
-        {tab === 'align' && <AlignCard settings={data.settings} llmKeySet={secrets.llmKey} />}
+        {tab === 'align' && <AlignCard settings={data.settings} />}
       </div>
     </>
   );
@@ -597,47 +596,11 @@ function CommonCard({ settings }: { settings: Settings }) {
   );
 }
 
-function AlignCard({ settings, llmKeySet }: { settings: Settings; llmKeySet: boolean }) {
+function AlignCard({ settings }: { settings: Settings }) {
   const save = useSave();
   const toast = useToast();
-  const llm = settings.align.llm;
   const [asr, setAsr] = useState(settings.align.asr);
-  const [provider, setProvider] = useState(llm.provider);
-  const [model, setModel] = useState(llm.model);
-  const [baseUrl, setBaseUrl] = useState(llm.baseUrl);
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [saving, setSaving] = useState(false);
-  const [testing, setTesting] = useState(false);
-  const [result, setResult] = useState<AlignModelCheck | null>(null);
   useEffect(() => setAsr(settings.align.asr), [settings.align.asr]);
-  useEffect(() => {
-    setProvider(llm.provider);
-    setModel(llm.model);
-    setBaseUrl(llm.baseUrl);
-  }, [llm.provider, llm.model, llm.baseUrl]);
-  const dirty = provider !== llm.provider || model !== llm.model || baseUrl !== llm.baseUrl;
-
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    setResult(null);
-    setErrors(await save({ align: { llm: { provider, model: model.trim(), baseUrl: baseUrl.trim() } } }));
-    setSaving(false);
-  };
-  const test = async () => {
-    setTesting(true);
-    setResult(null);
-    try {
-      setResult(await post<AlignModelCheck>('/api/admin/align/test'));
-    } catch {
-      setResult({ ok: false, code: 'UNREACHABLE', ms: 0 });
-    } finally {
-      setTesting(false);
-    }
-  };
-  const resultText = (r: AlignModelCheck) =>
-    r.code === 'OK' ? t.modelTests.OK((r.ms / 1000).toFixed(1)) : t.modelTests[r.code];
-
   return (
     <section className="card stack">
       <h2>{c().align}</h2>
@@ -655,91 +618,12 @@ function AlignCard({ settings, llmKeySet }: { settings: Settings; llmKeySet: boo
         }}
       />
       <p className="sub">{c().asrHelp}</p>
-      <form className="stack" onSubmit={submit} noValidate>
-        <Field label={c().provider} help={c().providerHelp}>
-          {(id, note) => (
-            <select
-              id={id}
-              aria-describedby={note}
-              value={provider}
-              onChange={(e) => setProvider(e.target.value as typeof provider)}
-            >
-              <option value="none">{c().providerNone}</option>
-              <option value="anthropic">{c().providerAnthropic}</option>
-              <option value="openai">{c().providerOpenai}</option>
-            </select>
-          )}
-        </Field>
-        {provider !== 'none' && (
-          <Field
-            label={c().model}
-            help={provider === 'anthropic' ? c().modelHelpAnthropic : c().modelHelpOpenai}
-            error={errors['align.llm.model']}
-          >
-            {(id, note) => (
-              <input
-                id={id}
-                aria-describedby={note}
-                aria-invalid={!!errors['align.llm.model']}
-                className="mono"
-                spellCheck={false}
-                autoCapitalize="none"
-                placeholder={provider === 'anthropic' ? 'claude-opus-5-5' : 'qwen-plus'}
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-              />
-            )}
-          </Field>
-        )}
-        {provider === 'openai' && (
-          <Field label={c().baseUrl} help={c().baseUrlHelp} error={errors['align.llm.baseUrl']}>
-            {(id, note) => (
-              <input
-                id={id}
-                aria-describedby={note}
-                aria-invalid={!!errors['align.llm.baseUrl']}
-                className="mono"
-                type="url"
-                inputMode="url"
-                spellCheck={false}
-                autoCapitalize="none"
-                placeholder="https://"
-                value={baseUrl}
-                onChange={(e) => setBaseUrl(e.target.value)}
-              />
-            )}
-          </Field>
-        )}
-        {errors._ && (
-          <p className="bad" role="alert">
-            {errors._}
-          </p>
-        )}
-        <div className="frow">
-          <button type="submit" className="primary" disabled={saving || !dirty}>
-            {c().saveAlign}
-          </button>
-        </div>
-      </form>
-      {llm.provider !== 'none' && (
-        <>
-          <SecretField
-            name="llmKey"
-            label={c().llmKey}
-            keyName={c().llmKeyName}
-            help={c().llmKeyHelp}
-            isSet={llmKeySet}
-          />
-          <div className="frow">
-            <button type="button" onClick={test} disabled={testing || dirty}>
-              {c().testModel}
-            </button>
-            <span className={result ? (result.ok ? 'good' : 'bad') : 'sub'} aria-live="polite">
-              {testing ? c().testing : result ? resultText(result) : ''}
-            </span>
-          </div>
-        </>
-      )}
+      <p className="sub">
+        {c().llmMoved}{' '}
+        <Link className="link" to="/admin/llm">
+          {c().toLlm}
+        </Link>
+      </p>
     </section>
   );
 }

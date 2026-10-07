@@ -984,6 +984,133 @@ fieldset.field > legend {
 #view .dl-confirm:has(> .cdialog) {
   display: contents;
 }
+/* Floating windows for forms (LLM profiles, translation; docs/18-llm.md). */
+.modal {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 0;
+  width: min(520px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  /* It may sit inside a table cell (a row's action): nothing of that cell's text layout carries over. */
+  text-align: start;
+  white-space: normal;
+  font-weight: 400;
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: 0 20px 50px rgba(8, 12, 28, 0.3);
+}
+.modal,
+#view td.act > .modal {
+  margin: auto;
+}
+.modal.wide {
+  width: min(640px, calc(100vw - 32px));
+}
+.modal::backdrop {
+  background: rgba(10, 12, 20, 0.45);
+}
+:root[data-theme="dark"] .modal::backdrop {
+  background: rgba(0, 0, 0, 0.68);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .modal::backdrop {
+    background: rgba(0, 0, 0, 0.68);
+  }
+}
+.modal-body {
+  display: grid;
+  gap: 14px;
+  padding: 20px;
+  min-width: 0;
+}
+.modal-body h2 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+}
+.modal-body .row2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr));
+  gap: 12px;
+}
+.modal-body details {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 12px;
+}
+.modal-body details[open] {
+  display: grid;
+  gap: 12px;
+  padding-bottom: 12px;
+}
+.modal-body summary {
+  cursor: pointer;
+  font-weight: 500;
+}
+#view .translations {
+  display: grid;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+#view .translations h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+#view .tr-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+}
+#view .tr-main {
+  flex: 1 1 260px;
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+#view .tr-act {
+  display: flex;
+  gap: 6px;
+}
+.modal .stack-form {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+.modal-act {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 4px;
+}
+.modal-act .push {
+  margin-right: auto;
+}
+.modal .inline {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+.modal .inline input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.modal fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.modal fieldset legend {
+  font-weight: 500;
+  padding: 0;
+  margin-bottom: 4px;
+}
 .cdialog {
   border: 1px solid var(--line);
   border-radius: 14px;
