@@ -97,7 +97,21 @@ export function buildApp(deps: Deps): FastifyInstance {
   });
 
   app.setErrorHandler((err, req, reply) => {
-    if (err instanceof ApiError) return reply.status(err.status).send(err.body());
+    if (err instanceof ApiError) {
+      // Refused requests are kept in the log by code and route (no bodies), so a failure someone
+      // reports can be traced. Not signed in is routine (every visit before logging in), so not that.
+      if (err.code !== 'UNAUTHENTICATED')
+        deps.log.info(
+          {
+            code: err.code,
+            status: err.status,
+            method: req.method,
+            url: req.routeOptions.url ?? req.url.split('?')[0],
+          },
+          'request refused',
+        );
+      return reply.status(err.status).send(err.body());
+    }
     const e = err as { statusCode?: number; code?: string; message?: string };
     if (e.statusCode && e.statusCode < 500) {
       const code = e.statusCode === 413 ? 'UPLOAD_TOO_LARGE' : e.statusCode === 415 ? 'UNSUPPORTED_FILE' : 'VALIDATION';

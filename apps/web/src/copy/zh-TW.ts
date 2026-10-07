@@ -998,6 +998,11 @@ export const t = {
       listenNext: '聽下一個檢查點',
       confirmed: '已確認。下面是同步結果。',
       confirmFailed: '確認沒有成功，請再試一次。',
+      confirmNotSaved: '同步結果還沒存進伺服器，所以還不能確認。等右上角顯示「已儲存」再按一次「確認同步」。',
+      confirmUnreachable:
+        '連不上網站伺服器（可能正在更新或重新啟動），等了一下再試也一樣。過一分鐘再按一次「確認同步」。',
+      confirmFailedCode: (code: string, status: number) =>
+        `確認沒有成功（錯誤代碼 ${code}，HTTP ${status}），請再試一次。一直這樣的話，把這個代碼告訴管理員。`,
       modeEdit: '逐句編輯：改文字、單獨調整一句的開始和結束，或刪掉廣告行。在時間軸上拖曳字幕區塊只會動那一句。',
       modeSync: '同步：位移和速率會一起移動整段字幕。',
       offsetNaN: '位移要填秒數，例如 -2.4。',

@@ -43,6 +43,9 @@ export async function api<T>(method: Method, path: string, body?: unknown, init?
 async function failure(res: Response, path: string): Promise<ApiFailure> {
   const data: unknown = await res.json().catch(() => null);
   const err = (data as { error?: { code?: ErrorCode; message?: string; details?: ErrorDetails } } | null)?.error;
+  // The proxy in front answers 502–504 while the api restarts (an update) or is unreachable:
+  // nothing of ours answered, which reads like the network, not like an error of ours.
+  if (!err && res.status >= 502 && res.status <= 504) return new ApiFailure('NETWORK', res.status, res.statusText);
   if (res.status === 401 && path !== '/api/auth/login') window.dispatchEvent(new Event('paiban:unauthenticated'));
   return new ApiFailure(err?.code ?? 'INTERNAL', res.status, err?.message ?? res.statusText, err?.details);
 }

@@ -24,7 +24,7 @@ import { Link } from 'react-router';
 import { Banner, Chip, Skeleton } from '../components/Bits';
 import { useToast } from '../components/Toasts';
 import { t } from '../copy/zh-TW';
-import { api, asFailure, type Conflict, conflictOf, get, getBytes, post } from '../lib/api';
+import { api, asFailure, type Conflict, conflictOf, fieldCodes, get, getBytes, post } from '../lib/api';
 import { RECONNECTED, SUBTITLE_EVENT, type SubtitleEvent } from '../lib/events';
 import { keys, useMe, useSubtitle } from '../lib/queries';
 import { langName } from '../pages/workspace/SubtitlesTab';
@@ -791,12 +791,20 @@ function Bench({ ws, detail }: { ws: Workspace; detail: SubtitleDetail }) {
     setConfirming(true);
     try {
       if (!(await save())) {
-        setConfirmError(t.bench.msg.confirmFailed);
+        // The edits did not reach the server, so there is nothing settled to confirm yet.
+        setConfirmError(t.bench.msg.confirmNotSaved);
         return;
       }
-      const s = await post<Subtitle>(`/api/subtitles/${sub.id}/confirm`, {
-        rev: savedRef.current.rev,
-        ...(left ? { force: true } : {}),
+      const send = () =>
+        post<Subtitle>(`/api/subtitles/${sub.id}/confirm`, {
+          rev: savedRef.current.rev,
+          ...(left ? { force: true } : {}),
+        });
+      // The server restarting (an update) answers for a few seconds with nothing: once more, a little later.
+      const s = await send().catch(async (e) => {
+        if (asFailure(e).code !== 'NETWORK') throw e;
+        await new Promise((r) => setTimeout(r, 4000));
+        return send();
       });
       savedRef.current = { ...savedRef.current, rev: s.rev };
       setStatus('confirmed');
@@ -818,7 +826,19 @@ function Bench({ ws, detail }: { ws: Workspace; detail: SubtitleDetail }) {
         setConflict(c);
         setSaveState('conflict');
       } else {
-        const text = asFailure(e).code === 'NETWORK' ? t.common.offline : t.bench.msg.confirmFailed;
+        const f = asFailure(e);
+        // Checkpoints the server still has as unheard (a mark that had not reached it): ask, as before pressing.
+        const pending = f.code === 'VALIDATION' && fieldCodes(f).force === 'CHECKPOINTS_PENDING';
+        if (pending) {
+          setAskConfirm(docRef.current.checkpoints.filter((c) => c.status !== 'ok').length || 1);
+          return;
+        }
+        const text =
+          f.code === 'NETWORK'
+            ? t.bench.msg.confirmUnreachable
+            : f.code === 'NOT_HOLDER' || f.code === 'NOT_FOUND'
+              ? t.bench.msg.removedElsewhere
+              : t.bench.msg.confirmFailedCode(f.code, f.status);
         say(text);
         setConfirmError(text);
       }
