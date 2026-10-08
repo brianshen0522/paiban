@@ -56,6 +56,22 @@ beforeEach(async () => {
 });
 
 describe('starting an export', () => {
+  it('titles the tracks in the language of the person who exports', async () => {
+    const f = await film(db.pool, dataDir, fixture('clip.mp4'), [haoId]);
+    const zh = await subtitle(db.pool, dataDir, f.tid, 'truth.zh-TW.srt');
+    await call(t.app, 'PATCH', '/api/me', { cookie: hao, body: { prefs: { locale: 'en' } } });
+    try {
+      const res = await start(hao, f.tid, {
+        fileName: 'Clip.mkv',
+        tracks: [{ subtitleId: zh.id, isDefault: true }],
+      });
+      expect(res.json().tracks).toMatchObject([{ language: 'zh-Hant', title: 'Traditional Chinese' }]);
+      await call(t.app, 'DELETE', `/api/exports/${res.json().id}`, { cookie: hao });
+    } finally {
+      await call(t.app, 'PATCH', '/api/me', { cookie: hao, body: { prefs: { locale: null } } });
+    }
+  });
+
   it('writes the final SRTs now, default first, and reserves the film size × 1.01 + 1 MB', async () => {
     const f = await film(db.pool, dataDir, fixture('clip.mp4'), [meiId, haoId]);
     const edited = SyncCore.identityDoc();

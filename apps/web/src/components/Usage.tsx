@@ -1,5 +1,5 @@
 import { USAGE_BAD_FREE_BYTES, USAGE_WARN_FREE_BYTES, type Usage } from '@paiban/shared';
-import { t } from '../copy/zh-TW';
+import { t } from '../copy';
 import { bytes } from '../lib/format';
 
 const ORDER = ['movies', 'exports', 'previews', 'reserved', 'partial'] as const;

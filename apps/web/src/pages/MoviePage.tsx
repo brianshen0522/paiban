@@ -8,9 +8,9 @@ import { Rating } from '../components/Rating';
 import { SpaceShort } from '../components/SpaceShort';
 import { useToast } from '../components/Toasts';
 import { UsageBar } from '../components/Usage';
-import { t } from '../copy/zh-TW';
+import { locale, t } from '../copy';
 import { ApiFailure, post } from '../lib/api';
-import { audioLabel, bytes, dateTime, genreLabel, percent, shortHash, sourceLabel } from '../lib/format';
+import { audioLabel, bytes, dateTime, filmTitle, genreLabel, percent, shortHash, sourceLabel } from '../lib/format';
 import { keys, useMovie } from '../lib/queries';
 import { SearchError } from './SearchPage';
 import { NotFoundPage } from './StatusPages';
@@ -46,19 +46,21 @@ export function MoviePage() {
       <div className="mhead">
         <Poster url={m.posterUrl} title={m.title} year={m.year} runtimeMin={m.runtimeMin} size="lg" />
         <div className="minfo">
-          <h1>{m.titleZh ?? m.title}</h1>
+          <h1>{filmTitle(m).main}</h1>
           <p className="sub">
             {[
-              m.titleZh ? m.title : null,
+              filmTitle(m).other,
               String(m.year),
               m.runtimeMin > 0 ? t.movie.runtime(m.runtimeMin) : null,
-              m.genres.map(genreLabel).join('、') || null,
+              m.genres.map(genreLabel).join(t.common.listSep) || null,
             ]
               .filter(Boolean)
               .join(' · ')}{' '}
             · <Rating m={m} />
           </p>
-          {m.summary && <p className="plot">{m.summary}</p>}
+          {(locale === 'en' && m.summaryEn) || m.summary ? (
+            <p className="plot">{(locale === 'en' && m.summaryEn) || m.summary}</p>
+          ) : null}
           {m.tmdbUrl && (
             <p>
               <a href={m.tmdbUrl} target="_blank" rel="noopener noreferrer">

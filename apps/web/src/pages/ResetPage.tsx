@@ -2,9 +2,10 @@ import { SITE_NAME } from '@paiban/shared';
 import { useQuery } from '@tanstack/react-query';
 import { type FormEvent, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
+import { LocaleToggle } from '../components/LocaleToggle';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { useToast } from '../components/Toasts';
-import { t } from '../copy/zh-TW';
+import { t } from '../copy';
 import { ApiFailure, get, post } from '../lib/api';
 
 /** docs/11-pages.md, "重設密碼": the account name read-only, a new password twice. */
@@ -44,7 +45,10 @@ export function ResetPage() {
 
   return (
     <div className="auth">
-      <ThemeToggle className="corner" />
+      <div className="corner-tools">
+        <LocaleToggle />
+        <ThemeToggle />
+      </div>
       <form className="box" onSubmit={submit} noValidate>
         <div className="mark">
           <i aria-hidden="true" />

@@ -7,9 +7,9 @@ import { FillPage, ScrollList } from '../components/FillPage';
 import { Poster } from '../components/Poster';
 import { SpaceShort } from '../components/SpaceShort';
 import { useToast } from '../components/Toasts';
-import { t } from '../copy/zh-TW';
+import { t } from '../copy';
 import { ApiFailure, del, post } from '../lib/api';
-import { bytes, eta, percent, relative, speed, versionLabel } from '../lib/format';
+import { bytes, eta, filmTitle, percent, relative, speed, versionLabel } from '../lib/format';
 import { keys, useTorrents } from '../lib/queries';
 
 const TONE: Record<Torrent['status'], Tone> = {
@@ -280,7 +280,7 @@ function Row({ x, me, showHolders }: { x: Torrent; me: Me; showHolders: boolean 
     <Link
       className="btn dl-detail"
       to={`/downloads/${x.id}`}
-      aria-label={t.downloads.detailLabel(x.movie.titleZh ?? x.movie.title)}
+      aria-label={t.downloads.detailLabel(filmTitle(x.movie).main)}
     >
       {t.downloads.detail} ›
     </Link>
@@ -302,9 +302,9 @@ function Row({ x, me, showHolders }: { x: Torrent; me: Me; showHolders: boolean 
           <Link
             to={`/downloads/${x.id}`}
             className="dl-title"
-            aria-label={t.downloadDetail.openDetail(x.movie.titleZh ?? x.movie.title)}
+            aria-label={t.downloadDetail.openDetail(filmTitle(x.movie).main)}
           >
-            <b>{x.movie.titleZh ?? x.movie.title}</b>
+            <b>{filmTitle(x.movie).main}</b>
           </Link>{' '}
           <span className="sub-i">{versionLabel(x.version)}</span>
         </div>
@@ -318,7 +318,7 @@ function Row({ x, me, showHolders }: { x: Torrent; me: Me; showHolders: boolean 
         )}
         <span className="dl-meta">{meta(x, me)}</span>
         {showHolders && (
-          <span className="sub">{t.downloads.holders(x.holders.map((h) => h.displayName).join('、'))}</span>
+          <span className="sub">{t.downloads.holders(x.holders.map((h) => h.displayName).join(t.common.listSep))}</span>
         )}
       </div>
       <div className="dl-act">

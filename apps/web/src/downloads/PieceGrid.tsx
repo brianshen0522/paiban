@@ -1,6 +1,6 @@
 import type { TorrentLive } from '@paiban/shared';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { t } from '../copy/zh-TW';
+import { intlLocale, t } from '../copy';
 import { pieceSize } from '../lib/format';
 
 type Pieces = NonNullable<TorrentLive['pieces']>;
@@ -149,11 +149,11 @@ export function PieceGrid({ pieces }: { pieces: Pieces }) {
     <div className="piece-grid">
       <p className="sub">
         {t.downloadDetail.piecesSummary(
-          pieces.count.toLocaleString('zh-TW'),
+          pieces.count.toLocaleString(intlLocale()),
           pieceSize(pieces.size),
-          stats.done.toLocaleString('zh-TW'),
-          stats.inFlight.toLocaleString('zh-TW'),
-          stats.nobody.toLocaleString('zh-TW'),
+          stats.done.toLocaleString(intlLocale()),
+          stats.inFlight.toLocaleString(intlLocale()),
+          stats.nobody.toLocaleString(intlLocale()),
         )}
         {per > 1 ? ` ${t.downloadDetail.perCell(per)}` : ''}
       </p>

@@ -1,6 +1,6 @@
 import { Link } from 'react-router';
 import { Empty } from '../components/Bits';
-import { t } from '../copy/zh-TW';
+import { t } from '../copy';
 
 export function NotFoundPage() {
   return (

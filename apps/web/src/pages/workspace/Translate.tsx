@@ -5,7 +5,7 @@ import { Link } from 'react-router';
 import { Banner, Field, Progress } from '../../components/Bits';
 import { Modal } from '../../components/Modal';
 import { useToast } from '../../components/Toasts';
-import { t } from '../../copy/zh-TW';
+import { t } from '../../copy';
 import { asFailure, get, post } from '../../lib/api';
 import { keys, useMe } from '../../lib/queries';
 import { langName } from './SubtitlesTab';

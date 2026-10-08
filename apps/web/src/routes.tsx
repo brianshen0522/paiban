@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { Navigate, Outlet, type RouteObject, useLocation, useNavigate, useOutletContext } from 'react-router';
 import { Banner } from './components/Bits';
 import { Shell } from './components/Shell';
-import { t } from './copy/zh-TW';
+import { locale, setLocale, t } from './copy';
 import { ApiFailure } from './lib/api';
 import { useMe } from './lib/queries';
 import { DownloadsPage } from './pages/DownloadsPage';
@@ -33,6 +33,11 @@ function RequireAuth() {
     window.addEventListener('paiban:unauthenticated', onLost);
     return () => window.removeEventListener('paiban:unauthenticated', onLost);
   }, [navigate, qc, location]);
+  // The language kept with the account wins over this device's (it follows the person around).
+  const wanted = me.data?.user.prefs.locale ?? null;
+  useEffect(() => {
+    if (wanted && wanted !== locale) setLocale(wanted);
+  }, [wanted]);
 
   if (me.isPending) return <div className="boot" role="status" aria-busy="true" aria-label={t.common.loading} />;
   if (me.isError) {

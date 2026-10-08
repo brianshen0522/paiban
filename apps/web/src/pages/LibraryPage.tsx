@@ -6,7 +6,7 @@ import { Banner, Chip, ConfirmInline, Empty, PageHead, Skeleton } from '../compo
 import { FillPage, ScrollList } from '../components/FillPage';
 import { Poster } from '../components/Poster';
 import { useToast } from '../components/Toasts';
-import { t } from '../copy/zh-TW';
+import { t } from '../copy';
 import { del } from '../lib/api';
 import { bytes, percent, versionLabel } from '../lib/format';
 import { keys, useLibrary, useMe } from '../lib/queries';
@@ -155,7 +155,7 @@ function Card({ item }: { item: LibraryItem }) {
             {item.exports ? t.library.stepExported(item.exports) : t.library.stepNotExported}
           </li>
         </ol>
-        {others.length > 0 && <span className="sub">{t.library.sharedWith(others.join('、'))}</span>}
+        {others.length > 0 && <span className="sub">{t.library.sharedWith(others.join(t.common.listSep))}</span>}
         {x.status === 'analyzing' && (
           <span className="sub">
             <Chip tone="info">{t.library.analyzing}</Chip> {t.library.analyzingNote}
@@ -166,7 +166,7 @@ function Card({ item }: { item: LibraryItem }) {
           <ConfirmInline
             text={
               others.length
-                ? t.library.confirmShared(others.join('、'))
+                ? t.library.confirmShared(others.join(t.common.listSep))
                 : t.library.confirmLast(
                     bytes(x.diskBytes),
                     preview > 0 ? bytes(preview) : null,

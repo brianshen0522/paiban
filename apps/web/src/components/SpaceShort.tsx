@@ -1,5 +1,5 @@
 import { Link } from 'react-router';
-import { t } from '../copy/zh-TW';
+import { t } from '../copy';
 import { type ApiFailure, isSpaceError } from '../lib/api';
 import { bytes } from '../lib/format';
 

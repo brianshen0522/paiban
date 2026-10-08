@@ -31,4 +31,13 @@ describe('the mux command', () => {
     expect(trackTag('zh-Hans')).toEqual({ language: 'chi', title: '简体中文' });
     expect(trackTag('und')).toEqual({ language: 'und', title: 'und' });
   });
+
+  it('titles tracks in English for someone who uses the site in English', () => {
+    expect(trackTag('zh-Hant', 'en')).toEqual({ language: 'chi', title: 'Traditional Chinese' });
+    expect(trackTag('zh', 'en')).toEqual({ language: 'chi', title: 'Traditional Chinese' });
+    expect(trackTag('zh-Hans', 'en')).toEqual({ language: 'chi', title: 'Simplified Chinese' });
+    expect(trackTag('en', 'en')).toEqual({ language: 'eng', title: 'English' });
+    expect(trackTag('ja', 'en')).toEqual({ language: 'jpn', title: 'Japanese' });
+    expect(trackTag('und', 'en')).toEqual({ language: 'und', title: 'und' });
+  });
 });

@@ -4,7 +4,7 @@
  * what is in view is drawn, and the waveform takes the min and max of the peaks under each pixel.
  */
 import type { SyncCore, SyncDoc } from '@paiban/shared';
-import { t } from '../copy/zh-TW';
+import { t } from '../copy';
 import { tick } from './model';
 
 type Speech = SyncCore.Speech;

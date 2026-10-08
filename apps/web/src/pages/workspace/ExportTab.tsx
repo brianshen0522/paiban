@@ -4,7 +4,7 @@ import { type FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { Banner, Chip, ConfirmInline, Progress } from '../../components/Bits';
 import { useToast } from '../../components/Toasts';
-import { t } from '../../copy/zh-TW';
+import { t } from '../../copy';
 import { type ApiFailure, asFailure, del, fieldCodes, isSpaceError, post } from '../../lib/api';
 import { bytes, percent, relative } from '../../lib/format';
 import { keys } from '../../lib/queries';
@@ -171,7 +171,7 @@ export function ExportTab({ ws }: { ws: Workspace }) {
           )}
           {pending.length > 0 && (
             <p className="sub">
-              {t.exportTab.pending(pending.length, pending.map((s) => langName(s.language)).join('、'))}{' '}
+              {t.exportTab.pending(pending.length, pending.map((s) => langName(s.language)).join(t.common.listSep))}{' '}
               <Link className="link" to={`/library/${x.id}/sync/${pending[0]?.id ?? ''}`}>
                 {t.exportTab.goSync}
               </Link>
@@ -321,7 +321,7 @@ export function ExportRow({ e, showFilm = false }: { e: Export; showFilm?: boole
       setConfirm(false);
     }
   };
-  const tracks = e.tracks.map((x) => langName(x.language)).join('、');
+  const tracks = e.tracks.map((x) => langName(x.language)).join(t.common.listSep);
   return (
     <>
       <tr>

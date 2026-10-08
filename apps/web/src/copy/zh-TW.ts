@@ -1,12 +1,16 @@
 /**
- * Every sentence people see (docs/17-ui.md, "文案"): Traditional Chinese, Taiwan usage, full-width
- * punctuation. Components never contain Chinese strings; they read from here. The site name comes
+ * Every sentence people see (docs/17-ui.md, "文案"), in Traditional Chinese, Taiwan usage,
+ * full-width punctuation; en.ts has the same in English (Brian, 2026-10-08: the site is bilingual).
+ * Components never contain sentences; they read `t` from copy/index.ts, the language in use. The site name comes
  * from SITE_NAME (D9) and is passed in where a sentence needs it.
  */
 import type { ErrorCode, TorrentErrorCode } from '@paiban/shared';
 
-export const t = {
+export const zhTW = {
   common: {
+    /** Between the items of a list (「美玲、阿豪」) and between clauses of one sentence. */
+    listSep: '、',
+    clauseSep: '；',
     loading: '載入中…',
     retry: '再試一次',
     cancel: '取消',
@@ -21,6 +25,16 @@ export const t = {
     goSources: '前往來源設定',
     unknownError: '發生錯誤，請再試一次。',
     offline: '連不上網站伺服器，請確認網路後再試一次。',
+  },
+
+  locale: {
+    title: '介面語言',
+    label: '介面語言',
+    help: '也決定 AI 翻譯字幕的名稱和匯出 MKV 時字幕軌的名稱用哪一種語言。',
+    follow: '跟隨瀏覽器',
+    names: { 'zh-TW': '繁體中文', en: 'English' },
+    short: { 'zh-TW': '中', en: 'EN' },
+    toggle: (next: string) => `介面語言：切換成 ${next}`,
   },
 
   theme: {
@@ -1653,3 +1667,17 @@ export const t = {
     TRANSLATION_RUNNING: '已經有一筆一樣的翻譯在進行。',
   } as Partial<Record<ErrorCode, string>>,
 } as const;
+
+/** The shape every language's copy has: the same keys and sentence functions, any wording. */
+type Widen<T> = T extends string
+  ? string
+  : T extends number
+    ? number
+    : T extends boolean
+      ? boolean
+      : T extends (...args: infer A) => infer R
+        ? (...args: A) => Widen<R>
+        : T extends object
+          ? { readonly [K in keyof T]: Widen<T[K]> }
+          : T;
+export type Copy = Widen<typeof zhTW>;

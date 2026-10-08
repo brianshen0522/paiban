@@ -185,6 +185,23 @@ describe('my account', () => {
     expect((await call(t.app, 'GET', '/api/auth/me', { cookie })).json().user.displayName).toBe('美玲');
   });
 
+  it('keeps the interface language with the account, or none to follow the browser', async () => {
+    await createUser(db.pool, 'speaker');
+    const cookie = await login(t.app, 'speaker');
+    const me = async () => (await call(t.app, 'GET', '/api/auth/me', { cookie })).json().user.prefs;
+    expect((await me()).locale).toBeNull();
+    const res = await call(t.app, 'PATCH', '/api/me', { cookie, body: { prefs: { locale: 'en' } } });
+    expect(res.json().prefs).toMatchObject({ locale: 'en' });
+    // Other preferences leave it alone.
+    await call(t.app, 'PATCH', '/api/me', { cookie, body: { prefs: { quality: '720p' } } });
+    expect((await me()).locale).toBe('en');
+    expect(
+      (await call(t.app, 'PATCH', '/api/me', { cookie, body: { prefs: { locale: 'fr' } } })).json().error.code,
+    ).toBe('VALIDATION');
+    await call(t.app, 'PATCH', '/api/me', { cookie, body: { prefs: { locale: null } } });
+    expect((await me()).locale).toBeNull();
+  });
+
   it('changes the password with the current one and signs out the other devices only', async () => {
     await createUser(db.pool, 'mover');
     const here = await login(t.app, 'mover');

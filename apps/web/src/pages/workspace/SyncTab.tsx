@@ -2,7 +2,7 @@ import type { Workspace } from '@paiban/shared';
 import { useEffect } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { Chip, Empty } from '../../components/Bits';
-import { t } from '../../copy/zh-TW';
+import { t } from '../../copy';
 import { Workbench } from '../../workbench/Workbench';
 import { MediaPanel, previewSentence } from './MediaPanel';
 import { langName, providerName } from './SubtitlesTab';

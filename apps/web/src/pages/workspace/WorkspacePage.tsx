@@ -4,9 +4,9 @@ import { type KeyboardEvent, useEffect, useRef } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { Banner, Chip, Empty, Skeleton } from '../../components/Bits';
 import { Poster } from '../../components/Poster';
-import { t } from '../../copy/zh-TW';
+import { t } from '../../copy';
 import { ApiFailure, post } from '../../lib/api';
-import { versionLabel } from '../../lib/format';
+import { filmTitle, versionLabel } from '../../lib/format';
 import { keys, useMe, useWorkspace } from '../../lib/queries';
 import { NotFoundPage } from '../StatusPages';
 import { ExportTab } from './ExportTab';
@@ -119,13 +119,13 @@ function Loaded({ ws, tab }: { ws: Workspace; tab: Tab }) {
           size="sm"
         />
         <div>
-          <h1>{x.movie.titleZh ?? x.movie.title}</h1>
+          <h1>{filmTitle(x.movie).main}</h1>
           <p className="sub">
             {[
-              x.movie.titleZh ? x.movie.title : null,
+              filmTitle(x.movie).other,
               String(x.movie.year),
               versionLabel(x.version),
-              others.length ? t.workspace.sharedWith(others.join('、')) : null,
+              others.length ? t.workspace.sharedWith(others.join(t.common.listSep)) : null,
             ]
               .filter(Boolean)
               .join(' · ')}{' '}

@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Banner, ConfirmInline, PageHead, Skeleton } from '../components/Bits';
 import { useToast } from '../components/Toasts';
 import { UsageBar, UsageLegend } from '../components/Usage';
-import { t } from '../copy/zh-TW';
+import { t } from '../copy';
 import { del } from '../lib/api';
 import { bytes } from '../lib/format';
 import { keys, useExports, useMe, useStorage } from '../lib/queries';
@@ -150,7 +150,7 @@ function MyItem({ item, preview }: { item: StorageItem; preview: number }) {
       : item.kind === 'partial'
         ? t.storage.confirmPartial(bytes(item.bytes))
         : others.length
-          ? t.storage.confirmShared(others.join('、'))
+          ? t.storage.confirmShared(others.join(t.common.listSep))
           : t.storage.confirmLast(
               bytes(item.bytes + preview + (item.filmExports?.bytes ?? 0)),
               item.filmExports?.count ?? 0,
@@ -188,7 +188,7 @@ function MyItem({ item, preview }: { item: StorageItem; preview: number }) {
           {preview > 0 && <div className="sub">{t.storage.previewExtra(bytes(preview))}</div>}
         </td>
         <td className="num">{bytes(item.bytes)}</td>
-        <td>{others.length ? item.holders.map((h) => h.displayName).join('、') : t.storage.onlyYou}</td>
+        <td>{others.length ? item.holders.map((h) => h.displayName).join(t.common.listSep) : t.storage.onlyYou}</td>
         <td className="act">
           <button type="button" aria-expanded={confirm} onClick={() => setConfirm(true)}>
             {button}

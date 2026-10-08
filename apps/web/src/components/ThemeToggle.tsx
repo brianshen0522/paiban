@@ -1,5 +1,5 @@
 import { type ReactElement, useState } from 'react';
-import { t } from '../copy/zh-TW';
+import { t } from '../copy';
 import { setTheme, type ThemeChoice, useTheme } from '../lib/theme';
 
 /** The order one press moves through. */

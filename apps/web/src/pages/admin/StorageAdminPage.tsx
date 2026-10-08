@@ -4,7 +4,7 @@ import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { Banner, ConfirmInline, Field, PageHead, Skeleton } from '../../components/Bits';
 import { useToast } from '../../components/Toasts';
 import { UsageBar, UsageLegend } from '../../components/Usage';
-import { t } from '../../copy/zh-TW';
+import { t } from '../../copy';
 import { ApiFailure, del, post, put } from '../../lib/api';
 import { bytes, relative } from '../../lib/format';
 import { type AdminStorage, keys, useAdminStorage } from '../../lib/queries';
@@ -171,7 +171,7 @@ function AdminItemRow({ item, hasPreview }: { item: StorageItem; hasPreview: boo
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const names = item.holders.map((h) => h.displayName).join('、') || t.forceDelete.nobody;
+  const names = item.holders.map((h) => h.displayName).join(t.common.listSep) || t.forceDelete.nobody;
   const size = bytes(item.bytes);
   // A film goes with its exports (Brian, 2026-10-06).
   const filmSize = bytes(item.bytes + (item.filmExports?.bytes ?? 0));

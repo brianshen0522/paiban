@@ -17,7 +17,27 @@ export type TrackRecord = {
  * ffmpeg writes three-letter codes only, so Traditional and Simplified Chinese differ by title.
  * These titles are fixed strings written into the file, not interface copy.
  */
-export function trackTag(language: string): { language: string; title: string } {
+export function trackTag(language: string, locale: 'zh-TW' | 'en' = 'zh-TW'): { language: string; title: string } {
+  // Titles in the language of the person who exports (Brian, 2026-10-08: the site is bilingual).
+  if (locale === 'en') {
+    const named: Record<string, string> = {
+      'zh-Hant': 'Traditional Chinese',
+      zh: 'Traditional Chinese',
+      'zh-Hans': 'Simplified Chinese',
+      en: 'English',
+    };
+    const base = language.split('-')[0] ?? language;
+    let title = named[language];
+    if (!title && base !== 'und') {
+      try {
+        title = new Intl.DisplayNames(['en'], { type: 'language' }).of(language) ?? language;
+      } catch {
+        title = language;
+      }
+    }
+    title ??= language;
+    return { language: base === 'en' ? 'eng' : (ISO639_2[base] ?? 'und'), title };
+  }
   if (language === 'zh-Hant' || language === 'zh') return { language: 'chi', title: '繁體中文' };
   if (language === 'zh-Hans') return { language: 'chi', title: '简体中文' };
   if (language === 'en') return { language: 'eng', title: 'English' };

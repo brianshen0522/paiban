@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { bytes, eta, percent, posterColor, shortHash } from './format';
+import { setLocale } from '../copy';
+import { bytes, eta, filmTitle, percent, posterColor, shortHash } from './format';
 
 describe('numbers (docs/17-ui.md, "數字怎麼寫")', () => {
   it('writes sizes on base 1024 with the documented precision', () => {
@@ -25,5 +26,20 @@ describe('numbers (docs/17-ui.md, "數字怎麼寫")', () => {
   it('gives each title its own stable placeholder colour', () => {
     expect(posterColor('Charade')).toBe(posterColor('Charade'));
     expect(posterColor('Charade')).not.toBe(posterColor('Metropolis'));
+  });
+});
+
+describe('film names in the interface language (Brian, 2026-10-08)', () => {
+  it('puts the Chinese title first in Chinese and the original first in English', () => {
+    const m = { title: 'Charade', titleZh: '謎中謎' };
+    expect(filmTitle(m)).toEqual({ main: '謎中謎', other: 'Charade' });
+    expect(filmTitle({ title: 'Charade', titleZh: null })).toEqual({ main: 'Charade', other: null });
+    setLocale('en');
+    try {
+      expect(filmTitle(m)).toEqual({ main: 'Charade', other: '謎中謎' });
+      expect(filmTitle({ title: 'Charade', titleZh: null })).toEqual({ main: 'Charade', other: null });
+    } finally {
+      setLocale('zh-TW');
+    }
   });
 });

@@ -419,9 +419,9 @@ ffmpeg -v error -nostdin -y -progress pipe:1 -nostats \
 | `zh-Hant`、`zh` | `chi` | 繁體中文 |
 | `zh-Hans` | `chi` | 简体中文 |
 | `en` | `eng` | English |
-| 其他 | `und` | 原本的語言代碼 |
+| 其他 | 對應的三字母碼（`jpn`、`kor`……），沒有對應的 `und` | 那個語言自己的名稱（日本語），沒有對應的寫原本的語言代碼 |
 
-ffmpeg 只能寫三個字母的語言碼，所以繁簡靠 `title` 區分。這幾個標題是寫進檔案裡的固定字串，不是介面文案。
+ffmpeg 只能寫三個字母的語言碼，所以繁簡靠 `title` 區分。上面是介面用繁體中文的人匯出時的標題；介面用英文的人匯出時，標題是英文的語言名稱（Traditional Chinese、Simplified Chinese、English、Japanese……；`zh` 也是 Traditional Chinese），建立匯出時就寫進 `exports.tracks`（Brian，2026-10-08）。這些標題是寫進檔案裡的字串，不是介面文案。
 
 **時間**：原檔的聲音常有一點負的起始時間（AAC 的編碼延遲）。封裝成 MKV 時 ffmpeg 會把**所有**軌一起往後挪同樣的量（測試片段是 46 毫秒），字幕也一起挪，所以影像、聲音、字幕之間的相對時間不變。不需要、也不應該自己去補這個量。
 

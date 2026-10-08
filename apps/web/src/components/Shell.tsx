@@ -2,12 +2,13 @@ import { type Me, type Notification, SITE_NAME } from '@paiban/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { type FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
-import { t } from '../copy/zh-TW';
+import { t } from '../copy';
 import { post } from '../lib/api';
 import { useServerEvents } from '../lib/events';
 import { bytes, relative } from '../lib/format';
 import { keys, useNotifications, useStorage, useTorrents } from '../lib/queries';
 import { langName } from '../pages/workspace/SubtitlesTab';
+import { LocaleToggle } from './LocaleToggle';
 import { SuggestInput } from './SuggestInput';
 import { ThemeToggle } from './ThemeToggle';
 import { useToast } from './Toasts';
@@ -183,6 +184,7 @@ export function Shell({ me }: { me: Me }) {
               )}
             </span>
           </Link>
+          <LocaleToggle />
           <ThemeToggle />
           <div className="popwrap" ref={notesRef}>
             <button

@@ -1,7 +1,7 @@
 import type { SyncCore } from '@paiban/shared';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { memo, useEffect, useMemo, useRef } from 'react';
-import { t } from '../copy/zh-TW';
+import { t } from '../copy';
 import { displayText, type LineOp, overlapClass, shortTc } from './model';
 
 type MappedCue = SyncCore.MappedCue;

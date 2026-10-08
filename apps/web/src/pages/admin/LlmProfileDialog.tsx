@@ -2,7 +2,7 @@ import type { LlmCheck, LlmParams, LlmProfile, LlmProfileInput, LlmProvider } fr
 import { type FormEvent, useId, useState } from 'react';
 import { Field, Switch } from '../../components/Bits';
 import { Modal } from '../../components/Modal';
-import { t } from '../../copy/zh-TW';
+import { t } from '../../copy';
 import { asFailure, fieldCodes, post, put } from '../../lib/api';
 
 const c = () => t.llm;

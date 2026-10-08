@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Link } from 'react-router';
 import { Progress } from '../../components/Bits';
 import { useToast } from '../../components/Toasts';
-import { t } from '../../copy/zh-TW';
+import { t } from '../../copy';
 import { type ApiFailure, asFailure, isSpaceError, post } from '../../lib/api';
 import { bytes, percent } from '../../lib/format';
 import { keys } from '../../lib/queries';

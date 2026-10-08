@@ -4,7 +4,7 @@ import { type FormEvent, useState } from 'react';
 import { useOutletContext } from 'react-router';
 import { Banner, Chip, ConfirmInline, PageHead, Skeleton } from '../../components/Bits';
 import { useToast } from '../../components/Toasts';
-import { t } from '../../copy/zh-TW';
+import { t } from '../../copy';
 import { ApiFailure, del, get, patch, post } from '../../lib/api';
 import { copyText } from '../../lib/clipboard';
 import { dateTime, relative } from '../../lib/format';

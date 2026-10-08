@@ -1,4 +1,13 @@
-import { t } from '../copy/zh-TW';
+import { intlLocale, locale, t } from '../copy';
+
+/**
+ * A film's name in the interface language, with the other one under it: the Chinese title first
+ * in 繁體中文 (when TMDB has one), the original first in English (Brian, 2026-10-08).
+ */
+export function filmTitle(m: { title: string; titleZh: string | null }): { main: string; other: string | null } {
+  if (locale === 'en') return { main: m.title, other: m.titleZh };
+  return { main: m.titleZh ?? m.title, other: m.titleZh ? m.title : null };
+}
 
 const GB = 1024 ** 3;
 const MB = 1024 ** 2;
@@ -40,11 +49,11 @@ export function relative(iso: string, now = Date.now()): string {
   if (d < 7) return t.time.daysAgo(d);
   if (d < 14) return t.time.lastWeek;
   if (d < 31) return t.time.weeksAgo(Math.floor(d / 7));
-  return new Date(iso).toLocaleDateString('zh-TW');
+  return new Date(iso).toLocaleDateString(intlLocale());
 }
 
 export function dateTime(iso: string): string {
-  return new Date(iso).toLocaleString('zh-TW', { dateStyle: 'medium', timeStyle: 'short' });
+  return new Date(iso).toLocaleString(intlLocale(), { dateStyle: 'medium', timeStyle: 'short' });
 }
 
 /** info hash: first 8 + … + last 4. */

@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useId, useRef } from 'react';
-import { t } from '../copy/zh-TW';
+import { t } from '../copy';
 
 export type Tone = 'ok' | 'warn' | 'bad' | 'info' | '';
 

@@ -16,6 +16,14 @@
 
 ---
 
+## 2026-10-08 介面雙語（繁體中文、English）
+
+- 原本：介面只有繁體中文，文案檔 `zh-TW.ts` 直接匯出 `t`。
+- 改成：多一份英文文案 `en.ts`，鍵和中文版完全一樣（型別檢查）。每個人在頂端列、登入頁或個人設定選語言，存在 `users.prefs.locale`（`'zh-TW'`、`'en'`，`null` 跟隨瀏覽器）。通知和操作紀錄的句子跟著看的人的語言；AI 翻譯字幕的名稱和匯出 MKV 的字幕軌標題用做的那個人的語言。片名和電影簡介依介面語言選用中文或原文。合約 `UserPrefs` 多 `locale`，`UiLocale` 型別，`MovieDetail` 多 `summaryEn`。沒有遷移（`prefs` 是 jsonb）。
+- 原因：Brian 要求系統做成雙語；語言、預設、範圍由 Brian 選定。
+- 改了哪些檔案：docs/17-ui.md、docs/11-pages.md、docs/04-api.md、docs/13-settings.md、docs/08-media-pipeline.md、docs/18-llm.md、AGENTS.md（語言表）、packages/shared/src/contracts/api.ts
+- Brian 是否已確認：是
+
 ## 2026-10-07 Ollama 從「自架」分出來
 
 - 原本：「自架」一種涵蓋 Ollama 和其他 OpenAI 相容的服務，都走 `/v1/chat/completions`。

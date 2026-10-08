@@ -151,7 +151,9 @@ export async function exportJob(d: JobDeps, id: string): Promise<'done' | 'faile
     if (!before) throw new MuxFailure('MUX_FAILED');
     const tracks: MuxTrack[] = row.tracks.map((t, n) => ({
       file: join(dir, 'tracks', `${n}.srt`),
-      ...trackTag(t.language),
+      language: trackTag(t.language).language,
+      // The title was written when the export was made, in its maker's language.
+      title: t.title || trackTag(t.language).title,
     }));
     for (const t of tracks) if (!(await exists(t.file))) throw new MuxFailure('MUX_FAILED');
 

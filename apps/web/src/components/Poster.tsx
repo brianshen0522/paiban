@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { t } from '../copy/zh-TW';
+import { t } from '../copy';
 import { posterColor } from '../lib/format';
 
 /**

@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { type FormEvent, useEffect, useState } from 'react';
 import { Banner, Chip, ConfirmInline, Empty, Field, PageHead, Skeleton } from '../../components/Bits';
 import { useToast } from '../../components/Toasts';
-import { t } from '../../copy/zh-TW';
+import { intlLocale, t } from '../../copy';
 import { asFailure, del, get, put } from '../../lib/api';
 import { when } from './AuditPage';
 import { LlmProfileDialog } from './LlmProfileDialog';
@@ -12,7 +12,7 @@ const c = () => t.llm;
 export const LLM_KEY = ['admin', 'llm'] as const;
 
 const hm = (iso: string) =>
-  new Date(iso).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false });
+  new Date(iso).toLocaleTimeString(intlLocale(), { hour: '2-digit', minute: '2-digit', hour12: false });
 
 /** docs/18-llm.md: the profiles translation and auto-align share, the translation limit, recent use. */
 export function LlmPage() {

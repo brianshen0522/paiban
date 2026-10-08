@@ -2142,10 +2142,26 @@ fieldset.field > legend {
   stroke-linecap: round;
   stroke-linejoin: round;
 }
-.theme-toggle.corner {
+/* Language and appearance in the corner of the sign-in pages. */
+.corner-tools {
   position: absolute;
   top: 16px;
   right: 16px;
+  display: flex;
+  gap: 8px;
+}
+/* 中 / EN: the same round button as the appearance one. */
+.locale-toggle {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 50%;
+  flex: none;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 @media (prefers-reduced-motion: reduce) {
   .theme-toggle .theme-roll {

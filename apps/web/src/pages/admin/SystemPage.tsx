@@ -5,12 +5,12 @@ import { Link } from 'react-router';
 import { Banner, Chip, PageHead, Skeleton, type Tone } from '../../components/Bits';
 import { SpaceShort } from '../../components/SpaceShort';
 import { useToast } from '../../components/Toasts';
-import { t } from '../../copy/zh-TW';
+import { live, t } from '../../copy';
 import { type ApiFailure, asFailure, isSpaceError, post } from '../../lib/api';
 import { bytes, percent } from '../../lib/format';
 import { keys, useAdminSystem, useStorage } from '../../lib/queries';
 
-const s = t.system;
+const s = live('system');
 
 /** "40 秒", "3 分 20 秒", "2 小時", "9 天". */
 export function durationText(seconds: number): string {

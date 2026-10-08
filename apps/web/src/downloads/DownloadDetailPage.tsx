@@ -5,9 +5,9 @@ import { Link, useParams, useSearchParams } from 'react-router';
 import { Banner, Chip, PageHead, Skeleton } from '../components/Bits';
 import { Flag } from '../components/Flag';
 import { Poster } from '../components/Poster';
-import { t } from '../copy/zh-TW';
+import { intlLocale, t } from '../copy';
 import { ApiFailure, get, post } from '../lib/api';
-import { bytes, percent, rate, versionLabel } from '../lib/format';
+import { bytes, filmTitle, percent, rate, versionLabel } from '../lib/format';
 import { keys } from '../lib/queries';
 import { NotFoundPage } from '../pages/StatusPages';
 import { countrySummary, PeerMap } from './PeerMap';
@@ -48,7 +48,7 @@ export function DownloadDetailPage() {
     refetchInterval: running ? 2000 : false,
     refetchIntervalInBackground: false,
   });
-  const names = useMemo(() => new Intl.DisplayNames(['zh-TW'], { type: 'region' }), []);
+  const names = useMemo(() => new Intl.DisplayNames([intlLocale()], { type: 'region' }), []);
   const [busy, setBusy] = useState(false);
   const [params, setParams] = useSearchParams();
   const view: View = (VIEWS as readonly string[]).includes(params.get('view') ?? '')
@@ -89,7 +89,8 @@ export function DownloadDetailPage() {
     }
   };
 
-  const title = x.movie.titleZh ?? x.movie.title;
+  const name = filmTitle(x.movie);
+  const title = name.main;
   return (
     <>
       <div className="crumbs">
@@ -99,7 +100,7 @@ export function DownloadDetailPage() {
       </div>
       <PageHead
         title={title}
-        lead={`${x.movie.titleZh ? `${x.movie.title} · ` : ''}${x.movie.year} · ${versionLabel(x.version)}`}
+        lead={`${name.other ? `${name.other} · ` : ''}${x.movie.year} · ${versionLabel(x.version)}`}
       />
 
       <section className="card dd-head">

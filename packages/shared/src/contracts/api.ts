@@ -107,7 +107,14 @@ export type UserPrefs = {
   secondLine: boolean;
   /** Highlighted in the versions table; never downloads anything by itself. */
   quality: '720p' | '1080p' | '2160p';
+  /**
+   * The interface language (Brian, 2026-10-08); null follows the browser. Also decides the
+   * language of names the server writes for this person (an AI translation's name, MKV track titles).
+   */
+  locale: UiLocale | null;
 };
+
+export type UiLocale = 'zh-TW' | 'en';
 
 export type User = { id: Id; username: string; displayName: string; role: Role; prefs: UserPrefs };
 
@@ -174,6 +181,8 @@ export type MovieSummary = {
 export type MovieDetail = MovieSummary & {
   /** TMDB's zh-TW overview when it has one, otherwise YTS's English summary. */
   summary: string;
+  /** YTS's English summary, for the English interface (docs/17-ui.md); empty when YTS has none. */
+  summaryEn: string;
   /** The film's page on TMDB, opened in a new tab (D30); null before a TMDB lookup. */
   tmdbUrl: string | null;
   language: string | null;

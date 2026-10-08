@@ -3,7 +3,7 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router';
 import { Banner, PageHead, Skeleton } from '../../components/Bits';
 import { FillPage, ScrollList } from '../../components/FillPage';
-import { t } from '../../copy/zh-TW';
+import { intlLocale, t } from '../../copy';
 import { get } from '../../lib/api';
 import { bytes } from '../../lib/format';
 import { langName } from '../workspace/SubtitlesTab';
@@ -85,12 +85,12 @@ export function AuditPage() {
 /** "今天 09:14", "昨天 22:41", else the date with the time (docs/17-ui.md). */
 export function when(iso: string): string {
   const d = new Date(iso);
-  const hm = d.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const hm = d.toLocaleTimeString(intlLocale(), { hour: '2-digit', minute: '2-digit', hour12: false });
   const day = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
   const diff = (day(new Date()) - day(d)) / 86_400_000;
   if (diff === 0) return t.audit.today(hm);
   if (diff === 1) return t.audit.yesterday(hm);
-  return `${d.toLocaleDateString('zh-TW')} ${hm}`;
+  return `${d.toLocaleDateString(intlLocale())} ${hm}`;
 }
 
 export function actionText(e: AuditEntry): string {

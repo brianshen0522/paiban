@@ -1,6 +1,6 @@
 import type { TorrentLivePeer } from '@paiban/shared';
 import { memo, useId, useMemo } from 'react';
-import { t } from '../copy/zh-TW';
+import { t } from '../copy';
 import { CENTROIDS, LAND, MAP_HEIGHT, MAP_WIDTH } from './world-map';
 
 /**
@@ -155,5 +155,5 @@ export function countrySummary(peers: TorrentLivePeer[], names: Intl.DisplayName
   return [...counts.entries()]
     .sort((a, b) => b[1] - a[1])
     .map(([k, n]) => `${k} ${n}`)
-    .join('、');
+    .join(t.common.listSep);
 }

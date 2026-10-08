@@ -2,7 +2,7 @@ import type { TmdbSuggestion } from '@paiban/shared';
 import { useQuery } from '@tanstack/react-query';
 import { type KeyboardEvent, useEffect, useId, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { t } from '../copy/zh-TW';
+import { t } from '../copy';
 import { get } from '../lib/api';
 
 /** Typing pauses this long before TMDB is asked. */

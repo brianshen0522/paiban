@@ -1,5 +1,5 @@
 import type { TorrentLive } from '@paiban/shared';
-import { t } from '../copy/zh-TW';
+import { t } from '../copy';
 import { speed } from '../lib/format';
 
 const W = 600;

@@ -208,6 +208,7 @@ export function accountRoutes(app: FastifyInstance, deps: Deps): void {
             convertToTraditional: z.boolean().optional(),
             secondLine: z.boolean().optional(),
             quality: z.enum(['720p', '1080p', '2160p']).optional(),
+            locale: z.enum(['zh-TW', 'en']).nullable().optional(),
           })
           .strict()
           .optional(),

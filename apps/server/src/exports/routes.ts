@@ -5,6 +5,7 @@ import { type Cue, type Export, exportNeedBytes, SyncCore, type SyncDoc } from '
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { audit } from '../audit.js';
+import { localeOf } from '../auth/users.js';
 import { one, tx } from '../db/pool.js';
 import { publishUsage } from '../events/publish.js';
 import type { AuthedUser, Deps } from '../http/context.js';
@@ -117,7 +118,7 @@ export function exportRoutes(app: FastifyInstance, deps: Deps): void {
             subtitleId: s.id,
             rev: s.doc_rev,
             language: s.language as TrackRecord['language'],
-            title: trackTag(s.language).title,
+            title: trackTag(s.language, localeOf(user.prefs)).title,
             isDefault: x.isDefault,
           });
         }

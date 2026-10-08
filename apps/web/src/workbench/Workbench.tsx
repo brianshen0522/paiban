@@ -23,7 +23,7 @@ import {
 import { Link } from 'react-router';
 import { Banner, Chip, Skeleton } from '../components/Bits';
 import { useToast } from '../components/Toasts';
-import { t } from '../copy/zh-TW';
+import { t } from '../copy';
 import { api, asFailure, type Conflict, conflictOf, fieldCodes, get, getBytes, post } from '../lib/api';
 import { RECONNECTED, SUBTITLE_EVENT, type SubtitleEvent } from '../lib/events';
 import { keys, useMe, useSubtitle } from '../lib/queries';
@@ -557,7 +557,7 @@ function Bench({ ws, detail }: { ws: Workspace; detail: SubtitleDetail }) {
             s.scale !== 1 ? rateText(s.scale) : null,
           );
         })
-        .join('；');
+        .join(t.common.clauseSep);
       const method: string = r.method;
       let text =
         before != null && after != null
@@ -586,7 +586,7 @@ function Bench({ ws, detail }: { ws: Workspace; detail: SubtitleDetail }) {
       const extra = r.extraLines ?? [];
       if (extra.length) {
         const nums = extra.map((id) => cues.findIndex((c) => c.id === id) + 1).filter((x) => x > 0);
-        text += t.bench.msg.refExtra(nums.join('、'));
+        text += t.bench.msg.refExtra(nums.join(t.common.listSep));
         say(text, [
           {
             label: t.bench.msg.refDelete(nums.length),

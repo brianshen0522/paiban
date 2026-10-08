@@ -178,6 +178,7 @@ export function ytsRoutes(app: FastifyInstance, deps: Deps): void {
     const detail: MovieDetail = {
       ...summary(movie, { title_zh: zh?.title_zh ?? null, mine }, film),
       summary: film?.overview ?? movie.summary,
+      summaryEn: movie.summary,
       tmdbUrl: film ? tmdbPageUrl(film.tmdbId) : null,
       language: movie.language,
       versions,

@@ -2,16 +2,18 @@ import { type Me, SITE_NAME } from '@paiban/shared';
 import { useQueryClient } from '@tanstack/react-query';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
+import { LocaleToggle } from '../components/LocaleToggle';
 import { ThemeToggle } from '../components/ThemeToggle';
 import { useToast } from '../components/Toasts';
-import { t } from '../copy/zh-TW';
+import { t } from '../copy';
 import { ApiFailure, get, post } from '../lib/api';
 import { keys } from '../lib/queries';
 
 type Fields = 'code' | 'displayName' | 'username' | 'password' | 'password2';
 type Errors = Partial<Record<Fields, string>>;
 
-const SERVER_FIELD: Record<string, Record<string, string>> = {
+/** Read when used, not when the module loads: the language can change. */
+const SERVER_FIELD = (): Record<string, Record<string, string>> => ({
   displayName: { REQUIRED: t.register.nameRequired, TOO_LONG: t.register.nameTooLong },
   username: {
     FORMAT: t.register.usernameFormat,
@@ -19,13 +21,13 @@ const SERVER_FIELD: Record<string, Record<string, string>> = {
     TAKEN: t.register.usernameTaken,
   },
   password: { TOO_SHORT: t.register.passwordShort, TOO_LONG: t.register.passwordTooLong },
-};
-const INVITE_ERRORS: Record<string, string> = {
+});
+const INVITE_ERRORS = (): Record<string, string> => ({
   INVITE_NOT_FOUND: t.register.codeNotFound,
   INVITE_EXPIRED: t.register.codeExpired,
   INVITE_USED: t.register.codeUsed,
   RATE_LIMITED: t.register.rateLimited,
-};
+});
 
 /** The same checks the server makes, so mistakes show before sending (docs/11-pages.md, "用邀請碼註冊"). */
 function check(v: Record<Fields, string>): Errors {
@@ -63,7 +65,7 @@ export function RegisterPage() {
   useEffect(() => {
     if (!fromLink) return;
     get(`/api/invites/${encodeURIComponent(fromLink)}`).catch((err) => {
-      if (err instanceof ApiFailure && INVITE_ERRORS[err.code]) setErrors({ code: INVITE_ERRORS[err.code] });
+      if (err instanceof ApiFailure && INVITE_ERRORS()[err.code]) setErrors({ code: INVITE_ERRORS()[err.code] });
     });
   }, [fromLink]);
 
@@ -89,11 +91,11 @@ export function RegisterPage() {
     } catch (err) {
       const next: Errors = {};
       if (err instanceof ApiFailure) {
-        if (INVITE_ERRORS[err.code]) next.code = INVITE_ERRORS[err.code];
+        if (INVITE_ERRORS()[err.code]) next.code = INVITE_ERRORS()[err.code];
         else if (err.code === 'USERNAME_TAKEN') next.username = t.register.usernameTaken;
         else if (err.details && 'fields' in err.details)
           for (const [k, c] of Object.entries(err.details.fields)) {
-            const msg = SERVER_FIELD[k]?.[c];
+            const msg = SERVER_FIELD()[k]?.[c];
             if (msg) next[k as Fields] = msg;
           }
       }
@@ -132,7 +134,10 @@ export function RegisterPage() {
 
   return (
     <div className="auth">
-      <ThemeToggle className="corner" />
+      <div className="corner-tools">
+        <LocaleToggle />
+        <ThemeToggle />
+      </div>
       <form className="box" onSubmit={submit} noValidate ref={formRef}>
         <div className="mark">
           <i aria-hidden="true" />

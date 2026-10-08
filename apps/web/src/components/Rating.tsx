@@ -1,5 +1,5 @@
 import type { MovieSummary } from '@paiban/shared';
-import { t } from '../copy/zh-TW';
+import { t } from '../copy';
 
 /** The rating with where it came from: TMDB's, or YTS's IMDb figure when TMDB has none (Brian, 2026-10-06). */
 export function Rating({ m }: { m: Pick<MovieSummary, 'rating' | 'ratingSource'> }) {

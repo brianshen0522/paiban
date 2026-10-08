@@ -3,6 +3,7 @@ import { mkdir, readdir, rename, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { type Cue, SyncCore, type SyncDoc, type Translation } from '@paiban/shared';
 import { audit } from '../audit.js';
+import { localeOf } from '../auth/users.js';
 import { many, one, type Queryable } from '../db/pool.js';
 import { publishSubtitle } from '../events/publish.js';
 import type { Deps } from '../http/context.js';
@@ -247,7 +248,15 @@ export class TranslationWorker {
       await mkdir(join(config.dataDir, 'subtitles'), { recursive: true });
       await rename(work, subtitleDir(config.dataDir, newId));
       placed = true;
-      const name = `AI 翻譯（${model || '語言模型'}）· ${src.release_name}`.slice(0, 300);
+      // Named in the language of the person who asked for it (Brian, 2026-10-08).
+      const maker = t.created_by
+        ? await one<{ prefs: Record<string, unknown> }>(pool, 'select prefs from users where id = $1', [t.created_by])
+        : null;
+      const name = (
+        localeOf(maker?.prefs) === 'en'
+          ? `AI translation (${model || 'language model'}) · ${src.release_name}`
+          : `AI 翻譯（${model || '語言模型'}）· ${src.release_name}`
+      ).slice(0, 300);
       const ins = await pool.query(
         `insert into subtitles (id, torrent_id, provider, provider_ref, release_name, language, format, cue_count, rel_dir,
                                 bytes, sha256, score, doc, added_by, updated_by)

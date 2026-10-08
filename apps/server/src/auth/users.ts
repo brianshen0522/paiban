@@ -24,7 +24,13 @@ export function prefsOf(stored: Record<string, unknown>, defaultLangs: UserPrefs
     convertToTraditional: typeof stored.convertToTraditional === 'boolean' ? stored.convertToTraditional : true,
     secondLine: typeof stored.secondLine === 'boolean' ? stored.secondLine : false,
     quality,
+    locale: stored.locale === 'zh-TW' || stored.locale === 'en' ? stored.locale : null,
   };
+}
+
+/** A person's interface language for names the server writes on their behalf; Chinese when they have not chosen. */
+export function localeOf(stored: Record<string, unknown> | null | undefined): 'zh-TW' | 'en' {
+  return stored?.locale === 'en' ? 'en' : 'zh-TW';
 }
 
 export async function buildMe(

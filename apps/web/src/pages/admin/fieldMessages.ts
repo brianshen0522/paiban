@@ -1,4 +1,4 @@
-import { t } from '../../copy/zh-TW';
+import { t } from '../../copy';
 
 /** Field codes from SETTING_INVALID into the sentences of docs/13-settings.md. */
 export function fieldMessage(key: string, code: string, context: { maxActive?: number } = {}): string {

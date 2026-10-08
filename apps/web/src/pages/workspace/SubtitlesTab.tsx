@@ -4,7 +4,7 @@ import { type DragEvent, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Banner, Chip, ConfirmInline, Skeleton, type Tone } from '../../components/Bits';
 import { useToast } from '../../components/Toasts';
-import { t } from '../../copy/zh-TW';
+import { intlLocale, t } from '../../copy';
 import { type ApiFailure, asFailure, candidateReason, del, post, upload } from '../../lib/api';
 import { bytes } from '../../lib/format';
 import { keys, useCandidates, useMe } from '../../lib/queries';
@@ -14,18 +14,24 @@ const LANGS: Lang[] = ['zh-Hant', 'zh-Hans', 'en'];
 const SEARCHED: ProviderStatus['id'][] = ['justsubtitles', 'yify', 'assrt'];
 const ACCEPT = ['srt', 'ass', 'ssa', 'vtt', 'zip', 'rar', '7z'];
 
-const names = (() => {
-  try {
-    return new Intl.DisplayNames(['zh-TW'], { type: 'language' });
-  } catch {
-    return null;
+/** Language names in the interface language, made once per language. */
+const namesBy = new Map<string, Intl.DisplayNames | null>();
+const names = (): Intl.DisplayNames | null => {
+  const l = intlLocale();
+  if (!namesBy.has(l)) {
+    try {
+      namesBy.set(l, new Intl.DisplayNames([l], { type: 'language' }));
+    } catch {
+      namesBy.set(l, null);
+    }
   }
-})();
+  return namesBy.get(l) ?? null;
+};
 /** Our own names for the languages detection knows; any other code (a translation's target) as the browser names it. */
 export const langName = (l: string): string => {
   if (t.langs[l]) return t.langs[l];
   try {
-    return (l && names?.of(l)) || l;
+    return (l && names()?.of(l)) || l;
   } catch {
     return l;
   }

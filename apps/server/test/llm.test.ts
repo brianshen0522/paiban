@@ -483,6 +483,21 @@ describe('translating a subtitle', () => {
     expect(usage.every((u) => u.purpose === 'translate' && u.user_id === meiId)).toBe(true);
   });
 
+  it('names the result in the language of the person who asked for it', async () => {
+    await create({ baseUrl: a.url });
+    const s = await source();
+    await call(t.app, 'PATCH', '/api/me', { cookie: mei, body: { prefs: { locale: 'en' } } });
+    try {
+      await translate(s.sid);
+      await t.app.translationWorker.idle();
+      const tr = (await call(t.app, 'GET', `/api/torrents/${s.tid}/translations`, { cookie: mei })).json()[0];
+      const sub = (await db.pool.query('select release_name from subtitles where id = $1', [tr.resultId])).rows[0];
+      expect(sub.release_name).toBe('AI translation (qwen-test) · Film.2026.1080p');
+    } finally {
+      await call(t.app, 'PATCH', '/api/me', { cookie: mei, body: { prefs: { locale: null } } });
+    }
+  });
+
   it('bilingual: the translation over the original, one line', async () => {
     await create({ baseUrl: a.url });
     const s = await source();

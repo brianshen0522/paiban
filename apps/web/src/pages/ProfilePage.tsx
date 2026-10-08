@@ -4,7 +4,7 @@ import { type FormEvent, useState } from 'react';
 import { useOutletContext } from 'react-router';
 import { Banner, Chip, Field, PageHead, Skeleton, Switch } from '../components/Bits';
 import { useToast } from '../components/Toasts';
-import { t } from '../copy/zh-TW';
+import { browserLocale, isLocale, LOCALES, setLocale, t } from '../copy';
 import { ApiFailure, del, get, patch, post } from '../lib/api';
 import { relative } from '../lib/format';
 import { keys } from '../lib/queries';
@@ -18,6 +18,7 @@ export function ProfilePage() {
     <>
       <PageHead title={t.profile.title} lead={t.profile.lead} />
       <NameCard me={me} />
+      <LanguageCard prefs={me.user.prefs} />
       <PrefsCard prefs={me.user.prefs} />
       <PasswordCard />
       <DevicesCard />
@@ -67,6 +68,49 @@ function NameCard({ me }: { me: Me }) {
           {t.profile.saveName}
         </button>
       </form>
+    </section>
+  );
+}
+
+/**
+ * The interface language (Brian, 2026-10-08), kept with the account: 繁體中文, English, or the
+ * browser's. It also names what the server writes for this person (AI translations, MKV tracks).
+ */
+function LanguageCard({ prefs }: { prefs: UserPrefs }) {
+  const setMe = useSetMe();
+  const [failed, setFailed] = useState(false);
+  const choose = async (value: string) => {
+    const next = isLocale(value) ? value : null;
+    setFailed(false);
+    try {
+      const user = await patch<User>('/api/me', { prefs: { locale: next } });
+      setMe(user);
+      setLocale(next ?? browserLocale());
+    } catch {
+      setFailed(true);
+    }
+  };
+  return (
+    <section className="card">
+      <h2>{t.locale.title}</h2>
+      <Field label={t.locale.label} help={t.locale.help}>
+        {(id, note) => (
+          <select
+            id={id}
+            aria-describedby={note}
+            value={prefs.locale ?? ''}
+            onChange={(e) => void choose(e.target.value)}
+          >
+            <option value="">{t.locale.follow}</option>
+            {LOCALES.map((l) => (
+              <option key={l} value={l}>
+                {t.locale.names[l]}
+              </option>
+            ))}
+          </select>
+        )}
+      </Field>
+      {failed && <Banner tone="bad">{t.common.unknownError}</Banner>}
     </section>
   );
 }

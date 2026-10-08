@@ -34,6 +34,7 @@ describe('sign-in', () => {
       convertToTraditional: true,
       secondLine: false,
       quality: '1080p',
+      locale: null,
     });
     expect(me.limits.maxActiveDownloads).toBe(2);
     expect(res.body).not.toMatch(/argon2|password/i);

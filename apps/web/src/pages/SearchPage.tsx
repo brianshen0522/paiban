@@ -6,8 +6,9 @@ import { FillPage, ScrollList } from '../components/FillPage';
 import { Poster } from '../components/Poster';
 import { Rating } from '../components/Rating';
 import { SuggestInput } from '../components/SuggestInput';
-import { t } from '../copy/zh-TW';
+import { t } from '../copy';
 import { ApiFailure } from '../lib/api';
+import { filmTitle } from '../lib/format';
 import { useSearch } from '../lib/queries';
 
 const GENRES = Object.keys(t.genres);
@@ -148,12 +149,13 @@ export function SearchPage() {
 }
 
 function MovieCard({ m }: { m: MovieSummary }) {
+  const name = filmTitle(m);
   return (
     <Link to={`/movies/${m.ytsId}`} className="mcard">
       <Poster url={m.posterUrl} title={m.title} year={m.year} runtimeMin={m.runtimeMin} />
-      <span className="mt">{m.titleZh ?? m.title}</span>
+      <span className="mt">{name.main}</span>
       <span className="ms">
-        {m.titleZh ? `${m.title} · ` : ''}
+        {name.other ? `${name.other} · ` : ''}
         {m.year}
         <Rating m={m} />
       </span>

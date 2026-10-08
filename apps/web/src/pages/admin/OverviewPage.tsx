@@ -2,14 +2,14 @@ import type { AdminOverview, TorrentErrorCode } from '@paiban/shared';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router';
 import { Banner, Chip, PageHead, Skeleton } from '../../components/Bits';
-import { t } from '../../copy/zh-TW';
+import { live, t } from '../../copy';
 import { get } from '../../lib/api';
 import { bytes, percent, relative } from '../../lib/format';
 import { actionText, targetText, when } from './AuditPage';
 import { taskKind } from './SystemPage';
 
 type Problem = AdminOverview['problems'][number];
-const o = t.overview;
+const o = live('overview');
 
 /** Where each problem's button goes. */
 const PAGE: Record<Problem['page'], string> = {

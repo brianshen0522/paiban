@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { Banner, Field, PageHead, Skeleton, Switch } from '../../components/Bits';
 import { useToast } from '../../components/Toasts';
-import { t } from '../../copy/zh-TW';
+import { t } from '../../copy';
 import { ApiFailure, patch } from '../../lib/api';
 import { keys, useAdminSettings } from '../../lib/queries';
 import { fieldMessage } from './fieldMessages';
