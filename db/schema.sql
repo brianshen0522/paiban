@@ -323,7 +323,7 @@ create table subtitle_candidates (
 create table subtitles (
   id             uuid primary key default gen_random_uuid(),
   torrent_id     uuid not null references torrents (id) on delete cascade,
-  provider       text not null check (provider in ('justsubtitles', 'yify', 'assrt', 'upload', 'translated')),
+  provider       text not null check (provider in ('justsubtitles', 'yify', 'assrt', 'upload', 'translated', 'bundled')),
   provider_ref   text,
   release_name   text not null default '',
   language       text not null,

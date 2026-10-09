@@ -16,6 +16,14 @@
 
 ---
 
+## 2026-10-09 種子內附的字幕
+
+- 原本：種子裡的字幕檔沒有用處（手動加入的甚至不下載），影片裡內嵌的字幕軌也不理。
+- 改成：影片探測完，種子資料夾裡的 `.srt`、`.ass`、`.ssa`、`.vtt` 和影片裡的文字字幕軌（用 ffmpeg 取出）自動加成這部片的字幕：來源「種子內附」（`provider = 'bundled'`），還沒確認，簡體照下載發起人的偏好轉繁體，重複的跳過。YTS 和手動加入的下載都一樣；手動加入的種子把字幕檔也選進來下載，預留空間一起算。`TorrentInspection` 多 `subtitleFiles`；`ProviderId` 多 `bundled`；遷移 `0008_bundled_subtitles.sql`；新的事件 `{type: 'subtitle', id}` 由 `media` 送、`api` 轉推。
+- 原因：Brian 要種子裡附的字幕一起加進來；他選了外掛檔和內嵌字幕軌都要、直接加成字幕、YTS 的也一起。
+- 改了哪些檔案：docs/03-data-model.md、docs/06-torrent-worker.md、docs/08-media-pipeline.md、docs/11-pages.md、db/schema.sql、packages/shared/src/contracts/api.ts
+- Brian 是否已確認：是
+
 ## 2026-10-09 手動加入種子（磁力連結、.torrent 檔）
 
 - 原本：AGENTS.md 絕對規則第 4 條和 D26：只接受 YTS 搜尋結果裡的 info hash，產品不做貼磁力連結、上傳 .torrent 的入口。

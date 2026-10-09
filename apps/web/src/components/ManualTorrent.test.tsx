@@ -16,6 +16,7 @@ const inspection = (over: Partial<TorrentInspection> = {}): TorrentInspection =>
   errorCode: null,
   name: 'Citizen.Kane.1941.1080p.BluRay.x264',
   file: { path: 'Citizen.Kane.1941.1080p.BluRay.x264/kane.mp4', sizeBytes: 2 * 1024 ** 3 },
+  subtitleFiles: 1,
   skippedFiles: 2,
   version: { quality: '1080p', source: 'bluray', videoCodec: 'x264', bitDepth: 8 },
   guess: { title: 'Citizen Kane', year: 1941 },

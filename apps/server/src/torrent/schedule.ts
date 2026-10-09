@@ -38,6 +38,22 @@ export function mainVideo(files: { path: string; length: number }[]): { path: st
   return best;
 }
 
+/** Text subtitle files a release may carry beside the film (Brian, 2026-10-09: they are added too). */
+export const SUBTITLE_EXTENSIONS = ['.srt', '.ass', '.ssa', '.vtt'];
+/** A subtitle file larger than this is not a subtitle; at most this many are taken from one torrent. */
+export const SUBTITLE_MAX_BYTES = 5 * 1024 * 1024;
+export const SUBTITLE_MAX_FILES = 50;
+
+/** The subtitle files of a torrent worth fetching and adding: text formats, small, at most 50. */
+export function subtitleFiles<F extends { path: string; length: number }>(files: F[]): F[] {
+  return files
+    .filter((f) => {
+      const lower = f.path.toLowerCase();
+      return SUBTITLE_EXTENSIONS.some((e) => lower.endsWith(e)) && f.length > 0 && f.length <= SUBTITLE_MAX_BYTES;
+    })
+    .slice(0, SUBTITLE_MAX_FILES);
+}
+
 /** Whether every file path stays inside the download folder (torrent names are untrusted). */
 export function pathsAreSafe(
   root: string,

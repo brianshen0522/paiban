@@ -361,6 +361,7 @@ function FileCard({ x }: { x: TorrentInspection }) {
         <span className="sub">
           {x.file ? bytes(x.file.sizeBytes) : ''} · {t.manual.skipped(x.skippedFiles)}
         </span>
+        {x.subtitleFiles > 0 && <span className="mt-subs">{t.manual.withSubs(x.subtitleFiles)}</span>}
         {chips.length > 0 && (
           <span className="mt-chips">
             {chips.map((c) => (

@@ -87,6 +87,17 @@ direct_play =
 
 探測成功：`probe_state = 'ready'`，其他欄位寫回資料庫，`NOTIFY paiban_media`（預覽資產可以排入了）和 `paiban_events`（`torrent`；預留量有變就再加 `usage`）。
 
+### 1b. 種子內附的字幕（Brian，2026-10-09）
+
+探測成功之後（不論結果，探測本身都不會因為這一步失敗），把下載帶來的字幕加成這部片的字幕：
+
+- **旁邊的檔案**：`/data/torrents/<hash>/` 底下（最多四層）的 `.srt`、`.ass`、`.ssa`、`.vtt`，只看一般檔案（不跟符號連結），每個最大 5 MB，最多 50 個，依路徑排序。顯示的名稱是種子資料夾裡的路徑（`Subs/English.srt`）。
+- **影片裡的字幕軌**：ffprobe 結果裡 `codec_type = subtitle`、編碼是文字的（`subrip`、`ass`、`ssa`、`webvtt`、`mov_text`、`text`），最多 20 軌。一次 `ffmpeg -nostdin -v error -y -i <影片> -map 0:<n> -c:s srt|ass <work>/track-<n>.srt|ass …` 全部寫出來（`nice`），寫在 `tmp/work/bundled-<媒體 id>/`，做完刪掉這個工作資料夾。顯示的名稱是「〈影片檔名〉 #〈軌號〉（〈語言標籤〉 · 〈軌道標題〉）」。圖片式的字幕（PGS、VobSub）轉不成文字，略過。
+- 每一條照「加入」的方式寫（[07-subtitle-providers.md](07-subtitle-providers.md)）：解碼、判斷格式與語言（判斷不出語言時參考字幕軌的語言標籤），`provider = 'bundled'`、`provider_ref` 是 `file:<路徑>` 或 `track:<軌號>`、狀態是還沒確認、`added_by` 是空的（不是某個人加的）。簡體的照下載發起人的「簡體自動轉成繁體」偏好轉換（原本的句子留在 `cues.original.json`）。同步文件是預設的（不偏移），附上檢查點。
+- 內容和這部片已有的字幕相同（`sha256`）就跳過，所以重新分析不會加兩次。下載正在被刪除的就什麼都不加。
+- 每加一條 `NOTIFY paiban_events`（`{type: 'subtitle', id}`），`api` 推給持有人；最後推一次用量。
+- YTS 和手動加入的下載都一樣。手動加入的種子本來只下載最大的影片檔，旁邊的字幕檔也一起選進來下載（[06-torrent-worker.md](06-torrent-worker.md)「手動加入」）。
+
 ### 2. 波形
 
 ```bash

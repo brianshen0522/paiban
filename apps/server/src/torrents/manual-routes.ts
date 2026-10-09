@@ -12,7 +12,7 @@ import { parse, requireUser } from '../http/guards.js';
 import { readSettings } from '../settings/settings.js';
 import { admit, predictDirectPlay, previewPlan } from '../storage/usage.js';
 import { type TmdbDetails, TmdbError, tmdbDetails, tmdbPosterImage } from '../tmdb/tmdb.js';
-import { pathsAreSafe } from '../torrent/schedule.js';
+import { pathsAreSafe, subtitleFiles } from '../torrent/schedule.js';
 import { tmdbEnv } from '../yts/routes.js';
 import {
   chosenFile,
@@ -82,6 +82,7 @@ async function view(deps: Deps, user: AuthedUser, r: InspectionRow): Promise<Tor
     }
   }
   const file = meta ? chosenFile(meta) : null;
+  const subs = meta && file ? subtitleFiles(meta.files.filter((f) => f !== file)) : [];
   if (meta && !error) {
     const dir = '/data/torrents/x';
     if (!pathsAreSafe(dir, meta.files, resolve, sep)) error = 'UNSAFE_PATH';
@@ -96,7 +97,8 @@ async function view(deps: Deps, user: AuthedUser, r: InspectionRow): Promise<Tor
     errorCode: error ?? (r.state === 'failed' ? 'NO_METADATA' : null),
     name,
     file: file ? { path: file.path, sizeBytes: file.length } : null,
-    skippedFiles: meta ? meta.files.length - (file ? 1 : 0) : 0,
+    subtitleFiles: subs.length,
+    skippedFiles: meta ? meta.files.length - (file ? 1 : 0) - subs.length : 0,
     version: guessVersion(`${name ?? ''} ${file?.path ?? ''}`),
     guess: titleGuess(name ?? file?.path ?? ''),
     existing: existing ? toTorrent(existing, user.id) : null,
@@ -261,7 +263,12 @@ export function manualTorrentRoutes(app: FastifyInstance, deps: Deps): void {
     if (!film) throw new ApiError('VALIDATION', 'TMDB has no such film', { fields: { tmdbId: 'NOT_FOUND' } });
     const details = film;
     const settings = await readSettings(pool);
-    const size = seen.file.sizeBytes;
+    // The video and the subtitle files beside it (tiny, but counted all the same).
+    const meta = await decodeMetainfo(ins.metainfo);
+    const main = chosenFile(meta);
+    const size =
+      (main?.length ?? seen.file.sizeBytes) +
+      subtitleFiles(meta.files.filter((f) => f !== main)).reduce((n, f) => n + f.length, 0);
     const v = seen.version;
     const playable = predictDirectPlay(v.videoCodec, v.bitDepth) && /\.(mp4|m4v)$/i.test(seen.file.path);
     const plan = previewPlan(playable, details.runtimeMin, settings.media);

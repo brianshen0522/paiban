@@ -133,7 +133,8 @@ export const zhTW = {
     elapsed: (s: number) => `已等 ${s} 秒`,
     back: '換一個種子',
     willDownload: '會下載的檔案',
-    skipped: (n: number) => (n ? `種子裡其他 ${n} 個檔案不下載。` : '種子裡只有這個檔案。'),
+    skipped: (n: number) => (n ? `種子裡其他 ${n} 個檔案不下載。` : '種子裡沒有其他檔案。'),
+    withSubs: (n: number) => `另附 ${n} 個字幕檔，會一起下載並加成這部片的字幕。`,
     existing: (title: string) => `這個種子已經在網站上：${title}`,
     existingMine: '它已經在你的片庫或下載清單裡。',
     existingJoin: '加入你的片庫不佔額外空間，字幕和同步結果和其他持有人共用。',
@@ -776,6 +777,7 @@ export const zhTW = {
       zimuku: '字幕庫',
       upload: '手動上傳',
       translated: 'AI 翻譯',
+      bundled: '種子內附',
     } as Record<string, string>,
     provState: {
       disabled: '已停用',

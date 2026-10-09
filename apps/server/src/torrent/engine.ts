@@ -2,7 +2,7 @@ import bencode from 'bencode';
 import MemoryChunkStore from 'memory-chunk-store';
 import WebTorrent from 'webtorrent';
 import { yourIp } from './live.js';
-import { VIDEO_EXTENSIONS } from './schedule.js';
+import { subtitleFiles, VIDEO_EXTENSIONS } from './schedule.js';
 
 /**
  * The only file that touches WebTorrent's untyped API (AGENTS.md: wrap third-party boundaries).
@@ -81,8 +81,9 @@ export type AddOptions = {
   /** Trackers to announce to besides the magnet's own (a torrent added by hand keeps its own). */
   announce?: string[];
   /**
-   * Only the largest video file is downloaded (torrents added by hand, docs/06-torrent-worker.md,
-   * "手動加入"). `length`, `progress`, `downloaded`, `done` and the `done` event are then that file's.
+   * Only the largest video file, and the subtitle files beside it, are downloaded (torrents added
+   * by hand, docs/06-torrent-worker.md, "手動加入"). `length`, `progress`, `downloaded`, `done` and
+   * the `done` event are then those files' together.
    */
   onlyMainVideo?: boolean;
 };
@@ -261,18 +262,26 @@ function mainVideoFile(files: WtFile[]): WtFile | null {
 }
 
 function wrap(t: WtTorrent, onlyMainVideo: boolean): EngineTorrent {
-  // Only one file wanted: select it as soon as the metadata is in (before WebTorrent checks which
-  // pieces are already on disk), and report that file in place of the whole torrent.
-  let only: WtFile | null = null;
+  // Only some files wanted: select them as soon as the metadata is in (before WebTorrent checks
+  // which pieces are already on disk), and report them in place of the whole torrent.
+  let wanted: WtFile[] = [];
+  let fired = false;
   const doneListeners: (() => void)[] = [];
+  const allDone = () => wanted.length > 0 && wanted.every((f) => f.done);
+  const sum = (pick: (f: WtFile) => number) => wanted.reduce((n, f) => n + pick(f), 0);
   if (onlyMainVideo)
     t.on('metadata', () => {
-      only = mainVideoFile(t.files ?? []);
-      if (!only) return;
-      only.select();
-      only.on('done', () => {
-        for (const fn of doneListeners) fn();
-      });
+      const main = mainVideoFile(t.files ?? []);
+      if (!main) return;
+      wanted = [main, ...subtitleFiles((t.files ?? []).filter((f) => f !== main))];
+      for (const f of wanted) {
+        f.select();
+        f.on('done', () => {
+          if (fired || !allDone()) return;
+          fired = true;
+          for (const fn of doneListeners) fn();
+        });
+      }
     });
   return {
     get infoHash() {
@@ -282,13 +291,15 @@ function wrap(t: WtTorrent, onlyMainVideo: boolean): EngineTorrent {
       return t.ready;
     },
     get done() {
-      return onlyMainVideo ? !!only?.done : t.done;
+      return onlyMainVideo ? allDone() : t.done;
     },
     get progress() {
-      return onlyMainVideo ? (only?.progress ?? 0) : t.progress;
+      if (!onlyMainVideo) return t.progress;
+      const total = sum((f) => f.length);
+      return total ? sum((f) => f.downloaded) / total : 0;
     },
     get downloaded() {
-      return onlyMainVideo ? (only?.downloaded ?? 0) : t.downloaded;
+      return onlyMainVideo ? sum((f) => f.downloaded) : t.downloaded;
     },
     get uploaded() {
       return t.uploaded;
@@ -303,7 +314,7 @@ function wrap(t: WtTorrent, onlyMainVideo: boolean): EngineTorrent {
       return t.numPeers;
     },
     get length() {
-      return onlyMainVideo && only ? only.length : t.length;
+      return onlyMainVideo && wanted.length ? sum((f) => f.length) : t.length;
     },
     get files() {
       return (t.files ?? []).map((f) => ({ path: f.path, length: f.length }));

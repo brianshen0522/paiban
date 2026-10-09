@@ -3072,3 +3072,7 @@ fieldset.field > legend {
     transition: none;
   }
 }
+.mt-subs {
+  color: var(--good);
+  font-size: 12.5px;
+}

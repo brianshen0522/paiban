@@ -12,6 +12,7 @@ import type { DiskProbe } from '../storage/disk.js';
 import { folderBytes } from '../storage/measure.js';
 import { removeOwnMediaOutput, removeWorkDir } from '../storage/remove.js';
 import { admit } from '../storage/usage.js';
+import { addBundledSubtitles } from './bundled-subs.js';
 import { assetReserve, audioCanBeCopied, directPlay, type ProbeInfo, parseProbe } from './probe.js';
 import { Cancelled, run, watched } from './proc.js';
 
@@ -188,6 +189,12 @@ export async function probeJob(d: JobDeps, row: MediaRow): Promise<void> {
   if (!done) return;
   await notify(pool, row.torrent_id, true);
   await pool.query(`select pg_notify('paiban_media', '{}')`);
+  // The subtitles the download came with (Brian, 2026-10-09). Never fails the probe.
+  try {
+    await addBundledSubtitles(d, row, src, json);
+  } catch (err) {
+    d.log.warn({ err, media: row.id }, 'could not add the subtitles that came with the download');
+  }
 }
 
 /** Waveform and speech (docs/08, "波形", "人聲偵測", "給瀏覽器的人聲資料"). */

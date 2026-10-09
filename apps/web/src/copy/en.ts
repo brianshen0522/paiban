@@ -133,9 +133,9 @@ export const en: Copy = {
     back: 'Use another torrent',
     willDownload: 'File to download',
     skipped: (n: number) =>
-      n
-        ? `The other ${plural(n, 'file')} in the torrent won't be downloaded.`
-        : 'This is the only file in the torrent.',
+      n ? `The other ${plural(n, 'file')} in the torrent won't be downloaded.` : 'Nothing else in the torrent.',
+    withSubs: (n: number) =>
+      `It comes with ${plural(n, 'subtitle file')}; ${n === 1 ? "it's" : "they're"} downloaded too and added as the film's subtitles.`,
     existing: (title: string) => `This torrent is already on the site: ${title}`,
     existingMine: "It's already in your library or downloads.",
     existingJoin: 'Adding it to your library takes no extra space, and you share its subtitles and sync work.',
@@ -828,6 +828,7 @@ export const en: Copy = {
       zimuku: 'Zimuku',
       upload: 'Uploaded',
       translated: 'AI translation',
+      bundled: 'From the torrent',
     } as Record<string, string>,
     provState: {
       disabled: 'Disabled',

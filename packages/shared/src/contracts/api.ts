@@ -300,6 +300,8 @@ export type TorrentInspection = {
   name: string | null;
   /** The one file that will be downloaded: the largest video. */
   file: { path: string; sizeBytes: Bytes } | null;
+  /** Subtitle files beside it (.srt, .ass, .ssa, .vtt): downloaded too, and added as the film's subtitles. */
+  subtitleFiles: number;
   /** How many other files the torrent has; they are not downloaded. */
   skippedFiles: number;
   /** What the name says about the version. */
@@ -430,7 +432,8 @@ export type Workspace = {
 
 /* ------------------------------------------------------------------ subtitles */
 
-export type ProviderId = 'justsubtitles' | 'yify' | 'assrt' | 'zimuku' | 'upload' | 'translated';
+/** 'bundled': came with the download, a file beside the film or a text track inside it (Brian, 2026-10-09). */
+export type ProviderId = 'justsubtitles' | 'yify' | 'assrt' | 'zimuku' | 'upload' | 'translated' | 'bundled';
 
 export type ProviderStatus = {
   id: ProviderId;

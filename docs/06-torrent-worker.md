@@ -156,7 +156,7 @@ new WebTorrent({
 **下載**：
 
 - 從存著的 `{info}` 開始（不用再取 metadata），帶它自己的 tracker。
-- 一開始不選任何 piece；metadata 一進來（WebTorrent 檢查磁碟上已有的 piece 之前）只選最大的影片檔。進度、大小、完成都看那個檔案：WebTorrent 的整個種子永遠不會「完成」，所以用那個檔案的 `done`。
+- 一開始不選任何 piece；metadata 一進來（WebTorrent 檢查磁碟上已有的 piece 之前）只選最大的影片檔，和旁邊的字幕檔（`.srt`、`.ass`、`.ssa`、`.vtt`，每個最大 5 MB，最多 50 個；下載完由 `media` 加成字幕，見 [08-media-pipeline.md](08-media-pipeline.md)「種子內附的字幕」）。進度、大小、完成都看這些檔案合起來：WebTorrent 的整個種子永遠不會「完成」，所以等它們每一個的 `done`。預留的空間也是影片加這些字幕檔。
 - 和選中的檔案共用頭尾 piece 的相鄰檔案，會寫進那一小段，其他檔案不會出現。`disk_bytes` 照樣量整個資料夾。
 - 其他行為（排程、暫停、失敗、做種、移除）和 YTS 的下載一樣。
 

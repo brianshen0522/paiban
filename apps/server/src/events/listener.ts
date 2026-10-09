@@ -1,9 +1,9 @@
 import pg from 'pg';
 import type { Logger } from 'pino';
-import type { Pool } from '../db/pool.js';
+import { one, type Pool } from '../db/pool.js';
 import { publishExport } from '../exports/view.js';
 import type { EventHub } from './hub.js';
-import { publishCandidates, publishNotification, publishTorrent, publishUsage } from './publish.js';
+import { publishCandidates, publishNotification, publishSubtitle, publishTorrent, publishUsage } from './publish.js';
 
 /**
  * LISTEN paiban_events on a dedicated connection (not one borrowed from the pool) and turn the
@@ -29,7 +29,22 @@ export function listenForEvents(databaseUrl: string, pool: Pool, hub: EventHub, 
       else if (msg.type === 'usage') await publishUsage(pool, hub);
       else if (msg.type === 'notification' && msg.id) await publishNotification(pool, hub, Number(msg.id));
       else if (msg.type === 'candidates' && msg.id) await publishCandidates(pool, hub, msg.id);
-      else if (msg.type === 'task') {
+      else if (msg.type === 'subtitle' && msg.id) {
+        // Added outside a request (the media service, for subtitles that came with a download).
+        const s = await one<{ torrent_id: string; doc_rev: number }>(
+          pool,
+          'select torrent_id, doc_rev from subtitles where id = $1',
+          [msg.id],
+        );
+        if (s)
+          await publishSubtitle(pool, hub, {
+            torrentId: s.torrent_id,
+            subtitleId: msg.id,
+            rev: s.doc_rev,
+            removed: false,
+            by: null,
+          });
+      } else if (msg.type === 'task') {
         if (msg.id) hub.taskChanged(msg.id);
         hub.toAdmins({ type: 'admin', what: 'tasks' });
       } else if (msg.type === 'storage') {

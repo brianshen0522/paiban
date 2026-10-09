@@ -122,7 +122,8 @@ describe('a .torrent file', () => {
         path: expect.stringMatching(/clip\.hevc10\.mp4$/),
         sizeBytes: (await stat(fixture('clip.hevc10.mp4'))).size,
       },
-      skippedFiles: 2,
+      subtitleFiles: 1,
+      skippedFiles: 1,
       version: { quality: '1080p', source: 'bluray', videoCodec: 'x265' },
       guess: { title: 'Citizen Kane', year: 1941 },
       existing: null,
@@ -140,7 +141,8 @@ describe('a .torrent file', () => {
     });
     expect(res.statusCode).toBe(201);
     const torrent = res.json().torrent;
-    const size = (await stat(fixture('clip.hevc10.mp4'))).size;
+    // The video and the subtitle file beside it: both are downloaded, so both are admitted.
+    const size = (await stat(fixture('clip.hevc10.mp4'))).size + (await stat(fixture('truth.en.srt'))).size;
     expect(res.json().joined).toBe(false);
     expect(torrent).toMatchObject({
       origin: 'manual',
@@ -172,6 +174,8 @@ describe('a .torrent file', () => {
     const whole = (await stat(fixture('clip.mp4'))).size;
     expect(await sha(join(dir, 'clip.mp4')).catch(() => '')).not.toBe(await sha(fixture('clip.mp4')));
     expect(other).toBeLessThanOrEqual(whole);
+    // The subtitle file beside it came too (it becomes a subtitle once the media service probes the film).
+    expect(await sha(join(dir, 'truth.en.srt'))).toBe(await sha(fixture('truth.en.srt')));
     const media = (await db.pool.query('select rel_path from media_files where torrent_id = $1', [torrent.id])).rows[0];
     expect(media.rel_path).toMatch(/clip\.hevc10\.mp4$/);
 
