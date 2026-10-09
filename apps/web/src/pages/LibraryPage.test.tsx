@@ -39,7 +39,8 @@ describe('the library page, all films', () => {
           joined = true;
           return new Response('{}', { status: 200 });
         }
-        if (url === '/api/library?scope=all') return new Response(JSON.stringify([film('t1', joined)]), { status: 200 });
+        if (url === '/api/library?scope=all')
+          return new Response(JSON.stringify([film('t1', joined)]), { status: 200 });
         return new Response('[]', { status: 200 });
       }),
     );
