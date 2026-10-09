@@ -2609,3 +2609,466 @@ fieldset.field > legend {
   justify-self: end;
   margin: 0;
 }
+
+/* ------------------------------------------------------------------ adding a torrent by hand */
+/* docs/11-pages.md, "手動加入種子": each step slides in; motion stops when the system asks for less. */
+.mt-steps {
+  display: grid;
+  min-width: 0;
+}
+.mt-step {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  animation: mt-in 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes mt-in {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.mt-step .field > span {
+  font-weight: 500;
+}
+.mt-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.mt-magnet {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  resize: vertical;
+  min-height: 72px;
+  word-break: break-all;
+}
+
+/* magnet / .torrent switch with a sliding thumb */
+.mt-seg {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  max-width: 340px;
+}
+.mt-seg button {
+  position: relative;
+  z-index: 1;
+  border: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--ink-2);
+  font-weight: 500;
+  transition: color 0.2s;
+}
+.mt-seg button[aria-selected="true"] {
+  color: var(--ink);
+}
+.mt-seg-thumb {
+  position: absolute;
+  inset: 3px auto 3px 3px;
+  width: calc(50% - 3px);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 1px 3px rgba(20, 24, 40, 0.14);
+  transition: transform 0.28s cubic-bezier(0.3, 1.3, 0.5, 1);
+}
+.mt-seg-thumb.file {
+  transform: translateX(100%);
+}
+
+/* drop zone */
+.mt-drop {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 26px 16px;
+  border: 2px dashed var(--line-strong);
+  border-radius: 12px;
+  text-align: center;
+  background: var(--panel-2);
+  transition:
+    border-color 0.2s,
+    background 0.2s,
+    transform 0.2s cubic-bezier(0.3, 1.4, 0.5, 1);
+}
+.mt-drop p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.mt-drop-icon {
+  width: 40px;
+  height: 40px;
+  fill: none;
+  stroke: var(--ink-3);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: stroke 0.2s;
+}
+.mt-drop.over {
+  border-color: var(--accent-fill);
+  background: var(--accent-wash);
+  transform: scale(1.01);
+}
+.mt-drop.over .mt-drop-icon {
+  stroke: var(--accent-ink);
+  animation: mt-bob 0.7s ease-in-out infinite alternate;
+}
+.mt-drop.has {
+  border-style: solid;
+  border-color: var(--good);
+  background: var(--good-wash);
+}
+.mt-drop.has .mt-drop-icon {
+  stroke: var(--good);
+}
+@keyframes mt-bob {
+  to {
+    transform: translateY(-6px);
+  }
+}
+
+/* waiting for the swarm: a core with peers orbiting it */
+.mt-wait {
+  justify-items: center;
+  text-align: center;
+}
+.mt-wait p {
+  margin: 0;
+}
+.mt-wait .mt-actions {
+  justify-self: stretch;
+}
+.mt-swarm {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  margin: 8px 0 4px;
+}
+.mt-swarm .core {
+  position: absolute;
+  inset: 36px;
+  border-radius: 50%;
+  background: var(--accent-fill);
+  animation: mt-pulse 1.6s ease-in-out infinite;
+}
+.mt-swarm .orbit {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px dashed color-mix(in srgb, var(--ink-3) 40%, transparent);
+  animation: mt-spin 2.4s linear infinite;
+}
+.mt-swarm .o2 {
+  inset: 12px;
+  animation-duration: 1.7s;
+  animation-direction: reverse;
+}
+.mt-swarm .o3 {
+  inset: 24px;
+  animation-duration: 1.1s;
+  border-color: transparent;
+}
+.mt-swarm .orbit i {
+  position: absolute;
+  top: -4px;
+  left: calc(50% - 4px);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--info);
+}
+.mt-swarm .o2 i {
+  background: var(--good);
+}
+.mt-swarm .o3 i {
+  background: var(--seg-b);
+}
+@keyframes mt-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes mt-pulse {
+  0%,
+  100% {
+    transform: scale(0.85);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent-fill) 50%, transparent);
+  }
+  50% {
+    transform: scale(1);
+    box-shadow: 0 0 0 12px color-mix(in srgb, var(--accent-fill) 0%, transparent);
+  }
+}
+
+/* what will be downloaded */
+.mt-file {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel-2);
+}
+.mt-file-icon {
+  width: 36px;
+  height: 36px;
+  fill: none;
+  stroke: var(--accent-ink);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.mt-file-icon path {
+  fill: var(--accent-fill);
+  stroke: none;
+}
+.mt-file-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.mt-file-text small {
+  color: var(--ink-3);
+  font-size: 12px;
+}
+.mt-file-text b {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+.mt-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.mt-chips .chip {
+  font-size: 12px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+}
+.mt-existing {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--info-wash);
+}
+.mt-existing p {
+  margin: 0;
+}
+
+/* picking the film on TMDB */
+.mt-film {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.mt-note {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 13px;
+}
+.mt-note.bad {
+  color: var(--bad);
+}
+.mt-films {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+  gap: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.mt-films li {
+  animation: mt-up 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.mt-films button {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  text-align: left;
+  padding: 6px 10px 6px 6px;
+  border-radius: 10px;
+  transition:
+    transform 0.15s,
+    border-color 0.15s,
+    background 0.15s;
+}
+.mt-films button:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent-fill);
+  background: var(--accent-wash);
+}
+.mt-films button span,
+.mt-film-chosen div {
+  display: grid;
+  min-width: 0;
+}
+.mt-films b,
+.mt-film-chosen b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.mt-films small {
+  color: var(--ink-3);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@keyframes mt-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.mt-thumb {
+  width: 40px;
+  height: 60px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: var(--panel-2);
+  display: block;
+}
+.mt-thumb.empty {
+  border: 1px dashed var(--line-strong);
+}
+.mt-film-chosen {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--accent-fill);
+  border-radius: 12px;
+  background: var(--accent-wash);
+  animation: mt-pop 0.34s cubic-bezier(0.3, 1.4, 0.5, 1) both;
+}
+.mt-film-chosen small {
+  color: var(--accent-ink);
+  font-size: 12px;
+}
+@keyframes mt-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.mt-error {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--bad-wash);
+  color: var(--bad);
+  font-size: 13px;
+  animation: mt-shake 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+@keyframes mt-shake {
+  10%,
+  90% {
+    transform: translateX(-1px);
+  }
+  20%,
+  80% {
+    transform: translateX(3px);
+  }
+  30%,
+  50%,
+  70% {
+    transform: translateX(-5px);
+  }
+  40%,
+  60% {
+    transform: translateX(5px);
+  }
+}
+
+/* done: a check mark that draws itself */
+.mt-done {
+  justify-items: center;
+  text-align: center;
+}
+.mt-done h3,
+.mt-done p {
+  margin: 0;
+}
+.mt-done .mt-actions {
+  justify-self: stretch;
+}
+.mt-check {
+  width: 64px;
+  height: 64px;
+  fill: none;
+  stroke: var(--good);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.mt-check circle {
+  stroke-dasharray: 151;
+  stroke-dashoffset: 151;
+  animation: mt-draw 0.5s ease-out forwards;
+}
+.mt-check path {
+  stroke-dasharray: 36;
+  stroke-dashoffset: 36;
+  animation: mt-draw 0.3s 0.42s ease-out forwards;
+}
+@keyframes mt-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mt-step,
+  .mt-films li,
+  .mt-film-chosen,
+  .mt-error,
+  .mt-drop.over .mt-drop-icon,
+  .mt-swarm .core,
+  .mt-swarm .orbit {
+    animation: none;
+  }
+  .mt-check circle,
+  .mt-check path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+  .mt-drop,
+  .mt-seg-thumb,
+  .mt-films button {
+    transition: none;
+  }
+}

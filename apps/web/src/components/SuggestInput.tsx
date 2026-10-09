@@ -21,11 +21,14 @@ export function SuggestInput({
   onChange,
   placeholder,
   label,
+  onMissing,
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder: string;
   label: string;
+  /** A picked film YTS does not have: offer to add a torrent for it by hand. */
+  onMissing?: (film: TmdbSuggestion) => void;
 }) {
   const navigate = useNavigate();
   const listId = useId();
@@ -49,6 +52,7 @@ export function SuggestInput({
     placeholderData: (prev) => prev,
   });
   const items = typed && res.data?.available ? res.data.items : [];
+  const missing = pick?.state === 'missing' ? (items.find((s) => s.tmdbId === pick.tmdbId) ?? null) : null;
   const shown = open && items.length > 0;
 
   // Clicking anywhere else closes the list.
@@ -173,7 +177,23 @@ export function SuggestInput({
               );
             })}
           </div>
-          <p className="suggest-foot">{t.suggest.enterHint(value.trim())}</p>
+          {missing && onMissing ? (
+            <p className="suggest-foot">
+              <button
+                type="button"
+                className="link"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  setOpen(false);
+                  onMissing(missing);
+                }}
+              >
+                {t.manual.fromMissing(missing.title)}
+              </button>
+            </p>
+          ) : (
+            <p className="suggest-foot">{t.suggest.enterHint(value.trim())}</p>
+          )}
         </div>
       )}
     </div>

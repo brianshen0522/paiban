@@ -3,6 +3,7 @@ import { type FormEvent, useEffect, useState } from 'react';
 import { Link, useOutletContext, useSearchParams } from 'react-router';
 import { Banner, Chip, Empty, PageHead } from '../components/Bits';
 import { FillPage, ScrollList } from '../components/FillPage';
+import { ManualTorrentDialog, type PresetFilm } from '../components/ManualTorrent';
 import { Poster } from '../components/Poster';
 import { Rating } from '../components/Rating';
 import { SuggestInput } from '../components/SuggestInput';
@@ -47,13 +48,26 @@ export function SearchPage() {
     window.scrollTo({ top: 0 });
   };
   const keyword = params.get('q') ?? '';
+  // Adding a torrent by hand when YTS does not have the film (Brian, 2026-10-09).
+  const [manual, setManual] = useState<{ preset: PresetFilm | null } | null>(null);
   const filtered = ['quality', 'genre', 'minRating', 'sort'].some((k) => params.get(k));
 
   return (
     <FillPage>
-      <PageHead title={t.search.title} lead={t.search.lead} />
+      <PageHead title={t.search.title} lead={t.search.lead}>
+        <button type="button" className="manual-open" onClick={() => setManual({ preset: null })}>
+          <span aria-hidden="true">＋</span> {t.manual.open}
+        </button>
+      </PageHead>
+      {manual && <ManualTorrentDialog preset={manual.preset} onClose={() => setManual(null)} />}
       <form className="filters" onSubmit={submit} aria-label={t.search.title}>
-        <SuggestInput value={q} onChange={setQ} placeholder={t.search.placeholder} label={t.search.placeholder} />
+        <SuggestInput
+          value={q}
+          onChange={setQ}
+          placeholder={t.search.placeholder}
+          label={t.search.placeholder}
+          onMissing={(film) => setManual({ preset: film })}
+        />
         <label className="sel-l">
           <span>{t.search.quality}</span>
           <select value={params.get('quality') ?? ''} onChange={(e) => update('quality', e.target.value)}>
@@ -130,6 +144,10 @@ export function SearchPage() {
                     {t.search.clear}
                   </button>
                 )}
+                <p className="sub">{t.manual.emptyHint}</p>
+                <button type="button" className="primary" onClick={() => setManual({ preset: null })}>
+                  {t.manual.open}
+                </button>
               </Empty>
             ) : (
               <>

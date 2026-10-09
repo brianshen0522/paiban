@@ -307,6 +307,12 @@ function Row({ x, me, showHolders }: { x: Torrent; me: Me; showHolders: boolean 
             <b>{filmTitle(x.movie).main}</b>
           </Link>{' '}
           <span className="sub-i">{versionLabel(x.version)}</span>
+          {x.origin === 'manual' && (
+            <>
+              {' '}
+              <Chip tone="info">{t.manual.originChip}</Chip>
+            </>
+          )}
         </div>
         {(x.status === 'downloading' || x.status === 'paused' || x.status === 'failed') && (
           <Progress
