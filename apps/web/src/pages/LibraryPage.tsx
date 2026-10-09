@@ -83,7 +83,7 @@ export function LibraryPage() {
           </button>
         ))}
       </div>
-      <div id="lib-panel" role="tabpanel" aria-labelledby={`lib-tab-${scope}`} className="lib-panel">
+      <div id="lib-panel" role="tabpanel" aria-labelledby={`lib-tab-${scope}`} className="fill-rest">
         {scope === 'all' ? <AllFilms /> : <MyLibrary />}
       </div>
     </FillPage>
