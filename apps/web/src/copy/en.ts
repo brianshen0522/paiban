@@ -782,6 +782,10 @@ export const en: Copy = {
     proxyReadySwitch: 'The preview file is ready. Switch to it to see the picture.',
     switchToProxy: 'Use preview file',
     audioOnlyTag: 'Audio only',
+    stageConverting: (pct: number) =>
+      `Browsers can't play this version directly, so a preview video is being made (${pct}%). Until it's ready you can sync by ear; you'll be told when you can switch.`,
+    stageNoProxy:
+      "Browsers can't play this version directly, so there's only sound. To see the picture, press “Make preview file”.",
     nothingPlayable:
       'Neither video nor audio can play yet. You can look at the subtitle list and timeline now; playback works once the preview or audio file is ready.',
     playbackFailed: "This browser can't play any source for this film. The subtitle list and timeline still work.",

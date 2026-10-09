@@ -1213,8 +1213,19 @@ function Bench({ ws, detail }: { ws: Workspace; detail: SubtitleDetail }) {
         }}
       />
       {audioOnly && (
-        <div className="audio-only" aria-hidden="true">
-          <b>{torrent.movie.title}</b>
+        <div className="audio-only">
+          <b aria-hidden="true">{torrent.movie.title}</b>
+          {/* Why there is no picture, in the picture itself (Brian, 2026-10-10: "Audio only" alone looked broken). */}
+          <p role="status">
+            {media && (media.proxy.state === 'pending' || media.proxy.state === 'running')
+              ? t.media.stageConverting(Math.round(media.proxy.progress * 100))
+              : t.media.stageNoProxy}
+          </p>
+          {media && (media.proxy.state === 'pending' || media.proxy.state === 'running') && (
+            <span className="audio-only-bar" aria-hidden="true">
+              <i style={{ width: `${Math.round(media.proxy.progress * 100)}%` }} />
+            </span>
+          )}
         </div>
       )}
       <div className="subs" aria-live="off">

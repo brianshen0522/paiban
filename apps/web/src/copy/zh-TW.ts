@@ -742,6 +742,9 @@ export const zhTW = {
     proxyReadySwitch: '預覽檔已經轉好了，可以切換過去看畫面。',
     switchToProxy: '改用預覽檔',
     audioOnlyTag: '只有聲音',
+    stageConverting: (pct: number) =>
+      `瀏覽器不能直接播這個版本，預覽影片正在轉檔（${pct}%）。轉好之前可以先聽聲音對字幕，轉好了會提示你切換。`,
+    stageNoProxy: '瀏覽器不能直接播這個版本，目前只有聲音。要看畫面，按「轉預覽檔」。',
     nothingPlayable: '影片和聲音都還不能播放。字幕清單和時間軸可以先看，預覽檔或聲音檔好了之後就能播放。',
     playbackFailed: '這個瀏覽器播不了這部片的任何一個來源。字幕清單和時間軸仍然可以用。',
   },

@@ -410,7 +410,9 @@ button[aria-pressed="true"] {
   position: absolute;
   inset: 0;
   display: grid;
-  place-items: center;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
   padding: 24px;
   color: var(--stage-ink-2);
   font-family: var(--font-poster);
@@ -418,7 +420,32 @@ button[aria-pressed="true"] {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   text-align: center;
+}
+#view .bench .audio-only b {
   opacity: 0.5;
+}
+#view .bench .audio-only p {
+  margin: 0;
+  max-width: 46ch;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.5;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--stage-ink-2);
+}
+#view .bench .audio-only-bar {
+  width: min(240px, 60%);
+  height: 4px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--stage-ink) 15%, transparent);
+  overflow: hidden;
+}
+#view .bench .audio-only-bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent-fill);
+  transition: width 0.6s ease;
 }
 #view .bench .subs {
   position: absolute;
