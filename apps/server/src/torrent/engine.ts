@@ -1,5 +1,8 @@
+import bencode from 'bencode';
+import MemoryChunkStore from 'memory-chunk-store';
 import WebTorrent from 'webtorrent';
 import { yourIp } from './live.js';
+import { VIDEO_EXTENSIONS } from './schedule.js';
 
 /**
  * The only file that touches WebTorrent's untyped API (AGENTS.md: wrap third-party boundaries).
@@ -71,8 +74,27 @@ export type EngineOptions = {
   offline: boolean;
 };
 
+export type AddOptions = {
+  path: string;
+  bitfield?: Buffer;
+  skipVerify?: boolean;
+  /** Trackers to announce to besides the magnet's own (a torrent added by hand keeps its own). */
+  announce?: string[];
+  /**
+   * Only the largest video file is downloaded (torrents added by hand, docs/06-torrent-worker.md,
+   * "手動加入"). `length`, `progress`, `downloaded`, `done` and the `done` event are then that file's.
+   */
+  onlyMainVideo?: boolean;
+};
+
 export type Engine = {
-  add(magnet: string, opts: { path: string; bitfield?: Buffer; skipVerify?: boolean }): EngineTorrent;
+  /** A magnet link, or a stored `{info}` (bencoded) for a torrent added by hand. */
+  add(source: string | Buffer, opts: AddOptions): EngineTorrent;
+  /**
+   * Fetches a magnet's metadata from the swarm into memory and leaves again: nothing is written
+   * to disk. Answers the bencoded `{info}`. Rejects after `timeoutMs` without it.
+   */
+  fetchMetadata(magnet: string, timeoutMs: number, peers?: string[]): Promise<Buffer>;
   /**
    * Removes a torrent and deletes its files. Only storage/remove.ts may call this
    * (docs/10-storage.md: one module deletes under /data).
@@ -97,13 +119,23 @@ type WtTorrent = {
   length: number;
   pieceLength: number;
   pieces: unknown[];
-  files: { path: string; length: number }[];
+  files: WtFile[];
+  info?: unknown;
   bitfield?: { buffer: Uint8Array; get(i: number): boolean };
   wires?: WtWire[];
   _reservations?: (unknown[] | null)[];
   on(event: string, fn: (...args: unknown[]) => void): void;
   addPeer(addr: string): void;
   destroy(opts: { destroyStore: boolean }, cb: (err?: Error) => void): void;
+};
+type WtFile = {
+  path: string;
+  length: number;
+  done: boolean;
+  progress: number;
+  downloaded: number;
+  select(): void;
+  on(event: 'done', fn: () => void): void;
 };
 type WtWire = {
   remoteAddress?: string;
@@ -116,7 +148,7 @@ type WtWire = {
   uploadSpeed?: () => number;
 };
 type WtClient = {
-  add(id: string, opts: object): WtTorrent;
+  add(id: string | Uint8Array, opts: object): WtTorrent;
   remove(id: string, opts: { destroyStore: boolean }, cb: (err?: Error) => void): void;
   get(id: string): Promise<WtTorrent | null> | WtTorrent | null;
   torrents: WtTorrent[];
@@ -143,14 +175,63 @@ export function createEngine(opts: EngineOptions): Engine {
   const find = (hash: string) => client.torrents.find((t) => t.infoHash === hash);
 
   return {
-    add(magnet, o) {
-      const t = client.add(magnet, {
+    add(source, o) {
+      const t = client.add(source, {
         path: o.path,
         ...(o.bitfield ? { bitfield: o.bitfield } : {}),
         ...(o.skipVerify ? { skipVerify: true } : {}),
-        ...(opts.offline ? { announce: [] } : {}),
+        ...(o.onlyMainVideo ? { deselect: true } : {}),
+        ...(opts.offline ? { announce: [] } : o.announce?.length ? { announce: o.announce } : {}),
       });
-      return wrap(t);
+      return wrap(t, !!o.onlyMainVideo);
+    },
+    fetchMetadata(magnet, timeoutMs, peers = []) {
+      return new Promise((resolve, reject) => {
+        const hash = /btih:([0-9a-f]{40})/i.exec(magnet)?.[1]?.toLowerCase() ?? '';
+        const existing = find(hash);
+        if (existing?.info) return resolve(Buffer.from(bencode.encode({ info: existing.info })));
+        if (existing) return reject(new Error('the torrent is open without its metadata yet'));
+        let t: WtTorrent;
+        try {
+          t = client.add(magnet, {
+            store: MemoryChunkStore,
+            deselect: true,
+            ...(opts.offline ? { announce: [] } : {}),
+          });
+        } catch (err) {
+          return reject(err instanceof Error ? err : new Error(String(err)));
+        }
+        let settled = false;
+        // The pieces live in memory (nothing was selected, so there are none): leaving is enough.
+        const leave = () => setImmediate(() => t.destroy({ destroyStore: false }, () => undefined));
+        const timer = setTimeout(() => {
+          if (settled) return;
+          settled = true;
+          leave();
+          reject(new Error('no metadata in time'));
+        }, timeoutMs);
+        t.on('metadata', () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          const info = t.info;
+          leave();
+          if (info) resolve(Buffer.from(bencode.encode({ info })));
+          else reject(new Error('metadata without an info dictionary'));
+        });
+        t.on('error', (err) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          leave();
+          reject(err instanceof Error ? err : new Error(String(err)));
+        });
+        // Tests: no trackers or DHT, so the seeding peers are added by hand once the hash is known.
+        if (peers.length)
+          t.on('infoHash', () => {
+            for (const p of peers) t.addPeer(p);
+          });
+      });
     },
     removeAndDeleteFiles(hash) {
       if (!find(hash)) return Promise.resolve();
@@ -168,7 +249,31 @@ export function createEngine(opts: EngineOptions): Engine {
   };
 }
 
-function wrap(t: WtTorrent): EngineTorrent {
+/** The largest video file, as schedule.ts's mainVideo picks it. */
+function mainVideoFile(files: WtFile[]): WtFile | null {
+  let best: WtFile | null = null;
+  for (const f of files) {
+    const lower = f.path.toLowerCase();
+    if (!VIDEO_EXTENSIONS.some((e) => lower.endsWith(e))) continue;
+    if (!best || f.length > best.length) best = f;
+  }
+  return best;
+}
+
+function wrap(t: WtTorrent, onlyMainVideo: boolean): EngineTorrent {
+  // Only one file wanted: select it as soon as the metadata is in (before WebTorrent checks which
+  // pieces are already on disk), and report that file in place of the whole torrent.
+  let only: WtFile | null = null;
+  const doneListeners: (() => void)[] = [];
+  if (onlyMainVideo)
+    t.on('metadata', () => {
+      only = mainVideoFile(t.files ?? []);
+      if (!only) return;
+      only.select();
+      only.on('done', () => {
+        for (const fn of doneListeners) fn();
+      });
+    });
   return {
     get infoHash() {
       return t.infoHash;
@@ -177,13 +282,13 @@ function wrap(t: WtTorrent): EngineTorrent {
       return t.ready;
     },
     get done() {
-      return t.done;
+      return onlyMainVideo ? !!only?.done : t.done;
     },
     get progress() {
-      return t.progress;
+      return onlyMainVideo ? (only?.progress ?? 0) : t.progress;
     },
     get downloaded() {
-      return t.downloaded;
+      return onlyMainVideo ? (only?.downloaded ?? 0) : t.downloaded;
     },
     get uploaded() {
       return t.uploaded;
@@ -198,7 +303,7 @@ function wrap(t: WtTorrent): EngineTorrent {
       return t.numPeers;
     },
     get length() {
-      return t.length;
+      return onlyMainVideo && only ? only.length : t.length;
     },
     get files() {
       return (t.files ?? []).map((f) => ({ path: f.path, length: f.length }));
@@ -208,6 +313,7 @@ function wrap(t: WtTorrent): EngineTorrent {
     on(event: string, fn: (...args: never[]) => void) {
       if (event === 'wire')
         t.on('wire', (wire: unknown) => (fn as (type: string) => void)(String((wire as { type?: string }).type ?? '')));
+      else if (event === 'done' && onlyMainVideo) doneListeners.push(fn as () => void);
       else t.on(event, fn as (...args: unknown[]) => void);
     },
     addPeer: (addr) => t.addPeer(addr),

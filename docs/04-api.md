@@ -64,8 +64,13 @@
 | `POST /api/torrents/:id/pause` | 持有人 | 只有 `queued`、`downloading` 能暫停，其他回 `TORRENT_STATE`。空間繼續保留 |
 | `POST /api/torrents/:id/resume` | 持有人 | 只有 `paused` 能繼續。回到佇列尾端 |
 | `POST /api/torrents/:id/retry` | 持有人 | 只有 `failed` 能重試。重新檢查空間：需求是完整大小加預覽預留，扣掉已經在磁碟上的殘留；不夠回 `STORAGE_LIMIT`。通過後回到佇列尾端，從已下載的部分接續 |
-| `POST /api/torrents/:id/hold` | 登入 | 加入別人已經下載的片（全站片庫的「加入我的片庫」）。不再問 YTS（這一列當初就是從 YTS 的結果建立的）、不檢查空間、不佔空間（D21）。已經是持有人就直接回現況。正在刪除或不存在回 `NOT_FOUND`。回 `Torrent`，寫操作紀錄 `torrent.join` |
+| `POST /api/torrents/:id/hold` | 登入 | 加入別人已經下載的片（全站片庫的「加入我的片庫」）。不再問 YTS（這一列當初就是從 YTS 的結果或手動加入建立的）、不檢查空間、不佔空間（D21）。已經是持有人就直接回現況。正在刪除或不存在回 `NOT_FOUND`。回 `Torrent`，寫操作紀錄 `torrent.join` |
 | `DELETE /api/torrents/:id/hold` | 持有人 | 把自己從持有人移除。還有別人持有：`{deleted: false, freedBytes: 0}`。自己是最後一位：整部片連同字幕、預覽檔和**這部片的所有匯出檔**排入刪除（Brian，2026-10-06），`{deleted: true, freedBytes}`，`freedBytes` 含匯出檔。別人建立的匯出檔，建立者會收到 `item.deleted` |
+
+| `POST /api/torrents/inspect` | 登入 | 手動加入種子的第一步（D26；[06-torrent-worker.md](06-torrent-worker.md)「手動加入」）。JSON `{magnet}`，或 multipart 一個欄位 `file`（.torrent，最大 4 MB）。回 `TorrentInspection`（201）：磁力連結通常是 `pending`，要輪詢下一個端點。看不懂回 `TORRENT_INVALID`，`details.reason` 是 `BAD_MAGNET` 或 `BAD_TORRENT`。每人每小時 30 次，超過回 `RATE_LIMITED`。種子已經在網站上時 `existing` 是那個下載 |
+| `GET /api/torrents/inspect/:id` | 建立的人 | 那一筆的現況：`pending`、`ready`（`file` 是會下載的檔案、`skippedFiles` 是不下載的檔案數、`version` 和 `guess` 是從名稱推測的版本與片名）、`failed`（`errorCode`：`NO_METADATA`、`NO_VIDEO_FILE`、`UNSAFE_PATH`、`BAD_TORRENT`）。別人的回 `NOT_FOUND` |
+| `POST /api/torrents/manual` | 建立的人 | `{inspectionId, tmdbId}`。還在 `pending` 回 `TORRENT_STATE`；`failed` 回 `TORRENT_INVALID`；超過 24 小時回 `NOT_FOUND`。向 TMDB 取這部片（沒有金鑰回 `TMDB_NOT_CONFIGURED`，連不上回 `TMDB_UNREACHABLE`，沒有這部片回 `VALIDATION`）。同一個 info hash 已經在網站上就加入持有人（`joined: true`，不檢查空間）；否則在交易裡 `storage_admit(檔案大小 + 預覽預留)`，不夠回 `STORAGE_LIMIT`，建立電影（需要的話）、下載、持有人。回 `{torrent, joined}`（新的 201、加入 200），寫操作紀錄 `torrent.manual` 或 `torrent.join` |
+| `GET /api/movies/:id/poster` | 登入 | 手動加入的電影存下來的 TMDB 海報（`/data/posters`）。沒有回 404，前端畫佔位海報 |
 
 **接受下載**（`POST /api/torrents`），依序：
 
@@ -240,6 +245,9 @@
 | `VALIDATION` | 422 | 欄位不合法 | 在各欄位下方顯示，焦點移到第一個錯的欄位 |
 | `WRONG_PASSWORD` | 422 | 改密碼時目前的密碼不對 | 「目前的密碼不正確。」 |
 | `HASH_NOT_FROM_YTS` | 422 | info hash 不在那部片的版本清單裡 | 正常操作不會遇到。重新整理電影頁 |
+| `TORRENT_INVALID` | 422 | 手動加入的磁力連結或 .torrent 檔不能用；`details.reason`：`BAD_MAGNET`、`BAD_TORRENT`、`NO_VIDEO_FILE`、`UNSAFE_PATH`、`NO_METADATA` | 視窗裡說明原因 |
+| `TMDB_NOT_CONFIGURED` | 409 | 手動加入要選 TMDB 的電影，但沒有 TMDB 金鑰 | 請管理員到「來源設定」設定 |
+| `TMDB_UNREACHABLE` | 502 | 連不上 TMDB | 稍後再試 |
 | `CANDIDATE_UNAVAILABLE` | 422 | 候選字幕的檔案抓不到或讀不了 | 依 `details.reason` 說明，見 [11-pages.md](11-pages.md) |
 | `NO_CONFIRMED_SUBTITLE` | 422 | 匯出時沒選字幕，或選了還沒確認的 | 「至少要選一條已確認的字幕。還沒有的話，先去同步。」 |
 | `INVALID_FILENAME` | 422 | | 檔名欄位下方說明規則 |

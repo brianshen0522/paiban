@@ -43,9 +43,14 @@ export async function removeDownloadFiles(
   log.info({ infoHash: d.infoHash, folders: dirs.length }, 'download removed (requested by a person)');
 }
 
-/** The poster copy of a film whose last download was removed (step 5). */
-export async function removePoster(dataDir: string, ytsId: number): Promise<void> {
-  await unlink(under(dataDir, 'posters', `${ytsId}.jpg`)).catch(() => undefined);
+/**
+ * The poster copy of a film whose last download was removed (step 5): `posters/<yts id>.jpg`, or
+ * `posters/tmdb-<id>.<ext>` for a film added by hand. Anything else in `movies.poster_path` is left alone.
+ */
+export async function removePoster(dataDir: string, posterPath: string): Promise<void> {
+  const file = /^posters\/((?:tmdb-)?\d{1,12}\.(?:jpg|png|webp))$/.exec(posterPath)?.[1];
+  if (!file) return;
+  await unlink(under(dataDir, 'posters', file)).catch(() => undefined);
 }
 
 /**

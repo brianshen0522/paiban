@@ -352,3 +352,101 @@ export async function tmdbImdbCode(env: TmdbEnv, tmdbId: number): Promise<string
 }
 
 export const tmdbSmallPosterUrl = (file: string) => `https://${TMDB_IMAGE_HOST}/t/p/w92/${file}`;
+
+/* ------------------------------------------------------------------ a film picked by hand */
+
+/** Everything a film added by hand needs (Brian, 2026-10-09): it has no YTS page to say it. */
+export type TmdbDetails = {
+  tmdbId: number;
+  /** The English title (what YTS would call it); the original one when TMDB has no English one. */
+  title: string;
+  titleZh: string | null;
+  year: number;
+  runtimeMin: number;
+  /** English names, as YTS gives them (the pages translate them). */
+  genres: string[];
+  overview: string;
+  overviewZh: string | null;
+  posterPath: string | null;
+  imdb: string | null;
+  rating: number | null;
+  language: string | null;
+};
+
+const Details = z.object({
+  id: z.number(),
+  title: z.string().nullish(),
+  original_title: z.string().nullish(),
+  original_language: z.string().nullish(),
+  release_date: z.string().nullish(),
+  runtime: z.number().nullish(),
+  genres: z.array(z.object({ name: z.string() })).nullish(),
+  overview: z.string().nullish(),
+  poster_path: z.string().nullish(),
+  vote_average: z.number().nullish(),
+  vote_count: z.number().nullish(),
+  imdb_id: z.string().nullish(),
+  external_ids: z.object({ imdb_id: z.string().nullish() }).nullish(),
+});
+
+/** Two answers of /3/movie/<id>, in English and in zh-TW, as one film. */
+export function parseDetails(en: unknown, zh: unknown): TmdbDetails {
+  const e = Details.safeParse(en);
+  const c = Details.safeParse(zh);
+  if (!e.success || !c.success) throw new TmdbError('BAD_RESPONSE', 'TMDB answered a film in an unexpected shape');
+  const m = e.data;
+  const title = (m.title || m.original_title || '').trim();
+  const zhTitle = c.data.title?.trim() || null;
+  const year = Number(/^(\d{4})-/.exec(m.release_date ?? '')?.[1] ?? 0);
+  const imdb = m.imdb_id ?? m.external_ids?.imdb_id ?? null;
+  const file = m.poster_path?.replace(/^\//, '') ?? '';
+  const votes = m.vote_count ?? 0;
+  const original = [title, m.original_title ?? ''].map((s) => s.trim().toLowerCase());
+  return {
+    tmdbId: m.id,
+    title: title.slice(0, 300),
+    titleZh: zhTitle && !original.includes(zhTitle.toLowerCase()) ? zhTitle.slice(0, 300) : null,
+    year,
+    runtimeMin: Math.max(0, Math.round(m.runtime ?? 0)),
+    genres: (m.genres ?? []).map((g) => g.name).slice(0, 10),
+    overview: (m.overview ?? '').trim().slice(0, 4000),
+    overviewZh: c.data.overview?.trim() ? c.data.overview.trim().slice(0, 4000) : null,
+    posterPath: POSTER_FILE.test(file) ? `/${file}` : null,
+    imdb: imdb && /^tt\d{7,10}$/.test(imdb) ? imdb : null,
+    rating: votes >= MIN_VOTES && m.vote_average ? Math.round(m.vote_average * 10) / 10 : null,
+    language: m.original_language ?? null,
+  };
+}
+
+/** One film by its TMDB id, a week in the cache. Null without a key or when TMDB does not know it. */
+export async function tmdbDetails(env: TmdbEnv, tmdbId: number): Promise<TmdbDetails | null> {
+  const key = await env.key();
+  if (!key) return null;
+  const ck = `details:${tmdbId}`;
+  const hit = await cached<TmdbDetails | null>(env.pool, ck);
+  if (hit) return hit.value;
+  const path = `/3/movie/${tmdbId}`;
+  const [en, zh] = await Promise.all([
+    tmdbGet(env.outbound, path, { language: 'en-US', append_to_response: 'external_ids' }, key),
+    tmdbGet(env.outbound, path, { language: 'zh-TW' }, key),
+  ]);
+  const details = en === null || zh === null ? null : parseDetails(en, zh);
+  await keep(env.pool, ck, details, details ? FILM_DAYS * 24 : UNKNOWN_HOURS);
+  return details;
+}
+
+/** The w342 poster TMDB keeps for a film, as image bytes; null when there is none. */
+export async function tmdbPosterImage(
+  env: Pick<TmdbEnv, 'outbound'>,
+  posterPath: string,
+): Promise<{ body: Buffer; ext: 'jpg' | 'png' | 'webp' } | null> {
+  const res = await outboundFetch(env.outbound, tmdbPosterUrl(posterPath), {
+    allow: (h) => h === TMDB_IMAGE_HOST,
+    maxBytes: 2 * 1024 * 1024,
+    timeoutMs: 10_000,
+  });
+  const type = (res.headers.get('content-type') ?? '').split(';')[0]?.trim();
+  const ext = type === 'image/jpeg' ? 'jpg' : type === 'image/png' ? 'png' : type === 'image/webp' ? 'webp' : null;
+  if (res.status !== 200 || !ext) return null;
+  return { body: res.body, ext };
+}

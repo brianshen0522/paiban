@@ -48,10 +48,14 @@ type Row = {
   video_codec: string;
   bit_depth: number;
   requested_by: string | null;
+  origin: 'yts' | 'manual';
+  metainfo: Buffer | null;
+  trackers: string[];
 };
 
 const ROW = `select t.id, t.info_hash, t.state, t.want, t.size_bytes, t.length_bytes, t.downloaded_bytes, t.bitfield, t.clean_stop, t.seeding,
-                    m.title, m.year, t.quality, t.source_type, t.video_codec, t.bit_depth, t.requested_by
+                    m.title, m.year, t.quality, t.source_type, t.video_codec, t.bit_depth, t.requested_by,
+                    t.origin, t.metainfo, t.trackers
                from torrents t join movies m on m.id = t.movie_id`;
 
 export type WorkerDeps = {
@@ -109,7 +113,7 @@ export class TorrentWorker {
     );
     for (const r of rows) {
       if (r.state === 'completed') {
-        const t = this.engine.add(this.magnet(r, []), { path: this.torrentDir(r.info_hash), skipVerify: true });
+        const t = this.add(r, [], { path: this.torrentDir(r.info_hash), skipVerify: true });
         this.watchTestPeers(t);
         this.seeding.set(r.id, t);
         continue;
@@ -269,6 +273,21 @@ export class TorrentWorker {
     return `magnet:?xt=urn:btih:${r.info_hash}&dn=${dn}${tr.map((t) => `&tr=${encodeURIComponent(t)}`).join('')}`;
   }
 
+  /**
+   * YTS downloads start from a magnet link with the configured trackers. One added by hand starts
+   * from its stored info dictionary with its own trackers, and fetches only its largest video file
+   * (docs/06-torrent-worker.md, "手動加入").
+   */
+  private add(
+    r: Row,
+    trackers: string[],
+    opts: { path: string; bitfield?: Buffer; skipVerify?: boolean },
+  ): EngineTorrent {
+    if (r.origin === 'manual' && r.metainfo)
+      return this.engine.add(r.metainfo, { ...opts, announce: r.trackers, onlyMainVideo: true });
+    return this.engine.add(this.magnet(r, trackers), opts);
+  }
+
   private watchTestPeers(t: EngineTorrent): void {
     if (!this.config.torrentTestPeers.length) return;
     // addPeer() throws before the infoHash event (reference/torrent/local-swarm-test.mjs).
@@ -278,7 +297,7 @@ export class TorrentWorker {
   }
 
   private async attach(r: Row, bitfield: Buffer | undefined, trackers: string[]): Promise<void> {
-    const t = this.engine.add(this.magnet(r, trackers), {
+    const t = this.add(r, trackers, {
       path: this.torrentDir(r.info_hash),
       ...(bitfield ? { bitfield } : {}),
     });
@@ -585,24 +604,24 @@ export class TorrentWorker {
         `delete from torrents where id = $1 and want = 'remove' returning movie_id`,
         [r.id],
       );
-      let ytsId: number | null = null;
+      let posterPath: string | null = null;
       if (gone) {
-        const m = await one<{ yts_id: number }>(
+        const m = await one<{ yts_id: number | null; poster_path: string | null }>(
           c,
-          `delete from movies where id = $1 and not exists (select 1 from torrents where movie_id = $1) returning yts_id`,
+          `delete from movies where id = $1 and not exists (select 1 from torrents where movie_id = $1) returning yts_id, poster_path`,
           [gone.movie_id],
         );
-        ytsId = m?.yts_id ?? null;
+        posterPath = m ? (m.poster_path ?? (m.yts_id !== null ? `posters/${m.yts_id}.jpg` : null)) : null;
       }
       return {
         notes: exportNotes,
-        ytsId,
+        posterPath,
         deleted: !!gone,
         exports: failedExports.map((e) => e.id),
         tasks: [...failedTasks, ...cancelledTasks].map((t) => t.id),
       };
     });
-    if (out.ytsId !== null) await removePoster(this.config.dataDir, out.ytsId);
+    if (out.posterPath) await removePoster(this.config.dataDir, out.posterPath);
     // The subtitle tracks of the exports that just failed: a running mux job removes them too when it
     // notices, but one still waiting has nobody else to do it.
     for (const e of out.exports) await removeExportTracks(this.config.dataDir, e);

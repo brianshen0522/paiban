@@ -17,8 +17,9 @@
 | `provider_cache` | 一筆對外查詢的結果（我們解析、清理過的，不是原始回應） | |
 | `source_health` | 一個外部來源最近一次的狀況 | |
 | `provider_slots` | 一個來源下一次可以發請求的時間 | |
-| `movies` | 一部有人下載過的電影 | 海報（不計入用量） |
-| `torrents` | 一個下載（一個 info hash） | `/data/torrents/<hash>` |
+| `movies` | 一部有人下載過的電影（手動加入、YTS 沒有的，`yts_id` 是空的，以 TMDB 編號區分） | 海報（不計入用量） |
+| `torrents` | 一個下載（一個 info hash）。`origin` 是 `yts` 或 `manual`（手動加入，存著 `metainfo` 和 `trackers`） | `/data/torrents/<hash>` |
+| `torrent_inspections` | 一個正要手動加入的磁力連結或 .torrent 檔（[06-torrent-worker.md](06-torrent-worker.md)「手動加入」）。加入後刪掉 | |
 | `torrent_holders` | 「某人持有某個下載」 | |
 | `media_files` | 一個下載完成的主影片檔和它的衍生檔 | `/data/media/<id>` |
 | `subtitle_searches` | 某部片在某個來源的最近一次搜尋 | |

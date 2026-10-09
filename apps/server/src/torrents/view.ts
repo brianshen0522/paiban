@@ -28,7 +28,10 @@ export type TorrentRow = {
   completed_at: Date | null;
   requested_by: string | null;
   req_name: string | null;
-  yts_id: number;
+  yts_id: number | null;
+  movie_id: string;
+  poster_path: string | null;
+  origin: 'yts' | 'manual';
   title: string;
   title_zh: string | null;
   year: number;
@@ -62,7 +65,7 @@ select t.id, t.info_hash, t.quality, t.source_type, t.video_codec, t.bit_depth, 
        t.length_bytes, t.state, t.want, t.progress, t.downloaded_bytes, t.download_bps, t.peers, t.error_code,
        t.error_message, t.disk_bytes, t.preview_reserve_bytes, t.queued_at, t.completed_at, t.requested_by,
        ru.display_name as req_name,
-       m.yts_id, m.title, m.title_zh, m.year, m.runtime_min,
+       m.yts_id, m.id as movie_id, m.poster_path, t.origin, m.title, m.title_zh, m.year, m.runtime_min,
        coalesce((select json_agg(json_build_object('id', u.id, 'displayName', u.display_name) order by h.added_at)
                    from torrent_holders h join users u on u.id = h.user_id where h.torrent_id = t.id), '[]'::json) as holders,
        case when t.state = 'queued' and t.want = 'run'
@@ -88,6 +91,9 @@ export function statusOf(state: TorrentRow['state'], analysis: AssetState | null
 }
 
 export const posterUrl = (ytsId: number) => `/api/yts/movies/${ytsId}/poster`;
+/** A film's poster: YTS's (kept under /data/posters once downloaded), or the TMDB copy kept for one added by hand. */
+export const filmPosterUrl = (r: Pick<TorrentRow, 'yts_id' | 'movie_id'>) =>
+  r.yts_id !== null ? posterUrl(r.yts_id) : `/api/movies/${r.movie_id}/poster`;
 
 /**
  * MediaStatus (docs/09-sync-workbench.md, "播哪個檔"): sources in the order the sync page should try
@@ -141,8 +147,9 @@ export function toTorrent(r: TorrentRow, viewerId: string): Torrent {
       titleZh: r.title_zh,
       year: r.year,
       runtimeMin: r.runtime_min,
-      posterUrl: posterUrl(r.yts_id),
+      posterUrl: filmPosterUrl(r),
     },
+    origin: r.origin,
     version: {
       quality: r.quality,
       source: r.source_type,

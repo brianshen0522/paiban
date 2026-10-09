@@ -16,6 +16,14 @@
 
 ---
 
+## 2026-10-09 手動加入種子（磁力連結、.torrent 檔）
+
+- 原本：AGENTS.md 絕對規則第 4 條和 D26：只接受 YTS 搜尋結果裡的 info hash，產品不做貼磁力連結、上傳 .torrent 的入口。
+- 改成：所有登入的人都能在「手動加入種子」視窗貼磁力連結或上傳 .torrent 檔，選 TMDB 上的一部電影後下載；只下載最大的影片檔。磁力連結的種子資訊由 `torrent` 服務在記憶體裡取得。tracker 過濾、網頁種子丟掉、每人每小時讀 30 次。新資料表 `torrent_inspections`，`movies.yts_id` 可以是空的，`torrents` 多 `origin`、`metainfo`、`trackers`（遷移 `0007_manual_torrents.sql`）。新端點 `POST /api/torrents/inspect`、`GET /api/torrents/inspect/:id`、`POST /api/torrents/manual`、`GET /api/movies/:id/poster`；錯誤碼 `TORRENT_INVALID`、`TMDB_NOT_CONFIGURED`、`TMDB_UNREACHABLE`；`Torrent.movie.ytsId` 可以是 null，`Torrent.origin`；操作紀錄 `torrent.manual`。
+- 原因：Brian 要在 YTS 找不到片時能手動加入。他確認取消原本的規則、所有人都能用、用 TMDB 選片、只下載最大的影片檔。
+- 改了哪些檔案：AGENTS.md、docs/00-decisions.md（D26）、docs/03-data-model.md、docs/04-api.md、docs/06-torrent-worker.md、docs/10-storage.md、docs/11-pages.md、docs/12-auth.md、db/schema.sql、packages/shared/src/contracts/api.ts
+- Brian 是否已確認：是
+
 ## 2026-10-09 全站片庫
 
 - 原本：每個人只看得到自己持有的片。要用別人下載過的片，得先在搜尋裡找到同一部片、同一個版本，再按「加入片庫」。系統裡有哪些片，只有管理員看得到。

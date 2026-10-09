@@ -108,6 +108,9 @@ export function idleEngine(): Engine {
     add: () => {
       throw new Error('idleEngine does not download');
     },
+    fetchMetadata: async () => {
+      throw new Error('idleEngine does not fetch metadata');
+    },
     removeAndDeleteFiles: async () => undefined,
     has: () => false,
     throttle: () => undefined,

@@ -185,6 +185,7 @@ ffmpeg、ffprobe、ffsubsync、解壓工具都用陣列參數啟動（`spawn(cmd
 | `auth.password.reset` | 用重設連結設定密碼 | |
 | `torrent.add` | 開始下載 / 排入下載 | `{movieTitle, version}` → 片名 · 版本 |
 | `torrent.join` | 加入片庫 | 同上 |
+| `torrent.manual` | 手動加入種子 | 同上（Brian，2026-10-09） |
 | `torrent.pause` | 暫停下載 | 同上 |
 | `torrent.resume` | 繼續下載 | 同上 |
 | `torrent.retry` | 重試下載 | 同上 |

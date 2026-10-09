@@ -129,6 +129,37 @@ new WebTorrent({
 
 重試由 `api` 發起：在交易裡通過 admission 之後，把 `state` 設成 `queued`、`want` 設成 `run`、`queued_at` 設成現在（回到隊伍尾端）、清掉錯誤。輪到它時，`torrent` 用存下來的 bitfield 從已下載的部分接續。
 
+## 手動加入（Brian，2026-10-09；D26）
+
+使用者在「手動加入種子」視窗貼磁力連結或上傳 .torrent 檔（[11-pages.md](11-pages.md)）。
+
+**讀取（`api`）**：
+
+- 磁力連結只取 info hash（`btih`，hex 或 base32）和 tracker。.torrent 檔最大 4 MB，只支援 BitTorrent v1；只留 info 字典，重新編碼成 `{info}` 存起來，確認 info hash 沒變。
+- tracker 過濾：只留 `udp`、`http(s)`、`ws(s)`，主機不能是 localhost、私有或保留位址、單一名稱的內部主機，網址裡不能帶帳號密碼；最多 20 個。網頁種子（`ws`、`url-list`）、`x.pe` 之類的欄位一律丟掉，所以 WebTorrent 不會去連使用者寫的任何網址。
+- 寫一列 `torrent_inspections`。.torrent 檔直接是 `ready`；磁力連結是 `pending`，`NOTIFY paiban_inspect`。同一個 info hash 已經有存過的 info 字典（網站上已有、或之前讀過）就直接 `ready`，不再問種子群。
+- 每人每小時最多讀 30 次（`RATE_LIMITED`）。
+
+**取種子資訊（`torrent`，`Inspector`）**：
+
+- 收到通知或每 2 秒，取最舊的 `pending`（同時最多 3 個），用**記憶體**當儲存、一個 piece 都不選地加進 WebTorrent；拿到 metadata 就離開，把 `{info}` 寫回、`ready`。2 分鐘內沒拿到就 `failed`（`NO_METADATA`）。磁碟上不會寫任何東西。
+- 服務重啟時，還在 `pending` 的直接標成 `failed`（不會接著問）。
+
+**加入（`api`，`POST /api/torrents/manual`）**：
+
+- 要先在 TMDB 選一部電影（[04-api.md](04-api.md)）。片名、年份、片長、類型、簡介（中文和英文）、海報、IMDb 編號從 TMDB 來。IMDb 編號和網站上已有的電影（例如 YTS 的那一列）相同就掛在那一列下；否則建一列 `yts_id` 是空的電影，同一個 TMDB 編號只有一列。
+- 要下載的檔案是最大的影片檔（`.mp4`、`.mkv`、`.avi`、`.mov`、`.m4v`、`.webm`）；沒有影片檔（`NO_VIDEO_FILE`）或有路徑跑到資料夾外面（`UNSAFE_PATH`）的不能加入。
+- 預留的空間：那個檔案的大小加預覽預留。預估能不能直接播：檔名看起來是 x264、8-bit，而且是 `.mp4` 或 `.m4v` 才算能播，其他都先預留預覽檔（[10-storage.md](10-storage.md)）。
+- 版本（畫質、來源、編碼、位元深度）從種子名稱和檔名推測，只用來顯示和預估。
+- `torrents.origin = 'manual'`，`metainfo` 是 `{info}`，`trackers` 是過濾過的 tracker。用過的 `torrent_inspections` 那一列刪掉（是資料列，不是檔案）。海報從 TMDB 抓一份存在 `/data/posters/tmdb-<id>.<副檔名>`，由 `GET /api/movies/:id/poster` 提供。
+
+**下載**：
+
+- 從存著的 `{info}` 開始（不用再取 metadata），帶它自己的 tracker。
+- 一開始不選任何 piece；metadata 一進來（WebTorrent 檢查磁碟上已有的 piece 之前）只選最大的影片檔。進度、大小、完成都看那個檔案：WebTorrent 的整個種子永遠不會「完成」，所以用那個檔案的 `done`。
+- 和選中的檔案共用頭尾 piece 的相鄰檔案，會寫進那一小段，其他檔案不會出現。`disk_bytes` 照樣量整個資料夾。
+- 其他行為（排程、暫停、失敗、做種、移除）和 YTS 的下載一樣。
+
 ## 暫停
 
 1. 還沒加進用戶端（`queued`）：直接把 `state` 改成 `paused`。
@@ -211,7 +242,7 @@ new WebTorrent({
 
 ## 界線
 
-- 這個程式只處理資料庫裡已經存在的 info hash。它沒有任何「加入任意種子」的入口（D26）。
+- 這個程式只處理資料庫裡已經存在的 info hash，和 `torrent_inspections` 裡等著取種子資訊的磁力連結。種子只從 `api` 的兩個入口進來（D26）。
 - 它不需要也拿不到 `SECRET_KEY`。
 - 它不刪除 `want` 不是 `remove` 的任何東西。失敗的下載留著殘留，直到有人按移除。
 - `want` 只有 `api` 會寫，而且每一次寫成 `remove` 都對應到某個人按下的動作（最後一位持有人移除，或管理員強制刪除）。

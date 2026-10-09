@@ -121,7 +121,7 @@ $$;
 -- Only films that someone has downloaded. Search results are not stored.
 create table movies (
   id          uuid primary key default gen_random_uuid(),
-  yts_id      integer not null unique,
+  yts_id      integer unique,                          -- null for a film added by hand (picked on TMDB)
   imdb_code   text not null,
   tmdb_id     integer,
   title       text not null,
@@ -135,6 +135,8 @@ create table movies (
   poster_path text,                                    -- cached copy under /data/posters; too small to count toward the limit
   fetched_at  timestamptz not null default now()
 );
+-- One row per TMDB film among those added by hand (YTS films are keyed by yts_id).
+create unique index movies_tmdb_manual on movies (tmdb_id) where yts_id is null;
 
 create table torrents (
   id                    uuid primary key default gen_random_uuid(),
@@ -145,8 +147,13 @@ create table torrents (
   video_codec           text not null default '',
   bit_depth             integer not null default 8,
   audio_channels        text not null default '',
-  size_bytes            bigint not null check (size_bytes > 0),  -- as YTS lists it; what admission used
+  size_bytes            bigint not null check (size_bytes > 0),  -- as YTS lists it (by hand: the video file's size); what admission used
   length_bytes          bigint,                                   -- from the torrent's own metadata, once known
+  -- 'manual': added by hand from a magnet link or .torrent file (Brian, 2026-10-09). Only its
+  -- largest video file is downloaded; `metainfo` is the info dictionary, so no metadata is fetched.
+  origin                text not null default 'yts' check (origin in ('yts', 'manual')),
+  metainfo              bytea,
+  trackers              text[] not null default '{}',           -- by hand: the link's or file's trackers, filtered
 
   -- `state` is written by the torrent worker (the API sets 'queued' on create and on retry).
   -- `want` is written by the API. The worker makes state follow want. See docs/06-torrent-worker.md.
@@ -189,6 +196,22 @@ create index torrents_movie on torrents (movie_id);
 -- What a download is doing right now, for its detail page (docs/11-pages.md, "下載細節"). The page
 -- keeps `wanted_until` a few seconds ahead while it is open; the torrent service writes `data`
 -- every pass for rows still wanted. Throwaway state, so the table is unlogged.
+-- A magnet link or .torrent file someone is about to add by hand (docs/06-torrent-worker.md,
+-- "手動加入"). The torrent service fetches a magnet's metadata; a .torrent file carries it.
+create table torrent_inspections (
+  id          uuid primary key default gen_random_uuid(),
+  created_by  uuid references users (id) on delete cascade,
+  created_at  timestamptz not null default now(),
+  source      text not null check (source in ('magnet', 'file')),
+  info_hash   text not null check (info_hash ~ '^[0-9a-f]{40}$'),
+  trackers    text[] not null default '{}',
+  state       text not null default 'pending' check (state in ('pending', 'ready', 'failed')),
+  error_code  text,
+  metainfo    bytea,                                    -- bencoded {info}, nothing else
+  finished_at timestamptz
+);
+create index torrent_inspections_pending on torrent_inspections (created_at) where state = 'pending';
+
 create unlogged table torrent_live (
   torrent_id   uuid primary key references torrents (id) on delete cascade,
   wanted_until timestamptz not null,

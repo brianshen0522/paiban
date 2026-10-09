@@ -9,6 +9,7 @@ import { createLogger } from './log.js';
 import { readSettings } from './settings/settings.js';
 import { diskProbe } from './storage/disk.js';
 import { createEngine } from './torrent/engine.js';
+import { Inspector } from './torrent/inspector.js';
 import { homeCountry } from './torrent/live.js';
 import { TorrentWorker } from './torrent/worker.js';
 
@@ -56,6 +57,9 @@ const worker = new TorrentWorker({
   home: homeCountry(process.env.TZ),
 });
 await worker.recover();
+// Magnet links someone is adding by hand: their metadata is fetched here (docs/06, "手動加入").
+const inspector = new Inspector(pool, engine, config, log);
+await inspector.recover();
 const stopHeartbeat = startHeartbeat(pool, 'torrent', () => ({
   port: config.torrentPort,
   dhtPort: config.torrentDhtPort,
@@ -66,12 +70,16 @@ const stopHeartbeat = startHeartbeat(pool, 'torrent', () => ({
 const listener = new pg.Client({ connectionString: config.databaseUrl });
 await listener.connect();
 await listener.query('listen paiban_torrent');
-listener.on('notification', () => void worker.tick());
+await listener.query('listen paiban_inspect');
+listener.on('notification', (n) => void (n.channel === 'paiban_inspect' ? inspector.tick() : worker.tick()));
 listener.on('error', (err) => {
   log.error({ err }, 'listen connection lost');
   process.exit(1);
 });
-const timer = setInterval(() => void worker.tick(), 2000);
+const timer = setInterval(() => {
+  void worker.tick();
+  void inspector.tick();
+}, 2000);
 void worker.tick();
 log.info({ port: config.torrentPort, offline: config.torrentTestPeers.length > 0 }, 'torrent service started');
 

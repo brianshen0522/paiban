@@ -22,6 +22,7 @@ import { secretRoutes } from './settings/secrets.js';
 import { storageRoutes } from './storage/routes.js';
 import { subtitleRoutes } from './subtitles/routes.js';
 import { tmdbRoutes } from './tmdb/routes.js';
+import { manualTorrentRoutes } from './torrents/manual-routes.js';
 import { torrentRoutes } from './torrents/routes.js';
 import { ytsRoutes } from './yts/routes.js';
 
@@ -146,6 +147,7 @@ export function buildApp(deps: Deps): FastifyInstance {
   ytsRoutes(app, deps);
   tmdbRoutes(app, deps);
   torrentRoutes(app, deps);
+  manualTorrentRoutes(app, deps);
   storageRoutes(app, deps);
   llmRoutes(app, deps);
   translationRoutes(app, deps);

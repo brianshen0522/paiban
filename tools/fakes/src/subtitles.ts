@@ -194,6 +194,37 @@ export async function startFakeSources(
                 '{"success":false,"status_code":34,"status_message":"The resource you requested could not be found."}',
               );
         }
+        // GET /3/movie/<id>?language=…: a film picked by hand (the fake knows only the zh-TW title).
+        const one = /^\/3\/movie\/(\d+)$/.exec(path);
+        if (one) {
+          const film = tmdbFilms.find((f) => f.tmdbId === Number(one[1]));
+          if (!film)
+            return send(
+              404,
+              '{"success":false,"status_code":34,"status_message":"The resource you requested could not be found."}',
+            );
+          const zh = (url.searchParams.get('language') ?? '').startsWith('zh');
+          return send(
+            200,
+            JSON.stringify({
+              id: film.tmdbId,
+              title: zh ? film.title : film.originalTitle,
+              original_title: film.originalTitle,
+              original_language: 'en',
+              release_date: `${film.year}-01-01`,
+              runtime: 110,
+              genres: [{ id: 18, name: zh ? '劇情' : 'Drama' }],
+              overview: zh ? film.overview : `${film.originalTitle}: an English overview.`,
+              poster_path: film.posterPath,
+              vote_average: film.voteAverage,
+              vote_count: film.voteCount,
+              imdb_id: film.imdb,
+              ...(url.searchParams.get('append_to_response') === 'external_ids'
+                ? { external_ids: { imdb_id: film.imdb } }
+                : {}),
+            }),
+          );
+        }
         const m = /^\/3\/find\/(tt\d+)$/.exec(path);
         const film = tmdbFilms.find((f) => f.imdb === m?.[1]);
         // A film answered as Inception keeps Inception's TMDB id (the subtitle sources know only

@@ -49,6 +49,7 @@ export const ERROR_STATUS = {
   SUBTITLE_DUPLICATE: 409,
   REVISION_CONFLICT: 409,
   YTS_NOT_CONFIGURED: 409,
+  TMDB_NOT_CONFIGURED: 409,
   LLM_NOT_CONFIGURED: 409,
   TRANSLATION_RUNNING: 409,
   INVITE_EXPIRED: 410,
@@ -59,6 +60,7 @@ export const ERROR_STATUS = {
   VALIDATION: 422,
   WRONG_PASSWORD: 422,
   HASH_NOT_FROM_YTS: 422,
+  TORRENT_INVALID: 422,
   CANDIDATE_UNAVAILABLE: 422,
   NO_CONFIRMED_SUBTITLE: 422,
   INVALID_FILENAME: 422,
@@ -68,6 +70,7 @@ export const ERROR_STATUS = {
   ALIGN_FAILED: 500,
   YTS_UNREACHABLE: 502,
   YTS_BAD_RESPONSE: 502,
+  TMDB_UNREACHABLE: 502,
   DISK_FULL: 507,
 } as const;
 
@@ -91,6 +94,8 @@ export type ErrorDetails =
   | { rev: number; doc: SyncDoc; updatedBy: UserRef | null }
   /** CANDIDATE_UNAVAILABLE: why the file behind a candidate cannot be used. */
   | { reason: CandidateFetchError | 'TIMEOUT' }
+  /** TORRENT_INVALID: what is wrong with a magnet link or .torrent file given by hand. */
+  | { reason: TorrentInvalidReason }
   /** RATE_LIMITED. */
   | { retryAfterSeconds: number };
 
@@ -242,7 +247,17 @@ export type TorrentErrorCode =
 export type Torrent = {
   id: Id;
   infoHash: string;
-  movie: { ytsId: number; title: string; titleZh: string | null; year: number; runtimeMin: number; posterUrl: string };
+  /** Null for a film added by hand that YTS does not list (it has no film page). */
+  movie: {
+    ytsId: number | null;
+    title: string;
+    titleZh: string | null;
+    year: number;
+    runtimeMin: number;
+    posterUrl: string;
+  };
+  /** 'manual': added by hand from a magnet link or .torrent file (Brian, 2026-10-09); only its largest video file is downloaded. */
+  origin: 'yts' | 'manual';
   version: { quality: string; source: string; videoCodec: string; bitDepth: number; audio: string };
   status: TorrentStatus;
   progress: number;
@@ -264,6 +279,40 @@ export type Torrent = {
   completedAt: IsoTime | null;
   media: MediaStatus | null;
 };
+
+/* ------------------------------------------------------------------ torrents added by hand */
+
+/** Why a magnet link or .torrent file cannot be used (docs/06-torrent-worker.md, "手動加入"). */
+export type TorrentInvalidReason = 'BAD_MAGNET' | 'BAD_TORRENT' | 'NO_VIDEO_FILE' | 'UNSAFE_PATH' | 'NO_METADATA';
+
+/**
+ * A magnet link or .torrent file someone is about to add (Brian, 2026-10-09; D26 changed). A
+ * magnet's metadata comes from the swarm, so it starts `pending`; the page polls it.
+ */
+export type TorrentInspection = {
+  id: Id;
+  source: 'magnet' | 'file';
+  infoHash: string;
+  state: 'pending' | 'ready' | 'failed';
+  /** Set when `failed`: no metadata in time, no video file, or a file path leaving the folder. */
+  errorCode: TorrentInvalidReason | null;
+  /** The torrent's own name; null until the metadata is in. */
+  name: string | null;
+  /** The one file that will be downloaded: the largest video. */
+  file: { path: string; sizeBytes: Bytes } | null;
+  /** How many other files the torrent has; they are not downloaded. */
+  skippedFiles: number;
+  /** What the name says about the version. */
+  version: { quality: string; source: string; videoCodec: string; bitDepth: number };
+  /** A film title and year read from the name, to start the TMDB search with. */
+  guess: { title: string; year: number | null };
+  /** The same torrent is already on the site: join it instead (POST /api/torrents/:id/hold). */
+  existing: Torrent | null;
+  createdAt: IsoTime;
+};
+
+/** POST /api/torrents/manual: the inspection and the film it is, picked on TMDB. */
+export type ManualTorrentBody = { inspectionId: Id; tmdbId: number };
 
 /**
  * What one download is doing right now, for its detail page (docs/11-pages.md, "下載細節"). Only
@@ -984,10 +1033,17 @@ export interface Endpoints {
   'POST /api/torrents/:id/pause': { ok: Torrent };
   'POST /api/torrents/:id/resume': { ok: Torrent };
   'POST /api/torrents/:id/retry': { ok: Torrent };
+  'POST /api/torrents/:id/hold': { ok: Torrent };
   'DELETE /api/torrents/:id/hold': { ok: { deleted: boolean; freedBytes: Bytes } };
+  'POST /api/torrents/inspect': {
+    body: { magnet: string } | 'multipart/form-data: one field "file" (.torrent)';
+    ok: TorrentInspection;
+  };
+  'GET /api/torrents/inspect/:id': { ok: TorrentInspection };
+  'POST /api/torrents/manual': { body: ManualTorrentBody; ok: { torrent: Torrent; joined: boolean } };
 
   /* library */
-  'GET /api/library': { ok: LibraryItem[] };
+  'GET /api/library': { query: { scope?: 'mine' | 'all' }; ok: LibraryItem[] };
   'GET /api/library/:torrentId': { ok: Workspace };
 
   /* media */
