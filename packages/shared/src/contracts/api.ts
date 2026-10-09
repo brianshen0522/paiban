@@ -366,6 +366,8 @@ export type LibraryItem = {
   filmExports: FilmExports;
   /** The step the card's main button leads to. */
   next: 'subtitles' | 'sync' | 'export' | 'exported';
+  /** The languages of its confirmed subtitles, each once, sorted: what the site-wide library shows. */
+  confirmedLanguages: SubtitleLang[];
 };
 
 export type Workspace = {

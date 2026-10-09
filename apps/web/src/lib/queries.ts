@@ -27,6 +27,7 @@ export const keys = {
   storage: ['storage'] as const,
   torrents: (scope: 'mine' | 'all') => ['torrents', scope] as const,
   library: ['library'] as const,
+  allFilms: ['library', 'all'] as const,
   notifications: ['notifications'] as const,
   movie: (id: number) => ['movie', id] as const,
   search: (params: string) => ['search', params] as const,
@@ -65,6 +66,9 @@ export const useTorrents = (scope: 'mine' | 'all' = 'mine') =>
     refetchInterval: scope === 'all' ? 5000 : false,
   });
 export const useLibrary = () => useQuery({ queryKey: keys.library, queryFn: () => get<LibraryItem[]>('/api/library') });
+/** Every finished film on the site (Brian, 2026-10-09); refreshed with the own library's key. */
+export const useAllFilms = () =>
+  useQuery({ queryKey: keys.allFilms, queryFn: () => get<LibraryItem[]>('/api/library?scope=all') });
 export const useNotifications = () =>
   useQuery({
     queryKey: keys.notifications,

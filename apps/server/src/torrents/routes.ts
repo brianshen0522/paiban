@@ -237,6 +237,33 @@ export function torrentRoutes(app: FastifyInstance, deps: Deps): void {
   });
 
   /** Leave a download. The last holder's leaving marks it for removal; the torrent worker deletes. */
+  /**
+   * Join a film someone already downloaded (Brian, 2026-10-09: the site-wide library). The row came
+   * from a YTS result when it was first added, so YTS is not asked again; no space is taken (D21).
+   */
+  app.post('/api/torrents/:id/hold', async (req): Promise<Torrent> => {
+    const user = requireUser(req);
+    const { id } = parse(IdParams, req.params);
+    const joined = await tx(pool, async (c) => {
+      const t = await one<{ id: string }>(c, `select id from torrents where id = $1 and want <> 'remove' for update`, [
+        id,
+      ]);
+      if (!t) throw new ApiError('NOT_FOUND', 'no such download');
+      const r = await c.query(
+        'insert into torrent_holders (torrent_id, user_id) values ($1, $2) on conflict do nothing',
+        [id, user.id],
+      );
+      return (r.rowCount ?? 0) > 0;
+    });
+    const [row] = await selectTorrents(pool, 't.id = $1', [id]);
+    if (!row) throw new ApiError('NOT_FOUND', 'download disappeared');
+    if (joined) {
+      await audit(pool, user, 'torrent.join', { movieTitle: row.title, version: versionLabel(row) }, req.ip);
+      await wake(deps, id, false);
+    }
+    return toTorrent(row, user.id);
+  });
+
   app.delete('/api/torrents/:id/hold', async (req) => {
     const user = requireUser(req);
     const { id } = parse(IdParams, req.params);

@@ -401,6 +401,21 @@ export const en: Copy = {
     removeWholeButton: 'Delete',
     removed: 'Removed from Library.',
     removedWhole: 'Deleted the whole film, with its subtitles and exports.',
+    tabsLabel: 'Which films',
+    tabs: { mine: 'My library', all: 'All films' },
+    tabNote: (n: number) => plural(n, 'film'),
+    allLead:
+      'Every film downloaded on this site. Adding one to your library takes no extra space, and you share its subtitles and sync work with its other holders.',
+    allEmpty: 'No films have been downloaded yet.',
+    heldBy: (names: string) => `Held by ${names}`,
+    nobodyHolds: 'Nobody holds it',
+    youHold: 'In your library',
+    confirmedLangs: (langs: string) => `Confirmed subtitles: ${langs}`,
+    noConfirmed: 'No confirmed subtitles yet',
+    join: 'Add to my library',
+    joined: 'Added to your library. You can look for subtitles or export now.',
+    joinGone: 'This film has been deleted.',
+    open: 'Open workspace',
   },
 
   storage: {

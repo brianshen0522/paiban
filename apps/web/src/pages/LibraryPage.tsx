@@ -1,15 +1,16 @@
-import type { LibraryItem } from '@paiban/shared';
+import type { LibraryItem, Torrent } from '@paiban/shared';
 import { useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { type KeyboardEvent, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { Banner, Chip, ConfirmInline, Empty, PageHead, Skeleton } from '../components/Bits';
 import { FillPage, ScrollList } from '../components/FillPage';
 import { Poster } from '../components/Poster';
 import { useToast } from '../components/Toasts';
 import { t } from '../copy';
-import { del } from '../lib/api';
-import { bytes, percent, versionLabel } from '../lib/format';
-import { keys, useLibrary, useMe } from '../lib/queries';
+import { ApiFailure, del, post } from '../lib/api';
+import { bytes, filmTitle, percent, versionLabel } from '../lib/format';
+import { keys, useAllFilms, useLibrary, useMe } from '../lib/queries';
+import { langName } from './workspace/SubtitlesTab';
 
 type Filter = keyof typeof t.library.filters;
 const FILTERS: Filter[] = ['all', 'nosub', 'draft', 'export', 'exported'];
@@ -37,7 +38,154 @@ const NEXT_TAB: Record<LibraryItem['next'], string> = {
   exported: 'export',
 };
 
+type Scope = 'mine' | 'all';
+const SCOPES: Scope[] = ['mine', 'all'];
+
+/**
+ * docs/11-pages.md, "片庫": the own library, and beside it every finished film on the site
+ * (Brian, 2026-10-09), which anyone can add to their own with one press.
+ */
 export function LibraryPage() {
+  const [params, setParams] = useSearchParams();
+  const scope: Scope = params.get('scope') === 'all' ? 'all' : 'mine';
+  const lib = useLibrary();
+  const all = useAllFilms();
+  const go = (next: Scope) => {
+    const p = new URLSearchParams();
+    if (next === 'all') p.set('scope', 'all');
+    setParams(p, { replace: true });
+  };
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    e.preventDefault();
+    const next: Scope = scope === 'mine' ? 'all' : 'mine';
+    go(next);
+    requestAnimationFrame(() => document.getElementById(`lib-tab-${next}`)?.focus());
+  };
+  const counts: Record<Scope, number | undefined> = { mine: lib.data?.length, all: all.data?.length };
+  return (
+    <FillPage>
+      <PageHead title={t.library.title} lead={scope === 'all' ? t.library.allLead : t.library.lead} />
+      <div className="tabs" role="tablist" aria-label={t.library.tabsLabel} onKeyDown={onKey}>
+        {SCOPES.map((k) => (
+          <button
+            key={k}
+            id={`lib-tab-${k}`}
+            type="button"
+            role="tab"
+            aria-selected={scope === k}
+            aria-controls="lib-panel"
+            tabIndex={scope === k ? 0 : -1}
+            onClick={() => go(k)}
+          >
+            {t.library.tabs[k]}
+            <small>{counts[k] === undefined ? '' : t.library.tabNote(counts[k])}</small>
+          </button>
+        ))}
+      </div>
+      <div id="lib-panel" role="tabpanel" aria-labelledby={`lib-tab-${scope}`} className="lib-panel">
+        {scope === 'all' ? <AllFilms /> : <MyLibrary />}
+      </div>
+    </FillPage>
+  );
+}
+
+function AllFilms() {
+  const all = useAllFilms();
+  if (all.isError)
+    return (
+      <Banner tone="bad">
+        <span>{t.common.unknownError}</span>
+        <button type="button" onClick={() => all.refetch()}>
+          {t.common.retry}
+        </button>
+      </Banner>
+    );
+  if (!all.data) return <Skeleton lines={4} />;
+  if (all.data.length === 0)
+    return (
+      <Empty title={t.library.allEmpty} hint={t.library.emptyHint}>
+        <Link className="btn" to="/search">
+          {t.pages.toSearch}
+        </Link>
+      </Empty>
+    );
+  return (
+    <ScrollList label={t.library.tabs.all}>
+      <div className="libs">
+        {all.data.map((item) => (
+          <FilmCard key={item.torrent.id} item={item} />
+        ))}
+      </div>
+    </ScrollList>
+  );
+}
+
+/** One film of the site: who holds it, which subtitles are confirmed, and join or open. */
+function FilmCard({ item }: { item: LibraryItem }) {
+  const qc = useQueryClient();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const x = item.torrent;
+  const name = filmTitle(x.movie);
+  const holders = x.holders.map((h) => h.displayName).join(t.common.listSep);
+  const join = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await post<Torrent>(`/api/torrents/${x.id}/hold`, {});
+      toast(t.library.joined);
+      void qc.invalidateQueries({ queryKey: keys.library });
+    } catch (err) {
+      setError(err instanceof ApiFailure && err.code === 'NOT_FOUND' ? t.library.joinGone : t.common.unknownError);
+      if (err instanceof ApiFailure && err.code === 'NOT_FOUND') void qc.invalidateQueries({ queryKey: keys.allFilms });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <article className="lib" id={`all-${x.id}`}>
+      <Poster
+        url={x.movie.posterUrl}
+        title={x.movie.title}
+        year={x.movie.year}
+        runtimeMin={x.movie.runtimeMin}
+        size="sm"
+      />
+      <div className="lib-main">
+        <h2>{name.main}</h2>
+        <span className="sub">
+          {[name.other, String(x.movie.year), versionLabel(x.version)].filter(Boolean).join(' · ')}
+        </span>
+        <span className="sub">
+          {x.mine ? <Chip tone="ok">{t.library.youHold}</Chip> : null}{' '}
+          {holders ? t.library.heldBy(holders) : t.library.nobodyHolds}
+        </span>
+        <span className="sub">
+          {item.confirmedLanguages.length
+            ? t.library.confirmedLangs(item.confirmedLanguages.map(langName).join(t.common.listSep))
+            : t.library.noConfirmed}
+          {item.exports > 0 ? ` · ${t.library.stepExported(item.exports)}` : ''}
+        </span>
+        {error && <Banner tone="bad">{error}</Banner>}
+      </div>
+      <div className="lib-act">
+        {x.mine ? (
+          <Link className="btn strong" to={`/library/${x.id}/${NEXT_TAB[item.next]}`}>
+            {t.library.open}
+          </Link>
+        ) : (
+          <button type="button" className="strong" disabled={busy} onClick={join}>
+            {t.library.join}
+          </button>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function MyLibrary() {
   const lib = useLibrary();
   const [params, setParams] = useSearchParams();
   const raw = params.get('filter');
@@ -51,8 +199,7 @@ export function LibraryPage() {
   const items = lib.data ?? [];
   const shown = items.filter((i) => matches(filter, i));
   return (
-    <FillPage>
-      <PageHead title={t.library.title} lead={t.library.lead} />
+    <>
       {lib.isError ? (
         <Banner tone="bad">
           <span>{t.common.unknownError}</span>
@@ -91,7 +238,7 @@ export function LibraryPage() {
           )}
         </>
       )}
-    </FillPage>
+    </>
   );
 }
 

@@ -64,6 +64,7 @@
 | `POST /api/torrents/:id/pause` | 持有人 | 只有 `queued`、`downloading` 能暫停，其他回 `TORRENT_STATE`。空間繼續保留 |
 | `POST /api/torrents/:id/resume` | 持有人 | 只有 `paused` 能繼續。回到佇列尾端 |
 | `POST /api/torrents/:id/retry` | 持有人 | 只有 `failed` 能重試。重新檢查空間：需求是完整大小加預覽預留，扣掉已經在磁碟上的殘留；不夠回 `STORAGE_LIMIT`。通過後回到佇列尾端，從已下載的部分接續 |
+| `POST /api/torrents/:id/hold` | 登入 | 加入別人已經下載的片（全站片庫的「加入我的片庫」）。不再問 YTS（這一列當初就是從 YTS 的結果建立的）、不檢查空間、不佔空間（D21）。已經是持有人就直接回現況。正在刪除或不存在回 `NOT_FOUND`。回 `Torrent`，寫操作紀錄 `torrent.join` |
 | `DELETE /api/torrents/:id/hold` | 持有人 | 把自己從持有人移除。還有別人持有：`{deleted: false, freedBytes: 0}`。自己是最後一位：整部片連同字幕、預覽檔和**這部片的所有匯出檔**排入刪除（Brian，2026-10-06），`{deleted: true, freedBytes}`，`freedBytes` 含匯出檔。別人建立的匯出檔，建立者會收到 `item.deleted` |
 
 **接受下載**（`POST /api/torrents`），依序：
@@ -79,7 +80,7 @@
 
 | 端點 | 權限 | 行為 |
 | --- | --- | --- |
-| `GET /api/library` | 登入 | 自己持有且已經下載完成的片（包含還在分析的），每一筆帶字幕與匯出的數量和「下一步」。篩選在前端做 |
+| `GET /api/library` | 登入 | 自己持有且已經下載完成的片（包含還在分析的），每一筆帶字幕與匯出的數量、已確認字幕的語言（`confirmedLanguages`）和「下一步」。篩選在前端做。`scope=all` 回全站所有下載完成的片，每個登入的人都能用（Brian，2026-10-09，「全站片庫」）；`torrent.mine` 說呼叫者有沒有持有 |
 | `GET /api/library/:torrentId` | 持有人 | 工作區一次要用到的東西：這部片、它的字幕、它的匯出檔、目前用量、匯出一次需要多少空間。還沒下載完成的回 `MEDIA_NOT_READY`。**它不會啟動分析**：自動分析關掉時，前端看到 `analysis` 是 `none`，自己呼叫一次 `POST /api/media/:id/analyze` |
 
 ### 影片

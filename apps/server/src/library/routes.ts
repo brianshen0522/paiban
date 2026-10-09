@@ -1,4 +1,4 @@
-import type { LibraryItem, Workspace } from '@paiban/shared';
+import type { LibraryItem, SubtitleLang, Workspace } from '@paiban/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { Queryable } from '../db/pool.js';
@@ -17,9 +17,10 @@ import { selectTorrents, type TorrentRow, toTorrent } from '../torrents/view.js'
 async function libraryItems(q: Queryable, rows: TorrentRow[], viewerId: string): Promise<LibraryItem[]> {
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id);
-  const subs = await many<{ torrent_id: string; total: number; confirmed: number }>(
+  const subs = await many<{ torrent_id: string; total: number; confirmed: number; langs: SubtitleLang[] }>(
     q,
-    `select torrent_id, count(*)::int as total, count(*) filter (where status = 'confirmed')::int as confirmed
+    `select torrent_id, count(*)::int as total, count(*) filter (where status = 'confirmed')::int as confirmed,
+            coalesce(array_agg(distinct language order by language) filter (where status = 'confirmed'), '{}') as langs
        from subtitles where torrent_id = any($1::uuid[]) group by torrent_id`,
     [ids],
   );
@@ -43,19 +44,29 @@ async function libraryItems(q: Queryable, rows: TorrentRow[], viewerId: string):
       exports,
       filmExports: fe.get(r.id) ?? { count: 0, bytes: 0 },
       next,
+      confirmedLanguages: s.get(r.id)?.langs ?? [],
     };
   });
 }
 
+const ListQuery = z.object({ scope: z.enum(['mine', 'all']).default('mine') });
+
 export function libraryRoutes(app: FastifyInstance, deps: Deps): void {
-  /** Finished films the caller holds, analysing ones included (docs/11-pages.md, "片庫"). */
+  /**
+   * Finished films the caller holds, analysing ones included (docs/11-pages.md, "片庫"); with
+   * `scope=all`, every finished film on the site, for everyone (Brian, 2026-10-09).
+   */
   app.get('/api/library', async (req): Promise<LibraryItem[]> => {
     const user = requireUser(req);
-    const rows = await selectTorrents(
-      deps.pool,
-      `t.state = 'completed' and exists (select 1 from torrent_holders h where h.torrent_id = t.id and h.user_id = $1)`,
-      [user.id],
-    );
+    const { scope } = parse(ListQuery, req.query);
+    const rows =
+      scope === 'all'
+        ? await selectTorrents(deps.pool, `t.state = 'completed'`, [])
+        : await selectTorrents(
+            deps.pool,
+            `t.state = 'completed' and exists (select 1 from torrent_holders h where h.torrent_id = t.id and h.user_id = $1)`,
+            [user.id],
+          );
     rows.sort((a, b) => (b.completed_at?.getTime() ?? 0) - (a.completed_at?.getTime() ?? 0));
     return libraryItems(deps.pool, rows, user.id);
   });
