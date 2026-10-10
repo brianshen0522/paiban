@@ -1,6 +1,19 @@
+import type { PosterRegion } from '@paiban/shared';
 import { useState } from 'react';
-import { t } from '../copy';
+import { locale, t } from '../copy';
 import { posterColor } from '../lib/format';
+import { useMe } from '../lib/queries';
+
+/** The poster country: the person's choice, else the interface language's (Brian, 2026-10-10). */
+export function posterRegion(chosen: PosterRegion | null | undefined): PosterRegion {
+  return chosen ?? (locale === 'en' ? 'US' : 'TW');
+}
+
+/** Our poster endpoints take the country; other addresses are left as they are. */
+export function withRegion(url: string, region: PosterRegion): string {
+  if (!/^\/api\/(yts\/movies\/\d+|movies\/[0-9a-f-]{36})\/poster$/.test(url)) return url;
+  return `${url}?region=${region}`;
+}
 
 /**
  * Poster through our own server (D30). Without an image, the flat typographic one-sheet from the
@@ -19,12 +32,16 @@ export function Poster({
   runtimeMin: number;
   size?: 'card' | 'lg' | 'sm';
 }) {
-  const [failed, setFailed] = useState(false);
+  const region = posterRegion(useMe().data?.user?.prefs.posterRegion);
+  const src = withRegion(url, region);
+  // A failure belongs to one address: another country's poster gets its own try.
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const failed = failedSrc === src;
   const cls = `poster${size === 'lg' ? ' lg' : size === 'sm' ? ' sm' : ''}`;
   if (!failed) {
     return (
       <div className={`${cls} has-img`} style={{ ['--p' as string]: posterColor(title) }}>
-        <img src={url} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} />
+        <img src={src} alt="" loading="lazy" decoding="async" onError={() => setFailedSrc(src)} />
       </div>
     );
   }

@@ -154,7 +154,9 @@ DHT 是開著的，所以 tracker 全部失效時通常還是找得到 peers，�
 - `GET /api/yts/movies/:ytsId/poster` 由伺服器抓 `medium_cover_image` 再回傳，帶 `Cache-Control: private, max-age=86400`。
 - 只抓主機等於 `yts.baseUrl` 的主機、或是它的子網域的圖片網址；其他的不抓，回 404。
 - 回應必須是圖片（`image/jpeg`、`image/png`、`image/webp`），大小上限 2 MB。
-- 電影被下載時，把海報存一份到 `/data/posters/<yts_id>.jpg`，之後從這裡讀。這樣 YTS 換網域也不影響片庫。
+- 電影被下載時，把海報存一份到 `/data/posters/<yts_id>.jpg`。這樣 YTS 換網域也不影響片庫。
+- **哪一國的海報**（Brian，2026-10-10）：海報端點帶 `region`（`TW`、`HK`、`CN`、`US`、`JP`、`KR`，預設 `TW`），前端依每個人的設定帶（`UserPrefs.posterRegion`；沒選的中文介面用 `TW`、英文介面用 `US`）。伺服器用 TMDB 的 `/3/movie/<tmdb id>?language=zh-TW|zh-HK|zh-CN|en-US|ja-JP|ko-KR` 取那一國的 `poster_path`（TMDB 的海報帶國家；2026-10-10 用真的金鑰實測三部片，五種語言各拿到不同的海報），快取一週。順序：已經存的那一國的副本 → TMDB 那一國的海報 → TMDB 預設的海報 → YTS 的封面 → 下載時存的那一份。
+- 片庫裡有的片（`movies` 有這一列），每一國的海報第一次抓到時存一份 `/data/posters/<yts_id>-<國家>.<副檔名>`，之後從這裡讀。手動加入、YTS 沒有的片用 `GET /api/movies/:id/poster?region=`，存成 `tmdb-<tmdb id>-<國家>.<副檔名>`。這些副本不計入用量，片子刪除時一起刪。
 - 抓不到時，前端畫佔位海報：用片名算出一個固定的底色，上面寫片名和年份（原型就是這樣畫的）。
 
 ## 請求的規矩

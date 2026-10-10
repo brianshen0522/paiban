@@ -36,7 +36,7 @@
 | `POST /api/auth/register` | 公開 | 用邀請碼建立帳號並直接登入。邀請碼在同一個交易裡標成已使用。`USERNAME_TAKEN`、三種邀請碼錯誤、`VALIDATION` |
 | `GET /api/auth/reset/:token` | 公開 | 檢查重設連結還有沒有效，回傳帳號名稱給頁面顯示。`RESET_INVALID` |
 | `POST /api/auth/reset/:token` | 公開 | 設定新密碼，連結失效，這個帳號的所有 session 全部登出 |
-| `PATCH /api/me` | 登入 | 改顯示名稱或偏好。`prefs.langs` 至少要有一個；`prefs.locale` 是介面語言，`'zh-TW'`、`'en'` 或 `null`（跟隨瀏覽器） |
+| `PATCH /api/me` | 登入 | 改顯示名稱或偏好。`prefs.langs` 至少要有一個；`prefs.locale` 是介面語言，`'zh-TW'`、`'en'` 或 `null`（跟隨瀏覽器）；`prefs.posterRegion` 是海報的國家（`TW`、`HK`、`CN`、`US`、`JP`、`KR`，`null` 跟隨介面語言） |
 | `POST /api/me/password` | 登入 | 要帶目前的密碼（錯了回 `WRONG_PASSWORD`）。成功後其他裝置全部登出 |
 | `GET /api/me/sessions` | 登入 | 登入中的裝置。作業系統和瀏覽器的名稱從登入時的 User-Agent 推出來，推不出來是 null |
 | `DELETE /api/me/sessions/:id` | 登入 | 登出那台裝置。不能用來登出目前這台（用 logout）；硬要的話回 `VALIDATION` |
@@ -47,7 +47,7 @@
 | --- | --- | --- |
 | `GET /api/yts/movies` | 登入 | 轉呼叫 YTS 的 `list_movies`。沒有 `q` 時就是「最新上架」。每頁 24 部。結果快取 10 分鐘。還沒設定 YTS 的網址回 `YTS_NOT_CONFIGURED`，連不上回 `YTS_UNREACHABLE`，回應看不懂回 `YTS_BAD_RESPONSE`。每一部標上呼叫者有沒有（`mine`） |
 | `GET /api/yts/movies/:ytsId` | 登入 | 電影資料加上每個版本。簡介有兩份：`summary`（TMDB 的中文簡介，沒有時是 YTS 的英文簡介）和 `summaryEn`（YTS 的英文簡介，給英文介面）。每個版本附上：能不能直接播、要預留多少預覽空間、總共需要多少、現在放不放得下、系統裡是不是已經有人下載。同時回目前的用量。YTS 連不上而這部片有先前存下來的資料時照常回傳，`stale` 是 true，`fetchedAt` 是那份資料的時間；沒有存過才回 `YTS_UNREACHABLE` |
-| `GET /api/yts/movies/:ytsId/poster` | 登入 | 由伺服器向 YTS 取海報再回傳。片庫裡的電影從 `/data/posters` 讀。取不到回 404，前端改畫佔位海報 |
+| `GET /api/yts/movies/:ytsId/poster` | 登入 | 由伺服器向 TMDB（沒有時向 YTS）取海報再回傳。`region` 是哪一國的海報（`TW`、`HK`、`CN`、`US`、`JP`、`KR`，預設 `TW`；見 [05-yts.md](05-yts.md)「海報」）。片庫裡的電影從 `/data/posters` 讀。取不到回 404，前端改畫佔位海報 |
 | `GET /api/tmdb/suggest?q=` | 登入 | 打字時的建議（Brian，2026-10-06）：向 TMDB 搜尋電影（`language=zh-TW`，中文和原文片名都比對），最多 8 部，`{items: TmdbSuggestion[], available}`。沒有 TMDB 金鑰、或 TMDB 出錯時 `available: false`、清單是空的（不擋搜尋）。`q` 1 到 100 字。結果快取一天 |
 | `GET /api/tmdb/:tmdbId/yts` | 登入 | 點了建議之後：向 TMDB 要這部片的 IMDb 編號（`/3/movie/<id>/external_ids`，快取一個月），再用這個編號查 YTS（`query_term` 認得 IMDb 編號，結果快取一小時）。`{ytsId, imdbCode}`；YTS 沒有這部片時 `ytsId` 是 null，TMDB 也不知道 IMDb 編號時兩個都是 null |
 | `GET /api/tmdb/poster/:file` | 登入 | 建議清單的小海報，由伺服器向 `image.tmdb.org/t/p/w92/…` 取（D30）。檔名只接受 TMDB 海報路徑的樣子（`[\w-]+.jpg` 之類），其他回 `VALIDATION` |
@@ -70,7 +70,7 @@
 | `POST /api/torrents/inspect` | 登入 | 手動加入種子的第一步（D26；[06-torrent-worker.md](06-torrent-worker.md)「手動加入」）。JSON `{magnet}`，或 multipart 一個欄位 `file`（.torrent，最大 4 MB）。回 `TorrentInspection`（201）：磁力連結通常是 `pending`，要輪詢下一個端點。看不懂回 `TORRENT_INVALID`，`details.reason` 是 `BAD_MAGNET` 或 `BAD_TORRENT`。每人每小時 30 次，超過回 `RATE_LIMITED`。種子已經在網站上時 `existing` 是那個下載 |
 | `GET /api/torrents/inspect/:id` | 建立的人 | 那一筆的現況：`pending`、`ready`（`file` 是會下載的檔案、`skippedFiles` 是不下載的檔案數、`version` 和 `guess` 是從名稱推測的版本與片名）、`failed`（`errorCode`：`NO_METADATA`、`NO_VIDEO_FILE`、`UNSAFE_PATH`、`BAD_TORRENT`）。別人的回 `NOT_FOUND` |
 | `POST /api/torrents/manual` | 建立的人 | `{inspectionId, tmdbId}`。還在 `pending` 回 `TORRENT_STATE`；`failed` 回 `TORRENT_INVALID`；超過 24 小時回 `NOT_FOUND`。向 TMDB 取這部片（沒有金鑰回 `TMDB_NOT_CONFIGURED`，連不上回 `TMDB_UNREACHABLE`，沒有這部片回 `VALIDATION`）。同一個 info hash 已經在網站上就加入持有人（`joined: true`，不檢查空間）；否則在交易裡 `storage_admit(檔案大小 + 預覽預留)`，不夠回 `STORAGE_LIMIT`，建立電影（需要的話）、下載、持有人。回 `{torrent, joined}`（新的 201、加入 200），寫操作紀錄 `torrent.manual` 或 `torrent.join` |
-| `GET /api/movies/:id/poster` | 登入 | 手動加入的電影存下來的 TMDB 海報（`/data/posters`）。沒有回 404，前端畫佔位海報 |
+| `GET /api/movies/:id/poster` | 登入 | 手動加入的電影的 TMDB 海報，`region` 同上；抓到的存在 `/data/posters`。沒有回 404，前端畫佔位海報 |
 
 **接受下載**（`POST /api/torrents`），依序：
 

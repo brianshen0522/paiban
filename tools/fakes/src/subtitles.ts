@@ -215,7 +215,11 @@ export async function startFakeSources(
               runtime: 110,
               genres: [{ id: 18, name: zh ? '劇情' : 'Drama' }],
               overview: zh ? film.overview : `${film.originalTitle}: an English overview.`,
-              poster_path: film.posterPath,
+              // Japan has a poster of its own (a white one), for the poster-country preference.
+              poster_path:
+                url.searchParams.get('language') === 'ja-JP'
+                  ? film.posterPath.replace(/\.png$/, '-ja.png')
+                  : film.posterPath,
               vote_average: film.voteAverage,
               vote_count: film.voteCount,
               imdb_id: film.imdb,
@@ -253,6 +257,8 @@ export async function startFakeSources(
         return send(200, '{"movie_results":[],"person_results":[],"tv_results":[]}');
       }
       case 'tmdb-img': {
+        const ja = tmdbFilms.find((f) => path.endsWith(f.posterPath.replace(/\.png$/, '-ja.png')));
+        if (ja) return send(200, solidPng('#ffffff'), 'image/png');
         const film = tmdbFilms.find((f) => path.endsWith(f.posterPath));
         return film ? send(200, solidPng(film.color), 'image/png') : send(404, 'not found', 'text/plain');
       }

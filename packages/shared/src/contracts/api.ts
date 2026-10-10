@@ -117,9 +117,14 @@ export type UserPrefs = {
    * language of names the server writes for this person (an AI translation's name, MKV track titles).
    */
   locale: UiLocale | null;
+  /** Which country's poster to show (Brian, 2026-10-10); null follows the interface language (中文 → TW, English → US). */
+  posterRegion: PosterRegion | null;
 };
 
 export type UiLocale = 'zh-TW' | 'en';
+/** Countries TMDB keeps posters for, as the poster endpoints' `region` parameter. */
+export type PosterRegion = 'TW' | 'HK' | 'CN' | 'US' | 'JP' | 'KR';
+export const POSTER_REGIONS: readonly PosterRegion[] = ['TW', 'HK', 'CN', 'US', 'JP', 'KR'];
 
 export type User = { id: Id; username: string; displayName: string; role: Role; prefs: UserPrefs };
 

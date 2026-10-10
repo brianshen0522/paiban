@@ -1,3 +1,5 @@
+import { access } from 'node:fs/promises';
+import { join } from 'node:path';
 import { type FakeSources, startFakeSources } from '@paiban/fakes/subtitles';
 import { type FakeYts, startFakeYts } from '@paiban/fakes/yts';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -8,6 +10,11 @@ import { call, createUser, GB, login, setLimit, setSetting, type TestApp, testAp
  * TMDB in place of IMDb for what people see (Brian, 2026-10-06): titles, overviews, posters and
  * ratings come from TMDB when a key is set, and from YTS otherwise. All against local fakes.
  */
+const exists = (p: string) =>
+  access(p).then(
+    () => true,
+    () => false,
+  );
 let db: Awaited<ReturnType<typeof testDb>>;
 let t: TestApp;
 let yts: FakeYts;
@@ -95,6 +102,29 @@ describe('search and the film page', () => {
     expect(res.headers['content-type']).toBe('image/png');
     expect(res.rawPayload.subarray(1, 4).toString()).toBe('PNG');
     expect(fake.requests.some((r) => r.source === 'tmdb-img' && r.path === '/t/p/w342/fake-charade.png')).toBe(true);
+  });
+
+  it('serves the poster of the country asked for, and keeps it for a film someone has', async () => {
+    await setKey();
+    const tw = await call(t.app, 'GET', '/api/yts/movies/2/poster?region=TW', { cookie: mei });
+    const jp = await call(t.app, 'GET', '/api/yts/movies/2/poster?region=JP', { cookie: mei });
+    expect(tw.statusCode).toBe(200);
+    expect(jp.statusCode).toBe(200);
+    expect(Buffer.compare(tw.rawPayload, jp.rawPayload)).not.toBe(0);
+    expect(fake.requests.some((r) => r.source === 'tmdb-img' && r.path.endsWith('fake-charade-ja.png'))).toBe(true);
+    expect((await call(t.app, 'GET', '/api/yts/movies/2/poster?region=XX', { cookie: mei })).statusCode).toBe(422);
+    // Not in anyone's library: nothing kept.
+    const kept = join(t.deps.config.dataDir, 'posters', '2-JP.png');
+    expect(await exists(kept)).toBe(false);
+    // Once the film is in the site's library, the copy is kept and served from disk.
+    await db.pool.query(`insert into movies (yts_id, imdb_code, title, year) values (2, 'tt9000002', 'Charade', 1963)`);
+    await call(t.app, 'GET', '/api/yts/movies/2/poster?region=JP', { cookie: mei });
+    expect(await exists(kept)).toBe(true);
+    const asked = fake.requests.length;
+    const again = await call(t.app, 'GET', '/api/yts/movies/2/poster?region=JP', { cookie: mei });
+    expect(Buffer.compare(again.rawPayload, jp.rawPayload)).toBe(0);
+    expect(fake.requests.length).toBe(asked);
+    await db.pool.query('delete from movies where yts_id = 2');
   });
 
   it('falls back to YTS when TMDB refuses the key, and says so on the sources page', async () => {

@@ -606,12 +606,19 @@ export class TorrentWorker {
       );
       let posterPath: string | null = null;
       if (gone) {
-        const m = await one<{ yts_id: number | null; poster_path: string | null }>(
+        const m = await one<{ yts_id: number | null; tmdb_id: number | null; poster_path: string | null }>(
           c,
-          `delete from movies where id = $1 and not exists (select 1 from torrents where movie_id = $1) returning yts_id, poster_path`,
+          `delete from movies where id = $1 and not exists (select 1 from torrents where movie_id = $1) returning yts_id, tmdb_id, poster_path`,
           [gone.movie_id],
         );
-        posterPath = m ? (m.poster_path ?? (m.yts_id !== null ? `posters/${m.yts_id}.jpg` : null)) : null;
+        // Names the poster copies by their stem; the per-country copies go with it.
+        posterPath = !m
+          ? null
+          : m.yts_id !== null
+            ? `posters/${m.yts_id}.jpg`
+            : m.tmdb_id !== null
+              ? `posters/tmdb-${m.tmdb_id}.jpg`
+              : null;
       }
       return {
         notes: exportNotes,

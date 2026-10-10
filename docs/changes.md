@@ -16,6 +16,14 @@
 
 ---
 
+## 2026-10-10 每個人選海報的國家
+
+- 原本：海報一律向 TMDB 用 zh-TW 查（有台灣版就是台灣版），下載過的片存一份。
+- 改成：個人設定多「電影海報」：跟隨介面語言（預設；中文用台灣、英文用美國），或台灣、香港、中國、美國、日本、韓國。海報端點多 `region` 參數；伺服器用 TMDB `language=` 取那一國的海報，片庫裡的片每一國各存一份，刪片時一起刪。`UserPrefs.posterRegion`、`PosterRegion`、`POSTER_REGIONS`。
+- 原因：Brian 要海報的國家可以在設定裡改；他同意做成每個人自己選。
+- 改了哪些檔案：docs/04-api.md、docs/05-yts.md、docs/11-pages.md、docs/13-settings.md、packages/shared/src/contracts/api.ts
+- Brian 是否已確認：是
+
 ## 2026-10-09 種子內附的字幕
 
 - 原本：種子裡的字幕檔沒有用處（手動加入的甚至不下載），影片裡內嵌的字幕軌也不理。

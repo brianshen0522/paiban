@@ -128,6 +128,7 @@ API 的形狀是 `packages/shared/src/contracts/api.ts` 的 `Settings`、`Settin
 | `convertToTraditional` | true | 加入簡體字幕時自動轉成繁體（`POST /api/candidates/:id/add` 沒帶 `convertToTraditional` 時用它） |
 | `secondLine` | false | 同步頁預設開著「同時顯示」；有英文字幕時選英文，沒有就選另一條 |
 | `quality` | `1080p` | 電影頁的版本表裡，這個畫質的列做個標記。「只是在版本清單裡先標出來，不會自動下載。」 |
+| `posterRegion` | `null` | 電影海報用哪一國的版本：`TW`、`HK`、`CN`、`US`、`JP`、`KR`；`null` 跟隨介面語言（中文用台灣、英文用美國）（Brian，2026-10-10） |
 | `locale` | `null` | 介面語言：`'zh-TW'`、`'en'`，`null` 跟隨瀏覽器（Brian，2026-10-08）。也決定這個人做出來的 AI 翻譯字幕名稱和匯出的字幕軌標題用哪種語言 |
 
 ## 不開放設定的常數

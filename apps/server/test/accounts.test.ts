@@ -202,6 +202,20 @@ describe('my account', () => {
     expect((await me()).locale).toBeNull();
   });
 
+  it('keeps the poster country with the account, or none to follow the interface language', async () => {
+    await createUser(db.pool, 'posters');
+    const cookie = await login(t.app, 'posters');
+    const me = async () => (await call(t.app, 'GET', '/api/auth/me', { cookie })).json().user.prefs;
+    expect((await me()).posterRegion).toBeNull();
+    await call(t.app, 'PATCH', '/api/me', { cookie, body: { prefs: { posterRegion: 'JP' } } });
+    expect((await me()).posterRegion).toBe('JP');
+    expect(
+      (await call(t.app, 'PATCH', '/api/me', { cookie, body: { prefs: { posterRegion: 'FR' } } })).json().error.code,
+    ).toBe('VALIDATION');
+    await call(t.app, 'PATCH', '/api/me', { cookie, body: { prefs: { posterRegion: null } } });
+    expect((await me()).posterRegion).toBeNull();
+  });
+
   it('changes the password with the current one and signs out the other devices only', async () => {
     await createUser(db.pool, 'mover');
     const here = await login(t.app, 'mover');

@@ -9,9 +9,10 @@ import { publishTorrent, publishUsage } from '../events/publish.js';
 import type { AuthedUser, Deps } from '../http/context.js';
 import { ApiError } from '../http/errors.js';
 import { parse, requireUser } from '../http/guards.js';
+import { keepPoster, keptPoster, RegionQuery } from '../posters/kept.js';
 import { readSettings } from '../settings/settings.js';
 import { admit, predictDirectPlay, previewPlan } from '../storage/usage.js';
-import { type TmdbDetails, TmdbError, tmdbDetails, tmdbPosterImage } from '../tmdb/tmdb.js';
+import { type TmdbDetails, TmdbError, tmdbDetails, tmdbPosterImage, tmdbRegionPoster } from '../tmdb/tmdb.js';
 import { pathsAreSafe, subtitleFiles } from '../torrent/schedule.js';
 import { tmdbEnv } from '../yts/routes.js';
 import {
@@ -341,21 +342,38 @@ export function manualTorrentRoutes(app: FastifyInstance, deps: Deps): void {
     return reply.status(result.joined ? 200 : 201).send({ torrent: toTorrent(row, user.id), joined: result.joined });
   });
 
-  /** The kept poster of a film added by hand (YTS films use /api/yts/movies/:ytsId/poster). */
+  /**
+   * The poster of a film added by hand (YTS films use /api/yts/movies/:ytsId/poster), in the
+   * country the person chose (Brian, 2026-10-10): a kept copy, else TMDB's (then kept), else the
+   * copy kept when the film was added.
+   */
   app.get('/api/movies/:id/poster', async (req, reply) => {
     requireUser(req);
     const { id } = parse(IdParams, req.params);
-    const m = await one<{ poster_path: string | null }>(pool, 'select poster_path from movies where id = $1', [id]);
-    const file = /^posters\/(tmdb-\d{1,12}\.(jpg|png|webp))$/.exec(m?.poster_path ?? '');
-    if (!file?.[1]) throw new ApiError('NOT_FOUND', 'no poster');
-    let body: Buffer;
-    try {
-      body = await readFile(join(config.dataDir, 'posters', file[1]));
-    } catch {
-      throw new ApiError('NOT_FOUND', 'no poster');
+    const { region } = parse(RegionQuery, req.query);
+    const m = await one<{ tmdb_id: number | null }>(
+      pool,
+      'select tmdb_id from movies where id = $1 and yts_id is null',
+      [id],
+    );
+    if (!m?.tmdb_id) throw new ApiError('NOT_FOUND', 'no poster');
+    const stem = `tmdb-${m.tmdb_id}`;
+    const send = async (kept: { path: string; type: string }) => {
+      reply.header('Cache-Control', 'private, max-age=86400').type(kept.type);
+      return reply.send(await readFile(kept.path));
+    };
+    const regional = await keptPoster(config.dataDir, `${stem}-${region}`);
+    if (regional) return send(regional);
+    const path = await tmdbRegionPoster(tmdbEnv(deps), m.tmdb_id, region).catch(() => null);
+    const image = path ? await tmdbPosterImage(deps, path).catch(() => null) : null;
+    if (image) {
+      const type = image.ext === 'png' ? 'image/png' : image.ext === 'webp' ? 'image/webp' : 'image/jpeg';
+      await keepPoster(config.dataDir, `${stem}-${region}`, { type, body: image.body });
+      reply.header('Cache-Control', 'private, max-age=86400').type(type);
+      return reply.send(image.body);
     }
-    const type = file[2] === 'png' ? 'image/png' : file[2] === 'webp' ? 'image/webp' : 'image/jpeg';
-    reply.header('Cache-Control', 'private, max-age=604800').type(type);
-    return reply.send(body);
+    const added = await keptPoster(config.dataDir, stem);
+    if (added) return send(added);
+    throw new ApiError('NOT_FOUND', 'no poster');
   });
 }

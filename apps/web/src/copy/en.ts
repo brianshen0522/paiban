@@ -34,6 +34,22 @@ export const en: Copy = {
     toggle: (next: string) => `Interface language: switch to ${next}`,
   },
 
+  posters: {
+    title: 'Film posters',
+    label: 'Poster version',
+    help: "Posters come from TMDB. When the chosen country has no poster for a film, TMDB's default one is used.",
+    follow: 'Follow the interface language (Chinese: Taiwan, English: US)',
+    regions: {
+      TW: 'Taiwan',
+      HK: 'Hong Kong',
+      CN: 'China',
+      US: 'United States (English original)',
+      JP: 'Japan',
+      KR: 'South Korea',
+    },
+    saved: 'Poster version updated.',
+  },
+
   theme: {
     light: 'Light',
     dark: 'Dark',

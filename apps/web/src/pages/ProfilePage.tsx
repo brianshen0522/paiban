@@ -1,4 +1,4 @@
-import type { Lang, Me, Session, User, UserPrefs } from '@paiban/shared';
+import { type Lang, type Me, POSTER_REGIONS, type Session, type User, type UserPrefs } from '@paiban/shared';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { type FormEvent, useState } from 'react';
 import { useOutletContext } from 'react-router';
@@ -19,6 +19,7 @@ export function ProfilePage() {
       <PageHead title={t.profile.title} lead={t.profile.lead} />
       <NameCard me={me} />
       <LanguageCard prefs={me.user.prefs} />
+      <PosterCard prefs={me.user.prefs} />
       <PrefsCard prefs={me.user.prefs} />
       <PasswordCard />
       <DevicesCard />
@@ -105,6 +106,46 @@ function LanguageCard({ prefs }: { prefs: UserPrefs }) {
             {LOCALES.map((l) => (
               <option key={l} value={l}>
                 {t.locale.names[l]}
+              </option>
+            ))}
+          </select>
+        )}
+      </Field>
+      {failed && <Banner tone="bad">{t.common.unknownError}</Banner>}
+    </section>
+  );
+}
+
+/** Which country's posters this person sees (Brian, 2026-10-10); none follows the interface language. */
+function PosterCard({ prefs }: { prefs: UserPrefs }) {
+  const setMe = useSetMe();
+  const toast = useToast();
+  const [failed, setFailed] = useState(false);
+  const choose = async (value: string) => {
+    const next = POSTER_REGIONS.find((r) => r === value) ?? null;
+    setFailed(false);
+    try {
+      setMe(await patch<User>('/api/me', { prefs: { posterRegion: next } }));
+      toast(t.posters.saved);
+    } catch {
+      setFailed(true);
+    }
+  };
+  return (
+    <section className="card">
+      <h2>{t.posters.title}</h2>
+      <Field label={t.posters.label} help={t.posters.help}>
+        {(id, note) => (
+          <select
+            id={id}
+            aria-describedby={note}
+            value={prefs.posterRegion ?? ''}
+            onChange={(e) => void choose(e.target.value)}
+          >
+            <option value="">{t.posters.follow}</option>
+            {POSTER_REGIONS.map((r) => (
+              <option key={r} value={r}>
+                {t.posters.regions[r]}
               </option>
             ))}
           </select>

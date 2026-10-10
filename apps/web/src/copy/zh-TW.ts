@@ -37,6 +37,15 @@ export const zhTW = {
     toggle: (next: string) => `介面語言：切換成 ${next}`,
   },
 
+  posters: {
+    title: '電影海報',
+    label: '海報的版本',
+    help: '海報從 TMDB 來。選的國家沒有這部片的海報時，用 TMDB 預設的那張。',
+    follow: '跟隨介面語言（中文用台灣、English 用美國）',
+    regions: { TW: '台灣', HK: '香港', CN: '中國', US: '美國（英文原版）', JP: '日本', KR: '韓國' },
+    saved: '海報版本已更新。',
+  },
+
   theme: {
     light: '淺色',
     dark: '深色',

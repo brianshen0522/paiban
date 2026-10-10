@@ -1,5 +1,5 @@
 import { createHash, randomBytes, randomInt } from 'node:crypto';
-import type { Me, Session, User } from '@paiban/shared';
+import { type Me, POSTER_REGIONS, type Session, type User } from '@paiban/shared';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { audit } from '../audit.js';
@@ -209,6 +209,7 @@ export function accountRoutes(app: FastifyInstance, deps: Deps): void {
             secondLine: z.boolean().optional(),
             quality: z.enum(['720p', '1080p', '2160p']).optional(),
             locale: z.enum(['zh-TW', 'en']).nullable().optional(),
+            posterRegion: z.enum(POSTER_REGIONS).nullable().optional(),
           })
           .strict()
           .optional(),

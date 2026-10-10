@@ -1,7 +1,5 @@
 import { createReadStream } from 'node:fs';
-import { access } from 'node:fs/promises';
-import { join } from 'node:path';
-import { type MovieDetail, type MovieSummary, SEARCH_PAGE_SIZE, type Version } from '@paiban/shared';
+import { type MovieDetail, type MovieSummary, type PosterRegion, SEARCH_PAGE_SIZE, type Version } from '@paiban/shared';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { many, one } from '../db/pool.js';
@@ -9,6 +7,7 @@ import type { Deps } from '../http/context.js';
 import { ApiError } from '../http/errors.js';
 import { parse, requireUser } from '../http/guards.js';
 import { OutboundError, outboundFetch } from '../net/outbound.js';
+import { keepPoster, keptPoster, RegionQuery } from '../posters/kept.js';
 import { recordSourceHealth } from '../settings/health.js';
 import { readSecret } from '../settings/secrets.js';
 import { readSettings } from '../settings/settings.js';
@@ -21,6 +20,7 @@ import {
   tmdbFilm,
   tmdbPageUrl,
   tmdbPosterUrl,
+  tmdbRegionPoster,
 } from '../tmdb/tmdb.js';
 import { posterUrl, selectTorrents, statusOf } from '../torrents/view.js';
 import { cacheGet, cachePut, YtsClient, type YtsMovie, type YtsPage } from './client.js';
@@ -192,21 +192,25 @@ export function ytsRoutes(app: FastifyInstance, deps: Deps): void {
   app.get('/api/yts/movies/:ytsId/poster', async (req, reply) => {
     requireUser(req);
     const { ytsId } = parse(z.object({ ytsId: z.coerce.number().int().positive() }), req.params);
-    // Films in a library are served from the copy kept on disk, so a YTS move does not lose them.
-    const kept = join(deps.config.dataDir, 'posters', `${ytsId}.jpg`);
-    if (
-      await access(kept).then(
-        () => true,
-        () => false,
-      )
-    ) {
-      reply.header('Cache-Control', 'private, max-age=86400').type('image/jpeg');
-      return reply.send(createReadStream(kept));
+    // The country's poster the person chose (Brian, 2026-10-10).
+    const { region } = parse(RegionQuery, req.query);
+    const dataDir = deps.config.dataDir;
+    const send = (type: string, body: Buffer | ReturnType<typeof createReadStream>) => {
+      reply.header('Cache-Control', 'private, max-age=86400').type(type);
+      return reply.send(body);
+    };
+    // Films in a library are served from copies kept on disk, so a YTS or TMDB move does not lose them.
+    const regional = await keptPoster(dataDir, `${ytsId}-${region}`);
+    if (regional) return send(regional.type, createReadStream(regional.path));
+    const image = await fetchPoster(deps, ytsId, region).catch(() => null);
+    if (image) {
+      if (await one(deps.pool, 'select 1 from movies where yts_id = $1', [ytsId]))
+        await keepPoster(dataDir, `${ytsId}-${region}`, image);
+      return send(image.type, image.body);
     }
-    const image = await fetchPoster(deps, ytsId).catch(() => null);
-    if (!image) throw new ApiError('NOT_FOUND', 'no poster');
-    reply.header('Cache-Control', 'private, max-age=86400').type(image.type);
-    return reply.send(image.body);
+    const added = await keptPoster(dataDir, String(ytsId));
+    if (added) return send(added.type, createReadStream(added.path));
+    throw new ApiError('NOT_FOUND', 'no poster');
   });
 }
 
@@ -243,14 +247,21 @@ const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
  * The poster through the server (D30). Only from the configured YTS host or one of its
  * subdomains, only images, at most 2 MB (docs/05-yts.md, "海報").
  */
-export async function fetchPoster(deps: Deps, ytsId: number): Promise<{ type: string; body: Buffer } | null> {
+export async function fetchPoster(
+  deps: Deps,
+  ytsId: number,
+  region: PosterRegion = 'TW',
+): Promise<{ type: string; body: Buffer } | null> {
   const base = await baseUrl(deps);
   if (!base) return null;
   const { movie } = await getMovie(deps, ytsId);
   // TMDB's poster first (Brian, 2026-10-06), YTS's cover when TMDB has none or no key is set.
+  // The chosen country's poster when TMDB has one (Brian, 2026-10-10), its default otherwise.
   const film = await tmdbFilm(tmdbEnv(deps), movie.imdbCode, movie.title).catch(() => null);
-  if (film?.posterPath) {
-    const fromTmdb = await image(deps, tmdbPosterUrl(film.posterPath), (h) => h === TMDB_IMAGE_HOST);
+  const regional = film ? await tmdbRegionPoster(tmdbEnv(deps), film.tmdbId, region).catch(() => null) : null;
+  for (const path of [regional, film?.posterPath ?? null]) {
+    if (!path) continue;
+    const fromTmdb = await image(deps, tmdbPosterUrl(path), (h) => h === TMDB_IMAGE_HOST);
     if (fromTmdb) return fromTmdb;
   }
   if (!movie.coverUrl) return null;

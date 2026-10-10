@@ -1,3 +1,4 @@
+import type { PosterRegion } from '@paiban/shared';
 import type { Logger } from 'pino';
 import { z } from 'zod';
 import { many, type Pool, type Queryable } from '../db/pool.js';
@@ -449,4 +450,38 @@ export async function tmdbPosterImage(
   const ext = type === 'image/jpeg' ? 'jpg' : type === 'image/png' ? 'png' : type === 'image/webp' ? 'webp' : null;
   if (res.status !== 200 || !ext) return null;
   return { body: res.body, ext };
+}
+
+/* ------------------------------------------------------------------ posters by country */
+
+/** The TMDB language that picks each country's poster (TMDB tags posters with a country). */
+export const POSTER_LANGUAGE: Record<PosterRegion, string> = {
+  TW: 'zh-TW',
+  HK: 'zh-HK',
+  CN: 'zh-CN',
+  US: 'en-US',
+  JP: 'ja-JP',
+  KR: 'ko-KR',
+};
+
+const PosterOnly = z.object({ poster_path: z.string().nullish() });
+
+/**
+ * A film's poster for one country (Brian, 2026-10-10): /3/movie/<id>?language=…, whose
+ * poster_path is that country's when TMDB has one (and its default otherwise). A week in the
+ * cache. Null without a key or when TMDB has no poster.
+ */
+export async function tmdbRegionPoster(env: TmdbEnv, tmdbId: number, region: PosterRegion): Promise<string | null> {
+  const key = await env.key();
+  if (!key) return null;
+  const ck = `poster:${tmdbId}:${region}`;
+  const hit = await cached<string | null>(env.pool, ck);
+  if (hit) return hit.value;
+  const body = await tmdbGet(env.outbound, `/3/movie/${tmdbId}`, { language: POSTER_LANGUAGE[region] }, key);
+  const parsed = body === null ? null : PosterOnly.safeParse(body);
+  if (parsed && !parsed.success) throw new TmdbError('BAD_RESPONSE', 'TMDB answered a film in an unexpected shape');
+  const file = parsed?.data.poster_path?.replace(/^\//, '') ?? '';
+  const path = POSTER_FILE.test(file) ? `/${file}` : null;
+  await keep(env.pool, ck, path, path ? FILM_DAYS * 24 : UNKNOWN_HOURS);
+  return path;
 }

@@ -1,5 +1,6 @@
 import { readdir, rm, rmdir, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
+import { POSTER_REGIONS } from '@paiban/shared';
 import type { Logger } from 'pino';
 import type { Engine } from '../torrent/engine.js';
 
@@ -48,9 +49,13 @@ export async function removeDownloadFiles(
  * `posters/tmdb-<id>.<ext>` for a film added by hand. Anything else in `movies.poster_path` is left alone.
  */
 export async function removePoster(dataDir: string, posterPath: string): Promise<void> {
-  const file = /^posters\/((?:tmdb-)?\d{1,12}\.(?:jpg|png|webp))$/.exec(posterPath)?.[1];
-  if (!file) return;
-  await unlink(under(dataDir, 'posters', file)).catch(() => undefined);
+  const stem = /^posters\/((?:tmdb-)?\d{1,12})\.(?:jpg|png|webp)$/.exec(posterPath)?.[1];
+  if (!stem) return;
+  // The copy kept when the film was added, and the per-country copies kept since (Brian, 2026-10-10).
+  const names = ['', ...POSTER_REGIONS.map((r) => `-${r}`)].flatMap((suffix) =>
+    ['jpg', 'png', 'webp'].map((ext) => `${stem}${suffix}.${ext}`),
+  );
+  for (const name of names) await unlink(under(dataDir, 'posters', name)).catch(() => undefined);
 }
 
 /**

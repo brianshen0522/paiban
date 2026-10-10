@@ -2,6 +2,8 @@ import {
   APP_VERSION,
   CHECKPOINT_COUNT,
   type Me,
+  POSTER_REGIONS,
+  type PosterRegion,
   SITE_NAME,
   UPLOAD_MAX_BYTES,
   type User,
@@ -25,6 +27,9 @@ export function prefsOf(stored: Record<string, unknown>, defaultLangs: UserPrefs
     secondLine: typeof stored.secondLine === 'boolean' ? stored.secondLine : false,
     quality,
     locale: stored.locale === 'zh-TW' || stored.locale === 'en' ? stored.locale : null,
+    posterRegion: POSTER_REGIONS.includes(stored.posterRegion as PosterRegion)
+      ? (stored.posterRegion as PosterRegion)
+      : null,
   };
 }
 

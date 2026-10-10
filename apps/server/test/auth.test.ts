@@ -35,6 +35,7 @@ describe('sign-in', () => {
       secondLine: false,
       quality: '1080p',
       locale: null,
+      posterRegion: null,
     });
     expect(me.limits.maxActiveDownloads).toBe(2);
     expect(res.body).not.toMatch(/argon2|password/i);
