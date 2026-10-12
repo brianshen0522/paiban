@@ -121,7 +121,7 @@ export function LlmProfileDialog({
       ...f,
       provider: p,
       apiVersion: AZURE_VERSION[p] ?? '',
-      name: nameTouched ? f.name : (c().providers[p] ?? p).replace(/（.*$/, ''),
+      name: nameTouched ? f.name : (c().providers[p] ?? p).replace(/\s*[\uFF08(].*$/, ''),
     }));
     setModels([]);
     setModelNote(null);

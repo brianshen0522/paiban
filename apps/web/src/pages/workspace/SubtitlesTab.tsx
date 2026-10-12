@@ -314,7 +314,7 @@ function FindSubtitles({ ws }: { ws: Workspace }) {
               ))}
               {zimuku && zimuku.state !== 'disabled' && (
                 <li>
-                  <Chip>{`${providerName('zimuku')}：${t.subs.provState.manual}`}</Chip>
+                  <Chip>{`${providerName('zimuku')}${t.common.labelSep}${t.subs.provState.manual}`}</Chip>
                 </li>
               )}
             </ul>
@@ -424,7 +424,7 @@ function ProviderChip({ p, onRetry }: { p: ProviderStatus; onRetry: () => void }
   }
   return (
     <li>
-      <Chip tone={tone}>{`${name}：${text}`}</Chip>{' '}
+      <Chip tone={tone}>{`${name}${t.common.labelSep}${text}`}</Chip>{' '}
       {p.state === 'error' && p.error?.code !== 'NOT_CONFIGURED' && (
         <button type="button" onClick={onRetry}>
           {t.subs.retry}

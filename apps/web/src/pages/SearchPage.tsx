@@ -56,7 +56,7 @@ export function SearchPage() {
     <FillPage>
       <PageHead title={t.search.title} lead={t.search.lead}>
         <button type="button" className="manual-open" onClick={() => setManual({ preset: null })}>
-          <span aria-hidden="true">＋</span> {t.manual.open}
+          <span aria-hidden="true">+</span> {t.manual.open}
         </button>
       </PageHead>
       {manual && <ManualTorrentDialog preset={manual.preset} onClose={() => setManual(null)} />}

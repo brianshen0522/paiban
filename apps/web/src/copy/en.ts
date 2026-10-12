@@ -7,6 +7,9 @@ const plural = (n: number, one: string, many: string = `${one}s`) => `${n} ${n =
 export const en: Copy = {
   common: {
     listSep: ', ',
+    sentenceSep: ' ',
+    labelSep: ': ',
+    paren: (s: string) => ` (${s})`,
     clauseSep: '; ',
     loading: 'Loading…',
     retry: 'Try again',

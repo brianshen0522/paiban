@@ -10,6 +10,12 @@ export const zhTW = {
   common: {
     /** Between the items of a list (「美玲、阿豪」) and between clauses of one sentence. */
     listSep: '、',
+    /** Between two sentences set side by side: nothing in Chinese, a space in English. */
+    sentenceSep: '',
+    /** Between a label and what it labels (「射手網：還沒查」). */
+    labelSep: '：',
+    /** A parenthetical after a word: full-width brackets in Chinese, a space and plain ones in English. */
+    paren: (s: string) => `（${s}）`,
     clauseSep: '；',
     loading: '載入中…',
     retry: '再試一次',

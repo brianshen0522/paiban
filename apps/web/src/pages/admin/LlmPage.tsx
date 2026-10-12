@@ -123,7 +123,7 @@ function ProfileRow({ p, onEdit }: { p: LlmProfile; onEdit: () => void }) {
         <td className="lead">
           <b>{p.name}</b>
         </td>
-        <td>{(c().providers[p.provider] ?? p.provider).replace(/（.*$/, '')}</td>
+        <td>{(c().providers[p.provider] ?? p.provider).replace(/\s*[\uFF08(].*$/, '')}</td>
         <td className="mono rel">{p.model || '—'}</td>
         <td>{c().orderValue(p.priority, p.weight)}</td>
         <td>

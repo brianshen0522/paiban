@@ -160,7 +160,7 @@ function TranslationRow({ x, from }: { x: Translation; from: string }) {
   const qc = useQueryClient();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
-  const to = `${langName(x.targetLanguage)}（${c().modeTag[x.mode]}）`;
+  const to = `${langName(x.targetLanguage)}${t.common.paren(c().modeTag[x.mode])}`;
   const act = async (what: 'cancel' | 'resume') => {
     setBusy(true);
     setError(false);

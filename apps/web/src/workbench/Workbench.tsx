@@ -1502,7 +1502,7 @@ function Bench({ ws, detail }: { ws: Workspace; detail: SubtitleDetail }) {
                       <select value={rateId} onChange={(e) => changeRate(e.target.value)}>
                         {SyncCore.RATES.map((r) => (
                           <option key={r.id} value={r.id}>
-                            {(t.bench.rates[r.id] ?? r.id) + (r.scale === 1 ? '' : `（${rateText(r.scale)}）`)}
+                            {(t.bench.rates[r.id] ?? r.id) + (r.scale === 1 ? '' : t.common.paren(rateText(r.scale)))}
                           </option>
                         ))}
                         {rateId === 'custom' && (

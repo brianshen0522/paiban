@@ -195,7 +195,7 @@ export function OverviewPage() {
                 <li key={e.id}>
                   <span>
                     <b>{e.actorName || e.actor?.displayName}</b> {actionText(e)}
-                    {targetText(e) ? `：${targetText(e)}` : ''}
+                    {targetText(e) ? `${t.common.labelSep}${targetText(e)}` : ''}
                   </span>
                   <small>{when(e.at)}</small>
                 </li>

@@ -62,6 +62,7 @@ export function SyncTab({ ws }: { ws: Workspace }) {
         </div>
         <p className="sub">
           {previewSentence(x)}
+          {t.common.sentenceSep}
           {t.media.preview.suffix}
         </p>
         <MediaPanel torrent={x} />

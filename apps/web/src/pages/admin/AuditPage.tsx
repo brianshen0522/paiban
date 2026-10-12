@@ -117,8 +117,11 @@ export function targetText(e: AuditEntry): string {
   const lang = x.language !== undefined ? langName(String(x.language)) : undefined;
   const form = x.mode !== undefined ? t.translate.modeTag[String(x.mode)] : undefined;
   if (x.movieTitle !== undefined)
-    return join(x.movieTitle, x.version ?? (lang && form ? `${lang}（${form}）` : lang) ?? x.releaseName ?? x.fileName);
-  if (lang) return join(form ? `${lang}（${form}）` : lang);
+    return join(
+      x.movieTitle,
+      x.version ?? (lang && form ? `${lang}${t.common.paren(form)}` : lang) ?? x.releaseName ?? x.fileName,
+    );
+  if (lang) return join(form ? `${lang}${t.common.paren(form)}` : lang);
   if (e.action === 'auth.login' || e.action === 'auth.session.revoke')
     return x.os || x.browser ? join(x.os, x.browser) : t.profile.unknownDevice;
   if (e.action === 'admin.user.role') return `${x.name} → ${t.shell.role[x.role as 'admin' | 'member'] ?? x.role}`;
