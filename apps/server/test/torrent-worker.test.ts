@@ -14,7 +14,7 @@ import { call, createUser, GB, login, setLimit, setSetting, type TestApp, testAp
 
 /**
  * The torrent service against a real WebTorrent seeder on 127.0.0.1 (docs/06-torrent-worker.md,
- * "測試"). No DHT, no trackers, no network beyond loopback.
+ * "Tests"). No DHT, no trackers, no network beyond loopback.
  */
 const fixture = (f: string) => fileURLToPath(new URL(`../../../fixtures/${f}`, import.meta.url));
 const sha = async (p: string) =>

@@ -129,7 +129,7 @@ export function storageRoutes(app: FastifyInstance, deps: Deps): void {
     };
   });
 
-  /** docs/10-storage.md, "上限的驗證". Lower than the current use is allowed: nothing is deleted. */
+  /** docs/10-storage.md, "Validating the limit". Lower than the current use is allowed: nothing is deleted. */
   app.put('/api/admin/storage/limit', async (req): Promise<Usage> => {
     const user = requireAdmin(req);
     const { limitBytes } = parse(z.object({ limitBytes: z.number().int() }), req.body);

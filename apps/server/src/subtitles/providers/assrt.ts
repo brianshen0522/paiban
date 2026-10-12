@@ -18,7 +18,7 @@ import {
 } from './common.js';
 
 /**
- * 射手網(偽) (docs/07-subtitle-providers.md, "射手網"): the official API with a Bearer token, keyword
+ * Assrt (docs/07-subtitle-providers.md, "Assrt (Shooter)"): the official API with a Bearer token, keyword
  * search, at most 20 requests a minute per token and IP (we pace at 3.4 s). Its download addresses
  * are temporary, so they are asked for right before downloading and never stored.
  */
@@ -46,7 +46,7 @@ const Envelope = z.object({
 });
 
 /**
- * An answer's status code → what happens (docs/07, "錯誤碼"). 0 is fine; 101 (keyword too short)
+ * An answer's status code → what happens (docs/07, "Error codes"). 0 is fine; 101 (keyword too short)
  * and 20900 (nothing found) are "no results" for a search. 30900 is handled by the caller.
  */
 export function assrtStatus(status: number): ProviderFailure | 'empty' | null {
@@ -154,7 +154,7 @@ export class Assrt implements SubtitleProvider {
     const e = Envelope.safeParse(body);
     if (!e.success) throw new ProviderFailure('BAD_RESPONSE', 'not an assrt answer');
     if (e.data.status === 30900) {
-      // Nobody sends again for 60 s, from either process (docs/07, "限制").
+      // Nobody sends again for 60 s, from either process (docs/07, "Limits").
       const retryAt = await holdSource(this.env.pool, 'assrt', 60);
       throw new ProviderFailure('RATE_LIMITED', 'over 20 requests a minute', { retryAt });
     }

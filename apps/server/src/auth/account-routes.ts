@@ -244,7 +244,7 @@ export function accountRoutes(app: FastifyInstance, deps: Deps): void {
     const hash = await hashPassword(body.next);
     await tx(pool, async (c) => {
       await c.query('update users set password_hash = $2 where id = $1', [me.id, hash]);
-      // Every other device signs in again (docs/12-auth.md, "密碼").
+      // Every other device signs in again (docs/12-auth.md, "Passwords").
       await c.query('delete from sessions where user_id = $1 and id <> $2', [me.id, me.sessionId]);
       await audit(c, me, 'auth.password.change', {}, req.ip);
     });

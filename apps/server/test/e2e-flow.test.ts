@@ -28,7 +28,7 @@ import {
 
 /**
  * The whole product flow, offline, at the API level (docs/14-plan.md phase 9; docs/15-testing.md,
- * "離線的完整流程"): search the fake YTS, download a version the local seeder serves, analyse it,
+ * "Offline end-to-end flow"): search the fake YTS, download a version the local seeder serves, analyse it,
  * find subtitles on the fake sources, upload one, auto-align, confirm, export two tracks, download
  * the MKV in two ranges, then remove the film and the export and find nothing left behind.
  *
@@ -402,7 +402,7 @@ describe.skipIf(!TOOLS)('the whole flow, offline', { timeout: 240_000 }, () => {
     });
     expect(res.statusCode).toBe(200);
     const r = res.json();
-    // docs/08-media-pipeline.md, "在測試素材上的結果": late is one segment at -2.36 s, both engines agree.
+    // docs/08-media-pipeline.md, "Results on the test fixtures": late is one segment at -2.36 s, both engines agree.
     expect(r.segments).toHaveLength(1);
     expect(r.segments[0].scale).toBe(1);
     expect(Math.abs(r.segments[0].offset - -2.36)).toBeLessThanOrEqual(0.01);

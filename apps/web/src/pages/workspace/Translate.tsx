@@ -12,7 +12,7 @@ import { langName } from './SubtitlesTab';
 
 const c = () => t.translate;
 
-/** The languages offered first (docs/18-llm.md, "從哪裡開始"); any other BCP 47 code can be typed. */
+/** The languages offered first (docs/18-llm.md, "Where it starts"); any other BCP 47 code can be typed. */
 export const TARGETS = ['zh-Hant', 'zh-Hans', 'en', 'ja', 'ko', 'fr', 'de', 'es', 'it', 'pt', 'ru', 'th', 'vi', 'id'];
 export const LANG_CODE = /^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/;
 const OTHER = 'other';

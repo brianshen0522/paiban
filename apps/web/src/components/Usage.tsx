@@ -5,7 +5,7 @@ import { bytes } from '../lib/format';
 const ORDER = ['movies', 'exports', 'previews', 'reserved', 'partial'] as const;
 const CLS = { movies: 'u-mv', exports: 'u-ex', previews: 'u-px', reserved: 'u-rs', partial: 'u-pt' } as const;
 
-/** The segmented bar (docs/10-storage.md, "介面上的呈現"). */
+/** The segmented bar (docs/10-storage.md, "How it appears in the interface"). */
 export function UsageBar({ usage, big = false }: { usage: Usage; big?: boolean }) {
   const scale = Math.max(usage.limitBytes, usage.usedBytes, 1);
   return (

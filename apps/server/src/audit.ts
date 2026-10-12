@@ -1,6 +1,6 @@
 import type { Queryable } from './db/pool.js';
 
-/** One line of the activity log (docs/12-auth.md, "操作紀錄"). Data, never sentences or secrets. */
+/** One line of the activity log (docs/12-auth.md, "Activity log"). Data, never sentences or secrets. */
 export async function audit(
   q: Queryable,
   actor: { id: string; displayName: string } | null,

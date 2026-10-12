@@ -7,7 +7,7 @@ import { Workbench } from '../../workbench/Workbench';
 import { MediaPanel, previewSentence } from './MediaPanel';
 import { langName, providerName } from './SubtitlesTab';
 
-/** docs/11-pages.md, "同步": pick the subtitle, say what will play, then the workbench. */
+/** docs/11-pages.md, "Sync (09)": pick the subtitle, say what will play, then the workbench. */
 export function SyncTab({ ws }: { ws: Workspace }) {
   const { subtitleId } = useParams();
   const navigate = useNavigate();

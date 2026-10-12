@@ -114,7 +114,7 @@ export function mediaRoutes(app: FastifyInstance, deps: Deps): void {
   });
 
   /**
-   * Preview assets on request (docs/08, "事後要求"): the missing ones become pending with the
+   * Preview assets on request (docs/08, "Requesting later"): the missing ones become pending with the
    * current resolution, after admission of what they reserve together.
    */
   app.post('/api/media/:id/proxy', async (req) => {

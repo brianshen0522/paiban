@@ -2,7 +2,7 @@ import { lookup } from 'node:dns/promises';
 import { BlockList, isIP } from 'node:net';
 
 /**
- * Internal addresses the server must never be pointed at (docs/12-auth.md, "對外請求"). Spelled out
+ * Internal addresses the server must never be pointed at (docs/12-auth.md, "Outbound requests"). Spelled out
  * with Node's own BlockList; the npm `ip` package is avoided on purpose (GHSA-2p57-rm9w-gvfp).
  */
 const internal = new BlockList();

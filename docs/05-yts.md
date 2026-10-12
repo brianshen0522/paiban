@@ -1,201 +1,200 @@
-# 05 YTS 串接
+# 05 YTS integration
 
-YTS 是電影搜尋和版本清單的唯一來源。它提供公開的 JSON API，不需要金鑰。
+YTS is the only source for film search and version lists. It offers a public JSON API that needs no key.
 
-## 網址由管理員手動設定
+## The address is set by hand by an administrator
 
-YTS 的網域不穩定，而且冒牌站很多：
+YTS domains are unstable, and there are many impostor sites:
 
-- `yts.mx` 在 2025 年 11 月消失，之後出現 `yts.lt`，2026 年 1 月是 `yts.bz`。
-- 2026-10-04 查證時，`yts.bz/api` 會被轉址到 `yts.gg/api`。
+- `yts.mx` disappeared in November 2025; after that came `yts.lt`, and in January 2026 `yts.bz`.
+- When checked on 2026-10-04, `yts.bz/api` redirected to `yts.gg/api`.
 
-所以：
+So:
 
-- 網址是設定 `yts.baseUrl`，由管理員在「來源設定」頁填寫。**程式不自己找新網域**，不從搜尋引擎、不從清單、不從轉址推斷。
-- **不跟隨跨主機的轉址。** 收到 3xx 而且目的地是另一個主機時，當成失敗（`YTS_UNREACHABLE`），並在「測試連線」的結果裡說明「這個網域把請求轉到 `<主機>`，確認那是真的之後再把設定改過去」。同一個主機內的轉址（例如補上結尾斜線）可以跟。
-- 沒有內建預設值。第一次啟動時這個設定是空的：搜尋和下載的端點回 `YTS_NOT_CONFIGURED`，搜尋頁顯示「還沒有設定 YTS 的網址」並引導管理員去設定。
+- The address is the setting `yts.baseUrl`, filled in by an administrator on the "Sources" page. **The program never looks for a new domain by itself**: not from search engines, not from lists, not by inferring from redirects.
+- **Do not follow redirects to another host.** On a 3xx whose destination is a different host, treat it as a failure (`YTS_UNREACHABLE`), and explain in the "Test connection" result: "This domain redirects requests to `<host>`. Make sure that is the real one before changing the setting to it." Redirects within the same host (for example adding a trailing slash) may be followed.
+- There is no built-in default. On first start this setting is empty: the search and download endpoints return `YTS_NOT_CONFIGURED`, and the Search page shows "The YTS address is not set yet." and guides the administrator to set it.
 
-驗證規則：`https://` 開頭、只有主機（可以有埠），不含路徑，不能指向內部位址。儲存時去掉結尾的斜線。開發和測試時用 `ALLOW_LOCAL_SOURCES=1` 放寬成可以填 `http://` 和內部位址，這樣才能指到假的 YTS（[15-testing.md](15-testing.md)）。
+Validation rules: starts with `https://`, host only (a port is allowed), no path, must not point to an internal address. Strip the trailing slash when saving. In development and testing, `ALLOW_LOCAL_SOURCES=1` relaxes this to allow `http://` and internal addresses, so it can point to the fake YTS ([15-testing.md](15-testing.md)).
 
-對 YTS 的請求走共用的對外 HTTP 用戶端（[12-auth.md](12-auth.md) 的「對外請求」）。這個用戶端在階段 2 就要做好，階段 5 的字幕來源直接沿用。
+Requests to YTS go through the shared outbound HTTP client ("Outbound requests" in [12-auth.md](12-auth.md)). This client must be done in phase 2; the subtitle sources in phase 5 reuse it as is.
 
-## 用到的兩個端點
+## The two endpoints we use
 
-`{base}` 是設定值，例如 `https://yts.example`。
+`{base}` is the setting value, for example `https://yts.example`.
 
-### 搜尋與列表
+### Search and listing
 
 ```
 GET {base}/api/v2/list_movies.json
 ```
 
-| 參數 | 值 | 對應到我們的 |
+| Parameter | Value | Maps to our |
 | --- | --- | --- |
-| `query_term` | 片名、IMDb 編號、演員、導演 | `q` |
-| `quality` | `720p`、`1080p`、`2160p`、`3D` | `quality` |
-| `genre` | 英文類型名，見下表 | `genre` |
-| `minimum_rating` | 0 到 9 的整數 | `minRating` |
-| `sort_by` | `date_added`、`rating`、`year`、`seeds`（還有 `title`、`peers`、`download_count`、`like_count`，用不到） | `sort`：`added`、`rating`、`year`、`seeds` |
-| `order_by` | `desc` | 固定 |
-| `limit` | 1 到 50 | 固定 24 |
-| `page` | 從 1 開始 | `page` |
+| `query_term` | Title, IMDb ID, actor, director | `q` |
+| `quality` | `720p`, `1080p`, `2160p`, `3D` | `quality` |
+| `genre` | English genre name, see the table below | `genre` |
+| `minimum_rating` | Integer from 0 to 9 | `minRating` |
+| `sort_by` | `date_added`, `rating`, `year`, `seeds` (also `title`, `peers`, `download_count`, `like_count`, which we don't use) | `sort`: `added`, `rating`, `year`, `seeds` |
+| `order_by` | `desc` | Fixed |
+| `limit` | 1 to 50 | Fixed at 24 |
+| `page` | Starts at 1 | `page` |
 
-回應的外層：
+The outer layer of the response:
 
 ```json
 { "status": "ok", "status_message": "Query was successful",
   "data": { "movie_count": 123, "limit": 24, "page_number": 1, "movies": [ … ] } }
 ```
 
-注意：**沒有結果時 `data` 裡沒有 `movies` 這個鍵**（不是空陣列）。`status` 不是 `ok` 時，`status_message` 是原因。
+Note: **when there are no results, `data` has no `movies` key** (not an empty array). When `status` is not `ok`, `status_message` gives the reason.
 
-### 單一電影
+### Single film
 
 ```
 GET {base}/api/v2/movie_details.json?movie_id=<id>
 ```
 
-回應是 `data.movie`，欄位和列表裡的每一部相同。
+The response is `data.movie`, with the same fields as each film in the list.
 
-### 電影的欄位
+### Film fields
 
-只列用得到的。完整的形狀範例在 `reference/providers/yts.list_movies.sample.json`（值是示意，欄位名稱依查證結果）。
+Only the ones we use are listed. A full example of the shape is in `reference/providers/yts.list_movies.sample.json` (the values are illustrative; the field names follow what was verified).
 
-| YTS 欄位 | 用途 |
+| YTS field | Use |
 | --- | --- |
-| `id` | 我們的 `ytsId` |
-| `imdb_code` | `tt` 開頭。查 TMDB、YIFY Subtitles 都用它 |
-| `title`、`title_english`、`year`、`runtime`、`rating`、`genres`、`summary`、`language` | 顯示。`runtime` 是分鐘，**可能是 0**（YTS 沒填）；這時預覽預留用 120 分鐘估 |
-| `medium_cover_image` | 海報。由伺服器代抓 |
-| `torrents[]` | 版本清單 |
+| `id` | Our `ytsId` |
+| `imdb_code` | Starts with `tt`. Used to look up TMDB and YIFY Subtitles |
+| `title`, `title_english`, `year`, `runtime`, `rating`, `genres`, `summary`, `language` | Display. `runtime` is in minutes and **may be 0** (YTS left it empty); in that case the preview reservation estimates 120 minutes |
+| `medium_cover_image` | Poster. Fetched by the server on the browser's behalf |
+| `torrents[]` | Version list |
 
-每個版本（`torrents[]` 的一項）：
+Each version (one item of `torrents[]`):
 
-| YTS 欄位 | 型別 | 說明 |
+| YTS field | Type | Description |
 | --- | --- | --- |
-| `hash` | 字串 | info hash，40 個十六進位字元，**大寫**。存進資料庫前轉小寫 |
-| `quality` | 字串 | `720p`、`1080p`、`2160p`、`3D` |
-| `type` | 字串 | `bluray` 或 `web` |
-| `video_codec` | 字串 | `x264` 或 `x265` |
-| `bit_depth` | **字串** | `"8"` 或 `"10"` |
-| `audio_channels` | 字串 | `"2.0"` 或 `"5.1"` |
-| `size_bytes` | 數字 | 接受下載時用這個值 |
-| `size` | 字串 | 例如 `"1.6 GB"`，不要用它，自己從 `size_bytes` 格式化 |
-| `seeds`、`peers` | 數字 | 是 YTS 上次統計的值，不是即時的 |
-| `date_uploaded_unix` | 數字 | 秒 |
-| `url` | 字串 | .torrent 檔的下載網址。**用不到**，我們只用 hash |
+| `hash` | string | Info hash, 40 hex characters, **uppercase**. Convert to lowercase before storing in the database |
+| `quality` | string | `720p`, `1080p`, `2160p`, `3D` |
+| `type` | string | `bluray` or `web` |
+| `video_codec` | string | `x264` or `x265` |
+| `bit_depth` | **string** | `"8"` or `"10"` |
+| `audio_channels` | string | `"2.0"` or `"5.1"` |
+| `size_bytes` | number | Used when admitting a download |
+| `size` | string | For example `"1.6 GB"`. Don't use it; format `size_bytes` yourself |
+| `seeds`, `peers` | number | The values from YTS's last count, not live |
+| `date_uploaded_unix` | number | Seconds |
+| `url` | string | Download URL of the .torrent file. **Not used**; we only use the hash |
 
-所有回應都用 zod 驗證。必要欄位（`id`、`imdb_code`、`title`、`year`、`torrents[].hash`、`torrents[].size_bytes`）缺了就把那一部或那個版本略過並記 log；整個回應不是預期的形狀（不是 JSON、是一個 HTML 頁面、`status` 欄位不存在）就回 `YTS_BAD_RESPONSE`，這通常表示網域已經不是 YTS 了。
+Every response is validated with zod. If a required field (`id`, `imdb_code`, `title`, `year`, `torrents[].hash`, `torrents[].size_bytes`) is missing, skip that film or that version and log it; if the whole response is not the expected shape (not JSON, an HTML page, no `status` field), return `YTS_BAD_RESPONSE`. This usually means the domain is no longer YTS.
 
-### 類型
+### Genres
 
-YTS 的類型是英文，查詢時用英文值，介面顯示中文。
+YTS genres are in English. Queries use the English value; the interface shows the Chinese name.
 
-| 值 | 顯示 | 值 | 顯示 | 值 | 顯示 |
+| Value | Display | Value | Display | Value | Display |
 | --- | --- | --- | --- | --- | --- |
-| `action` | 動作 | `drama` | 劇情 | `mystery` | 懸疑 |
-| `adventure` | 冒險 | `family` | 家庭 | `romance` | 愛情 |
-| `animation` | 動畫 | `fantasy` | 奇幻 | `sci-fi` | 科幻 |
-| `biography` | 傳記 | `film-noir` | 黑色電影 | `sport` | 運動 |
-| `comedy` | 喜劇 | `history` | 歷史 | `thriller` | 驚悚 |
-| `crime` | 犯罪 | `horror` | 恐怖 | `war` | 戰爭 |
-| `documentary` | 紀錄片 | `music` / `musical` | 音樂 / 歌舞 | `western` | 西部 |
+| `action` | 動作 (Action) | `drama` | 劇情 (Drama) | `mystery` | 懸疑 (Mystery) |
+| `adventure` | 冒險 (Adventure) | `family` | 家庭 (Family) | `romance` | 愛情 (Romance) |
+| `animation` | 動畫 (Animation) | `fantasy` | 奇幻 (Fantasy) | `sci-fi` | 科幻 (Sci-fi) |
+| `biography` | 傳記 (Biography) | `film-noir` | 黑色電影 (Film noir) | `sport` | 運動 (Sport) |
+| `comedy` | 喜劇 (Comedy) | `history` | 歷史 (History) | `thriller` | 驚悚 (Thriller) |
+| `crime` | 犯罪 (Crime) | `horror` | 恐怖 (Horror) | `war` | 戰爭 (War) |
+| `documentary` | 紀錄片 (Documentary) | `music` / `musical` | 音樂 / 歌舞 (Music / Musical) | `western` | 西部 (Western) |
 
-回應裡的 `genres` 是首字大寫的英文（`"Sci-Fi"`），顯示前用同一張表轉換（比對時不分大小寫）；表裡沒有的原樣顯示。查詢參數的大小寫要求請在階段 0 用真的 YTS 確認一次。
+`genres` in the response is capitalized English (`"Sci-Fi"`); before display, convert it with the same table (matching is case-insensitive). Anything not in the table is shown as is. Confirm once in phase 0, against the real YTS, whether the query parameter is case-sensitive.
 
-## 版本怎麼變成我們的 `Version`
+## How a version becomes our `Version`
 
 ```
 directPlay   = video_codec == "x264" && bit_depth == "8"
-previewBytes = directPlay ? 0 : 預覽預留(片長, 現在的設定)   見 10-storage.md
+previewBytes = directPlay ? 0 : previewReservation(runtime, current settings)   see 10-storage.md
 needBytes    = size_bytes + previewBytes
 ```
 
-`directPlay` 在這裡只是預測，下載完成後由 ffprobe 的結果決定（見 [08-media-pipeline.md](08-media-pipeline.md)）。`previewBytes` 用的是查詢當下的設定（自動轉檔開不開、解析度）；真正按下載時再算一次，並且從那一刻起固定下來（D40）。
+`directPlay` here is only a prediction; after the download finishes, the ffprobe result decides (see [08-media-pipeline.md](08-media-pipeline.md)). `previewBytes` uses the settings at query time (whether automatic conversion is on, resolution); it is computed again when someone actually presses download, and fixed from that moment on (D40).
 
-每個版本還要帶上本地的狀況（`local`）：系統裡有沒有這個 info hash 的下載、狀態、進度、誰持有、呼叫者自己有沒有。沒有的話算出現在放不放得下。
+Each version also carries the local situation (`local`): whether the system has a download for this info hash, its status, progress, who holds it, and whether the caller holds it. If there is none, compute whether it would fit right now.
 
-## 磁力連結
+## Magnet links
 
-只用 hash 就能下載。交給 WebTorrent 的是：
+The hash alone is enough to download. What we hand to WebTorrent is:
 
 ```
-magnet:?xt=urn:btih:<小寫 hash>&dn=<片名+年份+畫質,URL 編碼>&tr=<tracker 1>&tr=<tracker 2>…
+magnet:?xt=urn:btih:<lowercase hash>&dn=<title+year+quality, URL-encoded>&tr=<tracker 1>&tr=<tracker 2>…
 ```
 
-tracker 清單是設定 `downloads.trackers`。預設值請取自 YTS API 文件當時列出的清單（拿到 YTS 網址後確認）。在那之前用下面兩個，它們在 2026-10-05 的階段 0 實測（`scripts/phase0/real-swarm.mjs`）有回應：
+The tracker list is the setting `downloads.trackers`. Take the default from the list in the YTS API documentation at the time (confirm once we have the YTS address). Until then use the two below; they responded in the phase 0 test on 2026-10-05 (`scripts/phase0/real-swarm.mjs`):
 
 ```
 udp://tracker.opentrackr.org:1337/announce
 udp://open.demonii.com:1337/announce
 ```
 
-原本憑記憶寫的另外兩個已經不能用：`udp://tracker.openbittorrent.com:80` 查不到網域（`ENOTFOUND`），`udp://p4p.arenabg.com:1337` 逾時。
+The other two originally written from memory no longer work: `udp://tracker.openbittorrent.com:80` fails DNS lookup (`ENOTFOUND`), and `udp://p4p.arenabg.com:1337` times out.
 
-DHT 是開著的，所以 tracker 全部失效時通常還是找得到 peers，只是比較慢。階段 0 在 Docker bridge 網路裡實測：DHT 和 uTP 都正常，加入後 4 到 8 秒拿到種子資訊。
+DHT is on, so even when every tracker fails, peers can usually still be found, just more slowly. Tested in phase 0 on a Docker bridge network: DHT and uTP both work, and the torrent info arrives 4 to 8 seconds after adding.
 
-## 快取
+## Caching
 
-存在 `provider_cache`，`provider = 'yts'`。存的是驗證、解析之後我們自己的形狀（電影資料和版本清單），不是 YTS 的原始回應。
+Stored in `provider_cache` with `provider = 'yts'`. What is stored is our own shape after validation and parsing (film data and version lists), not YTS's raw response.
 
-| 內容 | 鍵 | 有效時間 |
+| Content | Key | Valid for |
 | --- | --- | --- |
-| 搜尋結果 | 參數組合 | 10 分鐘 |
-| 單一電影 | `movie:<id>` | 60 分鐘 |
+| Search results | Parameter combination | 10 minutes |
+| Single film | `movie:<id>` | 60 minutes |
 
-過期的列不會被清掉，只會在下次查到新資料時被覆寫。
+Expired rows are not cleaned up; they are only overwritten the next time new data is fetched.
 
-**YTS 連不上時**：搜尋回 `YTS_UNREACHABLE`；單一電影如果有存過（不論多舊）就用存下來的那一份，回應裡 `stale` 是 true、`fetchedAt` 是那份資料的時間，電影頁據此顯示「這是先前存下來的資料」。這表示已經看過的電影頁在 YTS 掛掉時仍然能開、能下載：那些 hash 確實是從 YTS 來的，符合 D26。
+**When YTS can't be reached**: search returns `YTS_UNREACHABLE`; for a single film, if a copy was stored (no matter how old), that copy is used, with `stale` true and `fetchedAt` set to the time of that data in the response, and the film page then shows "This is data saved earlier." This means a film page someone has already seen still opens and can still download while YTS is down: those hashes really did come from YTS, which satisfies D26.
 
-## 海報
+## Posters
 
-瀏覽器不直接連 YTS（D30）。
+The browser never connects to YTS directly (D30).
 
-- `GET /api/yts/movies/:ytsId/poster` 由伺服器抓 `medium_cover_image` 再回傳，帶 `Cache-Control: private, max-age=86400`。
-- 只抓主機等於 `yts.baseUrl` 的主機、或是它的子網域的圖片網址；其他的不抓，回 404。
-- 回應必須是圖片（`image/jpeg`、`image/png`、`image/webp`），大小上限 2 MB。
-- 電影被下載時，把海報存一份到 `/data/posters/<yts_id>.jpg`。這樣 YTS 換網域也不影響片庫。
-- **哪一國的海報**（Brian，2026-10-10）：海報端點帶 `region`（`TW`、`HK`、`CN`、`US`、`JP`、`KR`，預設 `TW`），前端依每個人的設定帶（`UserPrefs.posterRegion`；沒選的中文介面用 `TW`、英文介面用 `US`）。伺服器用 TMDB 的 `/3/movie/<tmdb id>?language=zh-TW|zh-HK|zh-CN|en-US|ja-JP|ko-KR` 取那一國的 `poster_path`（TMDB 的海報帶國家；2026-10-10 用真的金鑰實測三部片，五種語言各拿到不同的海報），快取一週。順序：已經存的那一國的副本 → TMDB 那一國的海報 → TMDB 預設的海報 → YTS 的封面 → 下載時存的那一份。
-- 片庫裡有的片（`movies` 有這一列），每一國的海報第一次抓到時存一份 `/data/posters/<yts_id>-<國家>.<副檔名>`，之後從這裡讀。手動加入、YTS 沒有的片用 `GET /api/movies/:id/poster?region=`，存成 `tmdb-<tmdb id>-<國家>.<副檔名>`。這些副本不計入用量，片子刪除時一起刪。
-- 抓不到時，前端畫佔位海報：用片名算出一個固定的底色，上面寫片名和年份（原型就是這樣畫的）。
+- `GET /api/yts/movies/:ytsId/poster` has the server fetch `medium_cover_image` and return it, with `Cache-Control: private, max-age=86400`.
+- Only image URLs whose host equals the host of `yts.baseUrl`, or is a subdomain of it, are fetched; others are not fetched and return 404.
+- The response must be an image (`image/jpeg`, `image/png`, `image/webp`), at most 2 MB.
+- When a film is downloaded, save a copy of the poster to `/data/posters/<yts_id>.jpg`. That way a YTS domain change does not affect the Library.
+- **Which country's poster** (Brian, 2026-10-10): the poster endpoint takes `region` (`TW`, `HK`, `CN`, `US`, `JP`, `KR`; default `TW`), and the front end passes it from each person's setting (`UserPrefs.posterRegion`; if not chosen, `TW` for the Chinese interface and `US` for the English interface). The server uses TMDB's `/3/movie/<tmdb id>?language=zh-TW|zh-HK|zh-CN|en-US|ja-JP|ko-KR` to get that country's `poster_path` (TMDB posters are tagged with a country; tested on 2026-10-10 with a real key on three films, and each of the five languages got a different poster), cached for one week. Order: the stored copy for that country → TMDB's poster for that country → TMDB's default poster → the YTS cover → the copy saved at download time.
+- For films in the Library (a row exists in `movies`), each country's poster is saved to `/data/posters/<yts_id>-<country>.<extension>` the first time it is fetched, and read from there afterward. Films added by hand that YTS doesn't have use `GET /api/movies/:id/poster?region=`, saved as `tmdb-<tmdb id>-<country>.<extension>`. These copies don't count toward usage and are deleted along with the film.
+- When nothing can be fetched, the front end draws a placeholder poster: a fixed background color computed from the title, with the title and year on it (this is how the prototype draws it).
 
-## 請求的規矩
+## Request etiquette
 
-- 逾時 10 秒。網路錯誤和 5xx 重試一次，其他不重試。
-- `User-Agent` 用 `Paiban/<版本>`。
-- 同時最多 4 個請求。
-- 回應大小上限 5 MB。
+- 10-second timeout. Retry once on network errors and 5xx; no retries otherwise.
+- `User-Agent` is `Paiban/<version>`.
+- At most 4 concurrent requests.
+- Response size limit of 5 MB.
 
-## 測試連線
+## Test connection
 
-管理頁的「測試連線」呼叫 `list_movies.json?limit=1`。結果是 `SourceCheck`（`packages/shared/src/contracts/api.ts`）：
+"Test connection" on the admin page calls `list_movies.json?limit=1`. The result is a `SourceCheck` (`packages/shared/src/contracts/api.ts`):
 
-| 情況 | `code` | `data` |
+| Case | `code` | `data` |
 | --- | --- | --- |
-| 成功，回應是 YTS 的形狀 | `OK` | `{status: 200, count: 片庫的總片數}` |
-| 還沒填網址 | `NOT_CONFIGURED` | |
-| 被轉址到別的主機 | `REDIRECTED` | `{host: 目的地的主機}` |
-| 連不上、逾時、5xx | `UNREACHABLE` | `{status}`（有的話） |
-| 回應不是 YTS 的形狀 | `BAD_RESPONSE` | |
+| Success, the response has the YTS shape | `OK` | `{status: 200, count: total number of films in the catalog}` |
+| Address not filled in yet | `NOT_CONFIGURED` | |
+| Redirected to another host | `REDIRECTED` | `{host: destination host}` |
+| Unreachable, timeout, 5xx | `UNREACHABLE` | `{status}` (if any) |
+| The response is not the YTS shape | `BAD_RESPONSE` | |
 
-`ms` 是花了多久。介面上的句子由前端依代碼寫，例如「這個網域把請求轉到 yts.example。確認那是真的之後，再把設定改過去。」
+`ms` is how long it took. The sentence in the interface is written by the front end from the code, for example "This domain redirects requests to yts.example. Make sure that is the real one before changing the setting to it."
 
-## 開發與測試用的假 YTS
+## Fake YTS for development and testing
 
-自動化測試和本機開發**不連真的 YTS**。請做一個假的 YTS（同樣的兩個端點、同樣的回應形狀），片單可以直接用原型裡那 14 部公有領域的老片（`prototype/platform/src/app1.js` 的 `MOVIES`）。其中一部的某個版本要對應到本機測試用的 torrent，讓整條流程能在沒有網路的情況下跑完。做法在 [15-testing.md](15-testing.md)。
+Automated tests and local development **never connect to the real YTS**. Build a fake YTS (the same two endpoints, the same response shapes); the film list can simply be the 14 old public-domain films from the prototype (`MOVIES` in `prototype/platform/src/app1.js`). One version of one of them must map to the torrent used for local testing, so the whole flow can run without a network. How to do it is in [15-testing.md](15-testing.md).
 
-## 電影資料改用 TMDB（Brian，2026-10-06）
+## Film data now comes from TMDB (Brian, 2026-10-06)
 
-YTS 只負責「有哪些片、有哪些版本可以下載」。人看到的電影資料改用 TMDB：用 YTS 給的 IMDb 編號呼叫一次 `GET /3/find/<imdb>?external_source=imdb_id&language=zh-TW`，拿到 TMDB 編號、中文片名、中文簡介、海報路徑和評分（`apps/server/src/tmdb/tmdb.ts`）。
+YTS is only responsible for "which films exist and which versions can be downloaded". The film data people see now comes from TMDB: with the IMDb ID from YTS, call `GET /3/find/<imdb>?external_source=imdb_id&language=zh-TW` once to get the TMDB ID, Chinese title, Chinese overview, poster path and rating (`apps/server/src/tmdb/tmdb.ts`).
 
-- 結果存在 `provider_cache`（`tmdb`、`film:<imdb>`）一週；TMDB 不認得的片存一天。片子已經在資料庫時，順便寫入 `movies.tmdb_id` 和 `title_zh`，字幕來源就直接用 TMDB 編號。
-- 搜尋頁一頁 24 部，快取以外的同時最多問 6 個，最多等 2.5 秒；沒等到的這次先用 YTS 的資料，答案照樣存進快取給下一次用。
-- 評分：TMDB 有 5 票以上時用 TMDB 的，否則用 YTS 的 IMDb 評分。頁面上寫明來源。
-- 海報：有 TMDB 海報就經由這個伺服器抓 `image.tmdb.org/t/p/w342/…`（瀏覽器不直接連 TMDB，D30），沒有才用 YTS 的封面。
-- 沒有 TMDB 金鑰、或金鑰被拒時，全部退回 YTS 的資料；金鑰被拒會在來源設定的 TMDB 卡片顯示。
-- IMDb 編號還是保留：YTS 和 YIFY Subtitles 只認得它。
+- The result is stored in `provider_cache` (`tmdb`, `film:<imdb>`) for one week; films TMDB doesn't know are stored for one day. When the film is already in the database, also write `movies.tmdb_id` and `title_zh`, so subtitle sources use the TMDB ID directly.
+- The Search page shows 24 films per page; for those not in the cache, ask at most 6 at a time and wait at most 2.5 seconds. Those not answered in time use YTS's data this time, and the answers are still stored in the cache for next time.
+- Ratings: use TMDB's when TMDB has 5 or more votes, otherwise YTS's IMDb rating. The page states the source.
+- Posters: if there is a TMDB poster, this server fetches `image.tmdb.org/t/p/w342/…` (the browser never connects to TMDB directly, D30); only otherwise is the YTS cover used.
+- With no TMDB key, or when the key is rejected, everything falls back to YTS's data; a rejected key is shown on the TMDB card in Sources.
+- IMDb IDs are still kept: YTS and YIFY Subtitles only recognize them.
 
-### 用中文片名找片（Brian，2026-10-06）
+### Finding films by Chinese title (Brian, 2026-10-06)
 
-YTS 只認得英文片名，打「謎中謎」什麼都找不到。所以搜尋框打字時（停 0.25 秒後），伺服器向 TMDB 的 `GET /3/search/movie?query=…&language=zh-TW&include_adult=false` 要建議，最多 8 部，列在搜尋框下面：小海報、中文片名、原文片名和年份。點一部（或用方向鍵選再按 Enter）：伺服器用 `GET /3/movie/<tmdbId>/external_ids` 取它的 IMDb 編號，再用這個編號當 YTS 的 `query_term`（YTS 的搜尋認得 IMDb 編號），找到就直接打開那部片的頁面；YTS 沒有就在那一列寫「YTS 上沒有這部片。」。沒有選任何建議時按 Enter，照舊用打的字搜尋 YTS。頂端列和搜尋頁的搜尋框都有。沒有 TMDB 金鑰時不顯示建議、也不連 TMDB。快取：建議一天，IMDb 編號一個月，「YTS 有沒有」一小時。
-
+YTS only recognizes English titles; typing "謎中謎" (the Chinese title of *Charade*) finds nothing. So while typing in the search box (after a 0.25-second pause), the server asks TMDB's `GET /3/search/movie?query=…&language=zh-TW&include_adult=false` for suggestions, up to 8 films, listed under the search box: small poster, Chinese title, original title and year. Clicking one (or choosing it with the arrow keys and pressing Enter): the server gets its IMDb ID with `GET /3/movie/<tmdbId>/external_ids`, then uses that ID as YTS's `query_term` (YTS search recognizes IMDb IDs); if found, it opens that film's page directly; if YTS doesn't have it, that row says "YTS doesn't have this film." Pressing Enter without choosing any suggestion searches YTS with the typed text as before. Both the top bar and the Search page's search box have this. With no TMDB key, no suggestions are shown and TMDB is not contacted. Caching: suggestions one day, IMDb IDs one month, "does YTS have it" one hour.

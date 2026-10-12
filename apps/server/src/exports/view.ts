@@ -13,7 +13,7 @@ export type TrackRecord = {
 };
 
 /**
- * Matroska language and track title for a subtitle language (docs/08-media-pipeline.md, "語言標籤").
+ * Matroska language and track title for a subtitle language (docs/08-media-pipeline.md, "language tag").
  * ffmpeg writes three-letter codes only, so Traditional and Simplified Chinese differ by title.
  * These titles are fixed strings written into the file, not interface copy.
  */
@@ -157,7 +157,7 @@ export async function exportsForTorrent(
 }
 
 /**
- * Pushes an export to the people allowed to see it (docs/04-api.md, "即時更新"): the holders of
+ * Pushes an export to the people allowed to see it (docs/04-api.md, "Live updates"): the holders of
  * its film and its creator, each with their own `canDelete`. A row that is gone (or cancelled and
  * waiting for media to stop) becomes `export.removed`, which goes to everyone and says only the id.
  */

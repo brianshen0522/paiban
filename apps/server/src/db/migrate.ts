@@ -6,7 +6,7 @@ import type { Pool } from './pool.js';
  * Plain SQL migrations, applied in file-name order. 0001_init.sql is db/schema.sql as it was handed
  * over; db/schema.sql stays the readable picture of the whole database and must stay equivalent to
  * the migrations (test/schema-equivalence.test.ts). Only the api runs this; torrent and media wait
- * for `latestMigration()` to appear (docs/02-architecture.md, "啟動與關閉").
+ * for `latestMigration()` to appear (docs/02-architecture.md, "Startup and shutdown").
  */
 export const MIGRATIONS_DIR = fileURLToPath(new URL('../../migrations/', import.meta.url));
 

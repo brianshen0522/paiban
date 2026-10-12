@@ -855,7 +855,7 @@ fieldset.field > legend {
   gap: 12px;
   max-width: 620px;
 }
-/* The settings tabs (來源設定): cards side by side when there is room, each as tall as it needs. */
+/* The settings tabs (Sources): cards side by side when there is room, each as tall as it needs. */
 #view .src-grid {
   display: grid;
   gap: 16px;
@@ -1868,7 +1868,7 @@ fieldset.field > legend {
   }
 }
 
-/* narrow: the side menu becomes a row of buttons under the top bar (docs/17-ui.md, "版面") */
+/* narrow: the side menu becomes a row of buttons under the top bar (docs/17-ui.md, "Layout") */
 @media (max-width: 860px) {
   .shell {
     grid-template-columns: minmax(0, 1fr);
@@ -2611,7 +2611,7 @@ fieldset.field > legend {
 }
 
 /* ------------------------------------------------------------------ adding a torrent by hand */
-/* docs/11-pages.md, "手動加入種子": each step slides in; motion stops when the system asks for less. */
+/* docs/11-pages.md, "Add a torrent by hand": each step slides in; motion stops when the system asks for less. */
 .mt-steps {
   display: grid;
   min-width: 0;

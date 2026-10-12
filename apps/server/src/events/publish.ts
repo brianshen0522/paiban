@@ -26,7 +26,7 @@ async function onlineHolders(q: Queryable, hub: EventHub, torrentId: string): Pr
   return rows.map((r) => r.user_id).filter((id) => online.has(id));
 }
 
-/** The film's candidate list changed: its holders refetch (docs/04-api.md, "即時更新"). */
+/** The film's candidate list changed: its holders refetch (docs/04-api.md, "Live updates"). */
 export async function publishCandidates(q: Queryable, hub: EventHub, torrentId: string): Promise<void> {
   for (const id of await onlineHolders(q, hub, torrentId)) hub.toUser(id, { type: 'candidates', torrentId });
 }

@@ -2,7 +2,7 @@ import { type ChildProcess, spawn } from 'node:child_process';
 
 /**
  * Child processes for ffmpeg, ffprobe and ffsubsync: argument arrays, never a shell
- * (docs/12-auth.md, "執行外部程式"), with a handle to stop them when the job is cancelled.
+ * (docs/12-auth.md, "Running external programs"), with a handle to stop them when the job is cancelled.
  */
 export type Running = { child: ChildProcess; done: Promise<{ code: number | null; stderr: string; stdout: string }> };
 
@@ -41,7 +41,7 @@ export class Cancelled extends Error {
 
 /**
  * Runs `fn` while checking `stillWanted` every two seconds; when it says no, `onCancel` stops the
- * child and the job ends with Cancelled (docs/08-media-pipeline.md, "執行中每 2 秒確認一次").
+ * child and the job ends with Cancelled (docs/08-media-pipeline.md, "check every 2 seconds while running").
  */
 export async function watched<T>(
   fn: () => Promise<T>,

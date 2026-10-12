@@ -18,8 +18,8 @@ import { many, one } from '../db/pool.js';
 import { ASSRT_CREDIT, type FilmContext, PROVIDER_ORDER, type ProviderKey } from './providers/index.js';
 
 /**
- * Where subtitle files live and how their rows read (docs/03-data-model.md, "字幕";
- * docs/02-architecture.md, "磁碟配置"). Paths come from ids, never from a request.
+ * Where subtitle files live and how their rows read (docs/03-data-model.md, "Subtitles";
+ * docs/02-architecture.md, "Disk layout"). Paths come from ids, never from a request.
  */
 export const candidateRel = (id: string) => `subtitles/candidates/${id}`;
 export const subtitleRel = (id: string) => `subtitles/${id}`;
@@ -83,7 +83,7 @@ export async function filmContext(q: Queryable, torrentId: string): Promise<Film
 
 /* ---------------------------------------------------------------- matching the downloaded version */
 
-/** docs/07, "和下載的版本相符": YIFY or YTS in the name, and the same resolution or none written. */
+/** docs/07, "Matching the downloaded version": YIFY or YTS in the name, and the same resolution or none written. */
 export function matchesRelease(name: string, quality: string): boolean {
   if (!/yify|yts/i.test(name)) return false;
   const res = name.match(/\b(720p|1080p|2160p)\b/i)?.[1]?.toLowerCase();
@@ -96,7 +96,7 @@ export function sourceKind(name: string): 'bluray' | 'web' | null {
   return null;
 }
 
-/** Which detected languages a choice of languages covers: Traditional takes every Chinese (docs/07, "全部自動對齊並排名"). */
+/** Which detected languages a choice of languages covers: Traditional takes every Chinese (docs/07, "Auto-align and rank them all"). */
 export function coveredLanguages(languages: readonly Lang[]): DetectedLang[] {
   const out = new Set<DetectedLang>();
   for (const l of languages) {
@@ -149,7 +149,7 @@ const PROVIDER_RANK: Record<string, number> = { justsubtitles: 0, yify: 1, assrt
 
 /**
  * The order before ranking (docs/07): chosen languages → matches the version → same kind of
- * source → the source's own rating → JustSubtitles, YIFY, 射手網. Uploads after the sources.
+ * source → the source's own rating → JustSubtitles, YIFY, Assrt. Uploads after the sources.
  */
 export function preRankOrder(
   rows: CandidateRow[],
@@ -179,7 +179,7 @@ export function preRankOrder(
   });
 }
 
-/** "建議": the highest score in each language group (zh joins zh-Hant), computed when read. */
+/** "Suggestions (not done, worth doing)": the highest score in each language group (zh joins zh-Hant), computed when read. */
 function recommendedIds(rows: CandidateRow[]): Set<string> {
   const best = new Map<string, CandidateRow>();
   for (const r of rows) {

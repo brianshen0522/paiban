@@ -11,7 +11,7 @@ import { parse, requireAdmin } from '../http/guards.js';
 import { linkBase } from '../http/links.js';
 import { readSettings } from '../settings/settings.js';
 
-/** Administration of people (docs/04-api.md, "管理"; docs/11-pages.md, "使用者與邀請", "操作紀錄"). */
+/** Administration of people (docs/04-api.md, "Admin"; docs/11-pages.md, "Users & invites (15)", "Activity log (21)"). */
 
 type UserRow = {
   id: string;

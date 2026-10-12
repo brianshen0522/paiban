@@ -5,7 +5,7 @@ import type { Logger } from 'pino';
 import type { Engine } from '../torrent/engine.js';
 
 /**
- * THE deletion module (docs/10-storage.md, "刪除"; AGENTS.md rule 1). Nothing else in the program
+ * THE deletion module (docs/10-storage.md, "Deletion"; AGENTS.md rule 1). Nothing else in the program
  * removes anything under /data, WebTorrent's destroyStore included. Every function here is the
  * execution of something a person pressed, or one of the listed scratch clean-ups; none of them
  * takes or computes an age, and nothing calls them because time passed.
@@ -22,7 +22,7 @@ export type RemovedDownload = { infoHash: string; mediaIds: string[]; subtitleId
 
 /**
  * A download whose `want` is 'remove': the last holder left or an administrator force-deleted it
- * (docs/03-data-model.md, "刪除一個下載時發生的事", steps 1 and 3). Safe to run again after a crash:
+ * (docs/03-data-model.md, "What happens when a download is deleted", steps 1 and 3). Safe to run again after a crash:
  * removing what is already gone is not an error.
  */
 export async function removeDownloadFiles(
@@ -59,7 +59,7 @@ export async function removePoster(dataDir: string, posterPath: string): Promise
 }
 
 /**
- * An administrator deleted a film's preview assets (docs/10-storage.md, "刪除": 管理員刪除預覽檔).
+ * An administrator deleted a film's preview assets (docs/10-storage.md, "Deletion": an administrator deletes preview files).
  * Only the preview video and audio go; the film and its analysis stay.
  */
 export async function removePreviewFiles(dataDir: string, mediaId: string, log: Logger): Promise<void> {
@@ -109,7 +109,7 @@ export async function removeSubtitleFiles(dataDir: string, subtitleId: string, l
   log.info({ subtitleId }, 'subtitle removed (requested by a person)');
 }
 
-/* ---------------------------------------------------------------- scratch (docs/10-storage.md, "哪些清理不算自動刪除") */
+/* ---------------------------------------------------------------- scratch (docs/10-storage.md, "Which clean-ups don't count as automatic deletion") */
 
 /**
  * The media service at start-up: the work folders of jobs that did not finish, and half-written
@@ -153,7 +153,7 @@ export async function removeWorkDir(dataDir: string, jobDir: string): Promise<vo
 
 /**
  * A job's own output that it just wrote, when its final conditional update found the row gone,
- * cancelled or being deleted (docs/08-media-pipeline.md, "工作的共通規矩"). Only names under
+ * cancelled or being deleted (docs/08-media-pipeline.md, "Common rules for jobs"). Only names under
  * /data/media/<id> that a media job writes.
  */
 export async function removeOwnMediaOutput(dataDir: string, mediaId: string, files: string[]): Promise<void> {
@@ -181,7 +181,7 @@ async function dropEmptyExportDir(dataDir: string, exportId: string): Promise<vo
 /**
  * The subtitle tracks an export wrote for ffmpeg (`/data/exports/<id>/tracks/`), once the export
  * has its final outcome: done, failed twice, cancelled, or its film removed (docs/10-storage.md,
- * "哪些清理不算自動刪除"). The folder goes too when that leaves it empty.
+ * "Which clean-ups don't count as automatic deletion"). The folder goes too when that leaves it empty.
  */
 export async function removeExportTracks(dataDir: string, exportId: string): Promise<void> {
   await rm(under(dataDir, 'exports', exportId, 'tracks'), { recursive: true, force: true });
@@ -190,7 +190,7 @@ export async function removeExportTracks(dataDir: string, exportId: string): Pro
 
 /**
  * The mux job's own output: its `.part`, or the finished MKV when the final conditional update
- * found the row cancelled or its film being removed (docs/08-media-pipeline.md, "工作的共通規矩").
+ * found the row cancelled or its film being removed (docs/08-media-pipeline.md, "Common rules for jobs").
  */
 export async function removeOwnExportOutput(dataDir: string, exportId: string, fileName: string): Promise<void> {
   if (!/\.mkv(\.part)?$/i.test(fileName)) throw new Error(`not an export output: ${fileName}`);
@@ -201,7 +201,7 @@ export async function removeOwnExportOutput(dataDir: string, exportId: string, f
 /**
  * A subtitle or candidate folder that a job (or the api's "add") just moved into place, when its
  * final conditional write found the film being removed, the row gone, or the same subtitle added
- * by someone else meanwhile (docs/03-data-model.md, "刪除一個下載時發生的事"; docs/07, "加入" step 6).
+ * by someone else meanwhile (docs/03-data-model.md, "What happens when a download is deleted"; docs/07, "Adding" step 6).
  */
 export async function removeOwnSubtitleOutput(
   dataDir: string,

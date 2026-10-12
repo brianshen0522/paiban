@@ -14,7 +14,7 @@ export function createPool(databaseUrl: string, max = 10): Pool {
   return new pg.Pool({ connectionString: databaseUrl, max });
 }
 
-/** Runs `fn` in a READ COMMITTED transaction (docs/03-data-model.md, "交易的邊界"). */
+/** Runs `fn` in a READ COMMITTED transaction (docs/03-data-model.md, "Transaction boundaries"). */
 export async function tx<T>(pool: Pool, fn: (c: Client) => Promise<T>): Promise<T> {
   const c = await pool.connect();
   try {

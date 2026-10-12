@@ -3,7 +3,7 @@ import { film, fixture, subtitle } from './export-helpers.js';
 import { call, createUser, login, type TestApp, testApp, testDb } from './helpers.js';
 
 /**
- * The site-wide library (Brian, 2026-10-09; docs/11-pages.md, "片庫"): everyone sees every finished
+ * The site-wide library (Brian, 2026-10-09; docs/11-pages.md, "Library (06, 25, 30)"): everyone sees every finished
  * film and joins one with a press, no space taken; holding and deleting stay as they were.
  */
 let db: Awaited<ReturnType<typeof testDb>>;

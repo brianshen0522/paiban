@@ -1,147 +1,147 @@
-# 07 字幕來源
+# 07 Subtitle sources
 
-四個來源加上使用者上傳，**全部在同一個階段完成**（D5）。階段內先做 JustSubtitles，因為它最重要，也因為它把整條路（搜尋 → 下載 → 解壓縮 → 轉碼 → 判斷語言）都走過一遍，其他來源只是換一個取得清單的方法。
+Four sources plus user uploads, **all done in the same phase** (D5). Within the phase, JustSubtitles comes first, because it matters most and because it walks the whole path (search → download → extract → convert encoding → detect language); the other sources only swap in a different way of getting the list.
 
-| 來源 | 方式 | 查詢依據 | 需要的設定 |
+| Source | Method | Looked up by | Settings needed |
 | --- | --- | --- | --- |
-| JustSubtitles | 它網站用的 JSON 介面；備援是 SubDL 官方 API | TMDB 編號 | 建議有 TMDB 金鑰；備援模式要 SubDL 金鑰 |
-| YIFY Subtitles | 解析網頁 | IMDb 編號 | 無 |
-| 射手網（偽） | 官方 API | 片名關鍵字 | API token |
-| 字幕庫 | 協助式：只給連結，使用者自己下載後上傳 | 片名 | 無 |
-| 上傳 | 使用者拖檔案進來 | | 無 |
+| JustSubtitles | The JSON interface its website uses; fallback is the official SubDL API | TMDB ID | TMDB key recommended; fallback mode needs a SubDL key |
+| YIFY Subtitles | Parse web pages | IMDb ID | None |
+| Assrt (Shooter) | Official API | Title keywords | API token |
+| Zimuku | Assisted: only gives a link; the user downloads and then uploads | Title | None |
+| Upload | The user drags files in | | None |
 
-這份文件裡各來源的細節是 2026-10-04 查證的。**第三方網站隨時會改。** 階段 0 的第 4 項是對每個來源錄下一份真實回應，和這裡寫的對一次，有出入就更新這份文件和 `reference/providers/` 的範例。
+The per-source details in this document were verified on 2026-10-04. **Third-party sites can change at any time.** Item 4 of Phase 0 records one real response from each source and checks it against what is written here; on any mismatch, update this document and the samples in `reference/providers/`.
 
-## 共通規則
+## Common rules
 
-這些規則適用於每一個來源，實作成共用的 HTTP 用戶端，不要每個來源各寫一套。
+These rules apply to every source. Implement them as a shared HTTP client; don't write a separate one per source.
 
-- **只連允許的主機。** 每個來源有一份主機清單（下面各節列出）。來源回應裡給的下載網址，主機不在清單裡就不連。解析出來的 IP 是私有位址、loopback、link-local 也不連。轉址最多 3 次，每一次都重新檢查。（開發和測試時用 `ALLOW_LOCAL_SOURCES` 和 `SOURCE_OVERRIDES` 把這些主機換成假的來源，見 [15-testing.md](15-testing.md)；主機清單本身仍然照樣檢查。）
-- **逾時 10 秒**（下載檔案 30 秒）。**回應大小上限**：JSON 和 HTML 2 MB，字幕檔 20 MB。
-- **`User-Agent: Paiban/<版本>`**，不偽裝成瀏覽器。
-- **不繞過任何擋自動存取的機制**（D27）。拿到驗證碼頁、挑戰頁、或明顯不是預期內容的回應，就把這個來源標成 `BAD_RESPONSE` 並停止。不重試、不換標頭、不模擬瀏覽器。
-- **金鑰衛生**（D28）：
-  - 我們自己的金鑰和 token 盡量放在標頭，不放在網址。不得已要放網址時（SubDL、TMDB v3），記 log 前把 query string 整個去掉。
-  - 回應裡出現的任何別人的金鑰（例如 JustSubtitles 的 `url` 有時帶 `?api_key=…`）在**解析的那一刻**就丟掉：取 `url` 時只保留路徑。不存、不記、不使用。這要有單元測試。
-- **一個來源失敗不影響其他來源。** 每個來源的結果和錯誤各自寫進 `subtitle_searches`，各自發事件。
-- **快取**在 `provider_cache`，有效時間是設定 `providers.cacheHours`（預設 24 小時，1 到 168）。存的是**解析之後**的結果（`FoundSubtitle` 的清單），不是來源的原始回應；原始回應可能夾帶別人的金鑰，解析後的不會。使用者按「重新搜尋」或「重試」時略過快取（`refresh: true`）。
-- **各來源的請求排隊**（D41）：對同一個來源，不論是哪個程式發的請求（目前查詢和下載都由 `api` 發，但規則不依賴這件事），兩個請求之間至少隔一段時間：JustSubtitles（含 SubDL）和 YIFY Subtitles 是 1 秒，射手網是 3.4 秒（每分鐘 18 次以內）。因為請求來自兩個程式，這個隊排在資料庫裡：發請求前呼叫 `select provider_take_slot('<來源>', <毫秒>)`，它回傳「你可以送出的時間」，等到那個時間再送（`db/schema.sql`，有測試）。TMDB 和 YTS 不排這個隊。
+- **Only connect to allowed hosts.** Each source has a host list (given in each section below). A download URL given in a source's response is not fetched if its host is not on the list. Nor are hosts whose resolved IP is private, loopback or link-local. At most 3 redirects, each checked again. (In development and testing, `ALLOW_LOCAL_SOURCES` and `SOURCE_OVERRIDES` swap these hosts for fake sources, see [15-testing.md](15-testing.md); the host list itself is still checked.)
+- **Timeout 10 seconds** (30 seconds for file downloads). **Response size limits**: 2 MB for JSON and HTML, 20 MB for subtitle files.
+- **`User-Agent: Paiban/<version>`**; never pose as a browser.
+- **Never bypass any mechanism that blocks automated access** (D27). On a CAPTCHA page, a challenge page, or a response that is clearly not the expected content, mark the source `BAD_RESPONSE` and stop. No retries, no changing headers, no imitating a browser.
+- **Key hygiene** (D28):
+  - Put our own keys and tokens in headers rather than URLs whenever possible. When they have to go in the URL (SubDL, TMDB v3), strip the whole query string before logging.
+  - Any key belonging to someone else that appears in a response (for example, JustSubtitles' `url` sometimes carries `?api_key=…`) is dropped **at the moment of parsing**: keep only the path when reading `url`. Never store, log or use it. This needs a unit test.
+- **One source failing doesn't affect the others.** Each source's results and errors are written to `subtitle_searches` separately, and each emits its own events.
+- **Caching** lives in `provider_cache`, valid for the setting `providers.cacheHours` (default 24 hours, 1 to 168). It stores the **parsed** result (a list of `FoundSubtitle`), not the source's raw response; the raw response may carry someone else's key, the parsed one won't. When the user presses "Search again" or "Retry", the cache is skipped (`refresh: true`).
+- **Per-source request queue** (D41): for a given source, no matter which program sends the request (currently both lookups and downloads are sent by `api`, but the rule doesn't depend on that), consecutive requests are spaced at least a minimum interval apart: 1 second for JustSubtitles (including SubDL) and YIFY Subtitles, 3.4 seconds for Assrt (fewer than 18 a minute). Because requests come from two programs, this queue lives in the database: before sending a request, call `select provider_take_slot('<source>', <milliseconds>)`; it returns "the time you may send", and you wait until then (`db/schema.sql`, tested). TMDB and YTS don't use this queue.
 
-### 介面
+### Interface
 
 ```ts
 interface SubtitleProvider {
   id: 'justsubtitles' | 'yify' | 'assrt';
-  hosts: string[];                                    // 允許連的主機(可用尾碼比對)
+  hosts: string[];                                    // allowed hosts (suffix match allowed)
   search(film: FilmContext, languages: Lang[]): Promise<FoundSubtitle[]>;
-  /** 回傳現在可以下載的網址。有些來源的下載網址是臨時的,所以要在下載前才解析。 */
+  /** Returns URLs that can be downloaded now. Some sources' download URLs are temporary, so resolve them right before downloading. */
   resolveDownload(ref: string): Promise<{ url: string; fileName?: string }[]>;
-  /** 回代碼和資料,不回句子。SourceCheck 定義在 packages/shared/src/contracts/api.ts。 */
+  /** Returns codes and data, not sentences. SourceCheck is defined in packages/shared/src/contracts/api.ts. */
   test(): Promise<SourceCheck>;
 }
 
 type FilmContext = {
   imdbCode: string; tmdbId: number | null;
   title: string; titleZh: string | null; year: number;
-  release: { quality: string; source: string; videoCodec: string };   // 下載的那個版本
+  release: { quality: string; source: string; videoCodec: string };   // the downloaded version
 };
 
 type FoundSubtitle = {
-  ref: string;                 // 這個來源裡的穩定編號
-  languageLabel: string;       // 來源自己的說法,原樣保留
-  language: DetectedLang;      // 我們的猜測
+  ref: string;                 // stable ID within this source
+  languageLabel: string;       // the source's own wording, kept as is
+  language: DetectedLang;      // our guess
   releaseName: string; uploader: string | null; pageUrl: string | null;
   hearingImpaired: boolean; rating: number | null;
 };
 ```
 
-### 誰做哪一步
+### Who does which step
 
-對外的查詢需要金鑰，只有 `api` 解得開，所以分工是：
+Outbound lookups need keys, which only `api` can decrypt, so the work is split like this:
 
-| 步驟 | 佇列 | 誰 | 做什麼 |
+| Step | Queue | Who | What it does |
 | --- | --- | --- | --- |
-| 查詢 | `subtitle.search` | api | 一個來源、一部片一個工作。呼叫 `search`，把結果寫進 `subtitle_candidates` 和 `subtitle_searches`，`NOTIFY`（`candidates`） |
-| 問下載網址並下載 | `subtitle.resolve` | api | 一條候選一個工作。呼叫 `resolveDownload`，馬上下載，把檔案和一份 `manifest.json`（每個檔案原本的檔名）先寫進 `/data/tmp/uploads/<候選 id>.part/`，確認候選還在抓、那部片沒有在被刪除，再改名成 `/data/tmp/uploads/<候選 id>/`，`NOTIFY paiban_media`。網址只在記憶體裡，不存進資料表，也不寫進 log。問不到或抓不到就把候選標成失敗（`DOWNLOAD_FAILED`），並 `NOTIFY paiban_media` 讓排名的進度跟著更新 |
-| 處理 | `subtitle.fetch` | media | 解壓縮、轉成句子清單（見「下載與處理」）。做完 `NOTIFY paiban_events`（`candidates`）；在等排名的候選（`align_state = 'queued'`）接著由 `subtitle.rank` 對齊 |
-| 上傳的檔案 | `subtitle.ingest` | media | 和上一步是同一個工作：上傳的檔案一樣放在 `/data/tmp/uploads/<候選 id>/` |
+| Lookup | `subtitle.search` | api | One job per source per film. Calls `search`, writes the results to `subtitle_candidates` and `subtitle_searches`, `NOTIFY` (`candidates`) |
+| Resolve the download URL and download | `subtitle.resolve` | api | One job per candidate. Calls `resolveDownload`, downloads right away, writes the files plus a `manifest.json` (each file's original name) to `/data/tmp/uploads/<candidate id>.part/` first, checks that the candidate is still being fetched and the film is not being deleted, then renames it to `/data/tmp/uploads/<candidate id>/`, `NOTIFY paiban_media`. The URL is kept only in memory, never stored in a table or written to the log. If the URL can't be resolved or the download fails, the candidate is marked failed (`DOWNLOAD_FAILED`), and `NOTIFY paiban_media` so the ranking progress updates too |
+| Processing | `subtitle.fetch` | media | Extract, convert to a list of lines (see "Download and processing"). When done, `NOTIFY paiban_events` (`candidates`); candidates waiting to be ranked (`align_state = 'queued'`) are then aligned by `subtitle.rank` |
+| Uploaded files | `subtitle.ingest` | media | Same job as the previous step: uploaded files are also placed in `/data/tmp/uploads/<candidate id>/` |
 
-查詢做成工作而不是在請求裡直接呼叫，有兩個好處：端點可以立刻回應；`api` 重啟時工作會被重新派送，不會留下永遠停在「查詢中」的來源。
+Making lookups jobs rather than calling them directly in the request has two benefits: the endpoint can respond immediately, and when `api` restarts the jobs are dispatched again, so no source is left stuck at "Searching…" forever.
 
-和 `media` 一樣，這些工作沒有另外的佇列，資料表本身就是待辦（2026-10-06 的變更，見 [changes.md](changes.md)）：`state = 'running'` 的 `subtitle_searches` 列是待做的查詢；`fetch_state = 'fetching'`、還沒有暫存資料夾的候選是待下載的；有暫存資料夾的是待 `media` 處理的。`api` 對每個來源各有一條線，依序處理那個來源的查詢和下載，所以一個慢的來源不會擋住其他來源；`api` 啟動時從資料表接著做。下載由 `api` 做而不是 `media`，是因為射手網的下載網址是臨時的，不能存進資料表，又沒有佇列的工作內容可以暫放。
+As with `media`, these jobs have no separate queue; the tables themselves are the to-do list (a change on 2026-10-06, see [changes.md](changes.md)): `subtitle_searches` rows with `state = 'running'` are lookups to do; candidates with `fetch_state = 'fetching'` and no temp folder yet are waiting to be downloaded; those with a temp folder are waiting for `media` to process them. `api` has one lane per source, which handles that source's lookups and downloads in order, so one slow source doesn't hold up the others; on startup `api` picks up from the tables. Downloads are done by `api` rather than `media` because Assrt's download URLs are temporary, can't be stored in a table, and there is no queued job payload to hold them in.
 
-這四種短工作不走「等待中 → 進行中」的認領（[08-media-pipeline.md](08-media-pipeline.md) 的「先認領」是給有 `tasks` 的工作用的）：它們的狀態只有「正在做」一種。其餘的規矩照樣要守，尤其是 [03-data-model.md](03-data-model.md)「刪除一個下載時發生的事」的那四條：不替正在被刪除的片開工、寫檔之前再確認一次、最後那一筆更新的條件包含那個下載的 `want` 不是 `remove`。防止重複靠兩件事：同一條線一次只做一件；工作一開始先確認那一列還需要它（來源還是 `running`、候選還是 `fetching`），不需要就直接結束。真的做了兩次也沒有害處：結果在工作目錄裡準備，最後那一筆帶條件的更新只有一個會成功（查詢的那一筆比對開始的時間，所以被新的搜尋取代的舊查詢寫不進去），另一個把自己準備的東西丟掉。
+These four kinds of short jobs don't go through the "Waiting → Running" claim (the "claim first" rule in [08-media-pipeline.md](08-media-pipeline.md) is for jobs that have `tasks`): their only state is "in progress". The other rules still apply, especially the four in "What happens when a download is deleted" in [03-data-model.md](03-data-model.md): don't start work for a film that is being deleted, check once more before writing files, and make the final update's condition include that the download's `want` is not `remove`. Duplicates are prevented by two things: each lane does one thing at a time, and each job first checks that its row still needs it (the source is still `running`, the candidate is still `fetching`) and simply ends if not. Doing the work twice is harmless anyway: results are prepared in a working directory, and only one of the final conditional updates succeeds (the lookup's update compares the start time, so an old lookup replaced by a newer search can't write); the other discards what it prepared.
 
-查詢的工作不自動重試：失敗就把那個來源記成 `error`，由使用者按「重試」。唯一的例外是射手網的額度限制（見它那一節）：那個查詢的工作把自己延後到可以重試的時間再做一次，只此一次。
+Lookup jobs don't retry automatically: on failure the source is recorded as `error`, and the user presses "Retry". The only exception is Assrt's quota limit (see its section): that lookup job postpones itself until the time it may retry and runs once more, just once.
 
-`api` 處理的這兩種工作做完時直接發 `candidates` 事件；`media` 處理的那兩種用 `NOTIFY`。
+When the two kinds of jobs handled by `api` finish, they emit the `candidates` event directly; the two handled by `media` use `NOTIFY`.
 
-## 語言
+## Languages
 
-使用者在字幕分頁選要找的語言（繁體中文、簡體中文、English），預設來自個人設定。
+On the Subtitles tab, the user picks the languages to look for (繁體中文 Traditional Chinese, 简体中文 Simplified Chinese, English); the defaults come from Profile.
 
-**來源標的語言只能當參考。** 實際查到的情況是繁體字幕常被歸在簡體底下、反之亦然。所以：
+**The language a source labels is only a hint.** In practice, Traditional subtitles are often filed under Simplified and vice versa. So:
 
-- 搜尋時把範圍放寬：要找繁體中文就同時查這個來源所有的中文分類。
-- 候選清單同時顯示我們的猜測和來源的原始標籤（原型就是這樣：「繁體中文 `ZH_BG`」）。
-- 檔案抓下來之後，**依內容重新判斷**（見「下載與處理」），清單上的語言跟著更新。
-- 加入時，如果內容是簡體而使用者的偏好是「簡體字幕自動轉成繁體」，就轉。
+- Widen the search: when looking for Traditional Chinese, query all of the source's Chinese categories.
+- The candidate list shows both our guess and the source's original label (the prototype does this: "繁體中文 `ZH_BG`").
+- After the file is downloaded, **detect again from the content** (see "Download and processing"), and the language in the list updates accordingly.
+- When adding, if the content is Simplified and the user's preference is "Convert Simplified Chinese subtitles to Traditional automatically", convert it.
 
-| 我們的 | 意思 |
+| Ours | Meaning |
 | --- | --- |
-| `zh-Hant` | 繁體中文 |
-| `zh-Hans` | 簡體中文 |
-| `zh` | 是中文，但還不確定繁簡（還沒抓檔，或內容太短） |
-| `en` | 英文 |
-| `und` | 判斷不出來 |
+| `zh-Hant` | Traditional Chinese |
+| `zh-Hans` | Simplified Chinese |
+| `zh` | Chinese, but not yet sure whether Traditional or Simplified (file not downloaded yet, or content too short) |
+| `en` | English |
+| `und` | Can't tell |
 
 ## JustSubtitles
 
-### 它是什麼
+### What it is
 
-JustSubtitles 的網站前端向自己的 JSON 介面要資料，那個介面不需要登入。字幕資料來自 SubDL，下載檔案也是從 SubDL 的下載主機。網站介面上看不到中文，但介面查得到。
+JustSubtitles' website front end requests data from its own JSON interface, which needs no sign-in. The subtitle data comes from SubDL, and files are downloaded from SubDL's download host too. The website's interface shows no Chinese, but the interface can query it.
 
-這個介面沒有公開文件，隨時可能改。所以有兩種模式（設定 `providers.justsubtitles.mode`）：
+This interface has no public documentation and can change at any time. So there are two modes (setting `providers.justsubtitles.mode`):
 
-| 模式 | 做法 | 什麼時候用 |
+| Mode | How | When to use |
 | --- | --- | --- |
-| `direct`（預設） | 用 JustSubtitles 的介面 | 正常情況 |
-| `subdl` | 用 SubDL 官方 API，同一批字幕 | `direct` 壞掉時，由管理員切換。需要管理員自己申請的 SubDL 金鑰 |
+| `direct` (default) | Use JustSubtitles' interface | Normally |
+| `subdl` | Use the official SubDL API, same set of subtitles | When `direct` breaks; switched by an administrator. Needs a SubDL key the administrator applies for |
 
-兩種模式回傳的每一筆字幕欄位相同，所以共用同一個解析函式。
+Both modes return the same fields for each subtitle, so they share one parsing function.
 
-允許的主機：`www.justsubtitles.com`、`api.justsubtitles.com`、`search.justsubtitles.com`、`api.subdl.com`、`dl.subdl.com`。
+Allowed hosts: `www.justsubtitles.com`, `api.justsubtitles.com`, `search.justsubtitles.com`, `api.subdl.com`, `dl.subdl.com`.
 
-### 查詢（`direct`）
+### Lookup (`direct`)
 
 ```
-GET https://www.justsubtitles.com/api/subtitles/<TMDB 編號>?lang=<語言代碼>
+GET https://www.justsubtitles.com/api/subtitles/<TMDB ID>?lang=<language code>
 ```
 
-（`https://api.justsubtitles.com/api/subtitles/<id>?lang=…` 回一樣的東西，當備用。）
+(`https://api.justsubtitles.com/api/subtitles/<id>?lang=…` returns the same thing; kept as a backup.)
 
-| 事實 | 影響 |
+| Fact | Consequence |
 | --- | --- |
-| 編號**只認 TMDB 編號**。給 IMDb 編號會回 0 筆 | 要先把 IMDb 編號換成 TMDB 編號，見下一小節 |
-| `lang` 一次一種：`EN`、`ZH`、`ZH_BG` | 每種語言一個請求 |
-| 每種語言最多回 30 筆，`page` 參數沒有作用 | 拿不到第 31 筆以後的。熱門片的英文字幕會被截斷 |
-| 編號不存在時，內容是 `{"status":false,"subtitles":[]}`。2026-10-04 用瀏覽器看到的是 **HTTP 500**，2026-10-05 階段 0 從伺服器端查到的是 **HTTP 200** | 兩種都當成「沒有結果」，不是錯誤。判斷方式看內容不看狀態碼：回應是 JSON 而且 `status` 是 false（狀態碼是 200 或 500 都一樣） |
-| 回應帶 `cache-control: public, max-age=86400` | 我們也快取 24 小時 |
-| 不是瀏覽器發的請求也會回應；robots.txt 沒有限制 | |
+| The ID **only accepts TMDB IDs**. An IMDb ID returns 0 results | IMDb IDs must first be turned into TMDB IDs, see the next subsection |
+| `lang` is one at a time: `EN`, `ZH`, `ZH_BG` | One request per language |
+| At most 30 results per language; the `page` parameter has no effect | Results past the 30th can't be reached. English subtitles for popular films get cut off |
+| When the ID doesn't exist, the body is `{"status":false,"subtitles":[]}`. On 2026-10-04 a browser saw **HTTP 500**; on 2026-10-05 Phase 0 got **HTTP 200** from the server side | Treat both as "no results", not an error. Decide by the body, not the status code: the response is JSON and `status` is false (whether the status code is 200 or 500) |
+| The response carries `cache-control: public, max-age=86400` | We cache for 24 hours too |
+| It responds to requests not sent by a browser; robots.txt has no restrictions | |
 
-語言對照：
+Language mapping:
 
-| 要找 | 查哪些 `lang` | 來源的標籤 |
+| Looking for | Which `lang` to query | Source's label |
 | --- | --- | --- |
 | English | `EN` | `english` |
-| 繁體中文 | `ZH_BG` 和 `ZH` 都查 | `big_5_code`；`chinese-bg-code` |
-| 簡體中文 | `ZH` | `chinese-bg-code` |
+| 繁體中文 (Traditional Chinese) | Query both `ZH_BG` and `ZH` | `big_5_code`; `chinese-bg-code` |
+| 简体中文 (Simplified Chinese) | `ZH` | `chinese-bg-code` |
 
-`ZH_BG` 是 SubDL 的「Big 5 code」，名義上是繁體；`ZH` 是「Chinese BG code」，名義上是簡體。以 *Inception* 為例查到 `EN` 30 筆、`ZH` 7 筆、`ZH_BG` 3 筆，而且 `ZH` 裡有檔名帶 `.cht` 的繁體字幕。階段 0 從 `ZH` 下載的第一個檔案就是繁體（`.hk.srt`，UTF-8）。
+`ZH_BG` is SubDL's "Big 5 code", nominally Traditional; `ZH` is "Chinese BG code", nominally Simplified. For *Inception*, the lookup returned 30 for `EN`, 7 for `ZH` and 3 for `ZH_BG`, and `ZH` included Traditional subtitles with `.cht` in the file name. The first file Phase 0 downloaded from `ZH` was Traditional (`.hk.srt`, UTF-8).
 
-**別人的金鑰確實會出現**：階段 0 錄到的回應裡，`ZH` 和 `ZH_BG` 的**每一筆** `url` 都帶 `?api_key=…`，`EN` 的都沒有。去掉 query string 之後，從 `dl.subdl.com` 下載照樣成功（200、`application/zip`），所以不需要、也不使用那個金鑰。
+**Other people's keys really do show up**: in the responses recorded in Phase 0, **every** `url` under `ZH` and `ZH_BG` carried `?api_key=…`, and none under `EN` did. With the query string removed, downloading from `dl.subdl.com` still succeeded (200, `application/zip`), so that key is neither needed nor used.
 
-回應（範例在 `reference/providers/justsubtitles.subtitles.sample.json`）：
+Response (sample in `reference/providers/justsubtitles.subtitles.sample.json`):
 
 ```json
 { "status": true,
@@ -151,281 +151,281 @@ GET https://www.justsubtitles.com/api/subtitles/<TMDB 編號>?lang=<語言代碼
                    "episode_from": null, "episode_end": 0, "full_season": false } ] }
 ```
 
-| 欄位 | 用法 |
+| Field | Use |
 | --- | --- |
-| `url` | **只取路徑**（`/subtitle/<數字>-<數字>.zip`），query string 丟掉。路徑不符合這個樣式就略過這一筆。這個路徑同時是 `ref` |
-| `release_name` | 版本名稱，顯示用，也用來判斷是否和下載的版本相符 |
-| `language` | 語言代碼，用它對照，不要用 `lang`（文字，格式不一致） |
-| `author` | 上傳者 |
-| `hi` | 聽障字幕 |
-| `subtitlePage` | 接在 `https://www.justsubtitles.com` 後面當作來源頁的連結 |
-| 其他 | 影集用的，忽略 |
+| `url` | **Take only the path** (`/subtitle/<number>-<number>.zip`); drop the query string. Skip the entry if the path doesn't match this pattern. This path is also the `ref` |
+| `release_name` | Release name, for display and for deciding whether it matches the downloaded version |
+| `language` | Language code; map from this, not from `lang` (text, inconsistent format) |
+| `author` | Uploader |
+| `hi` | Hearing impaired |
+| `subtitlePage` | Appended to `https://www.justsubtitles.com` as the link to the source page |
+| Others | For TV series; ignored |
 
-### 下載
-
-```
-GET https://dl.subdl.com<url 的路徑>
-```
-
-回應是 `application/zip`。不需要任何參數或金鑰。
-
-### 把 IMDb 編號換成 TMDB 編號
-
-YTS 給的是 IMDb 編號。依序嘗試：
-
-1. 這部片已經查過（`movies.tmdb_id` 或快取）：直接用。
-2. **有 TMDB 金鑰**：
-   ```
-   GET https://api.themoviedb.org/3/find/<IMDb 編號>?external_source=imdb_id&language=zh-TW
-   ```
-   取 `movie_results[0].id`，順便把 `title` 存成中文片名（和原文片名相同就不存）。金鑰看起來是 v4 的讀取權杖（很長、有兩個點）就放 `Authorization: Bearer`；否則是 v3 金鑰，放 `api_key` 參數（記 log 時去掉）。結果快取 30 天。
-3. **沒有 TMDB 金鑰**（D38）：用 JustSubtitles 自己的片名搜尋
-   ```
-   GET https://search.justsubtitles.com/api/search?q=<片名>
-   ```
-   回應是 `{"results": [...]}`，每一筆是 TMDB「搜尋電影」的形狀：`id`、`title`、`original_title`、`release_date`（`YYYY-MM-DD`，可能是 null）、`original_language` 等（範例在 `reference/providers/justsubtitles.search.sample.json`，階段 0 錄的）。結果只有電影，沒有 `media_type` 欄位，所以「是電影」這一條不用另外判斷。只在「片名（或原文片名）不分大小寫完全相同、`release_date` 的年份和 YTS 的年份相同」時採用那一筆的 `id`。有多筆符合或沒有符合就放棄。查 *Inception* 時有兩筆片名完全相同（2010 和 1980），年份這一條是必要的。
-4. 都失敗：這個來源回報 `NOT_CONFIGURED`，訊息引導管理員設定 TMDB 金鑰。其他來源不受影響。
-
-### 備援模式（`subdl`）
+### Download
 
 ```
-GET https://api.subdl.com/api/v1/subtitles?api_key=<金鑰>&imdb_id=<tt…>&type=movie&languages=EN,ZH,ZH_BG&subs_per_page=30
+GET https://dl.subdl.com<path from url>
 ```
 
-- 直接用 IMDb 編號，不需要 TMDB。
-- `subs_per_page` 最大 30。
-- 免費額度每天 2,000 次請求。下載次數的限制，它的兩份文件寫的不一樣（每 IP 每天 300 次或 50 次），以實際遇到的為準。
-- 回應的 `subtitles` 陣列裡每一筆的欄位和上面相同；下載方式相同。
-- 金鑰在網址裡，所以這個來源的請求記 log 時一律不記 query string。
+The response is `application/zip`. No parameters or key needed.
 
-### 測試連線
+### Turning IMDb IDs into TMDB IDs
 
-兩種模式在來源設定頁上是兩個各自的測試（`POST /api/admin/sources/justsubtitles/test` 和 `…/subdl/test`），不管目前用的是哪一種模式都可以測：
+YTS gives IMDb IDs. Try in order:
 
-| 測試 | 做什麼 | 結果 |
+1. This film has been looked up already (`movies.tmdb_id` or the cache): use it directly.
+2. **With a TMDB key**:
+   ```
+   GET https://api.themoviedb.org/3/find/<IMDb ID>?external_source=imdb_id&language=zh-TW
+   ```
+   Take `movie_results[0].id`, and store `title` as the Chinese title while at it (not stored if it equals the original title). If the key looks like a v4 read access token (long, with two dots), send it as `Authorization: Bearer`; otherwise it's a v3 key, sent as the `api_key` parameter (stripped when logging). Cache the result for 30 days.
+3. **Without a TMDB key** (D38): use JustSubtitles' own title search
+   ```
+   GET https://search.justsubtitles.com/api/search?q=<title>
+   ```
+   The response is `{"results": [...]}`, each entry in the shape of TMDB's "search movie": `id`, `title`, `original_title`, `release_date` (`YYYY-MM-DD`, may be null), `original_language` and so on (sample in `reference/providers/justsubtitles.search.sample.json`, recorded in Phase 0). Results are only films and have no `media_type` field, so "is a film" needs no separate check. Use an entry's `id` only when the title (or original title) is an exact case-insensitive match and the year of `release_date` equals the YTS year. If several match or none do, give up. Looking up *Inception* returns two entries with exactly the same title (2010 and 1980), so the year condition is necessary.
+4. All fail: this source reports `NOT_CONFIGURED`, with a message pointing the administrator to set a TMDB key. Other sources are unaffected.
+
+### Fallback mode (`subdl`)
+
+```
+GET https://api.subdl.com/api/v1/subtitles?api_key=<key>&imdb_id=<tt…>&type=movie&languages=EN,ZH,ZH_BG&subs_per_page=30
+```
+
+- Uses the IMDb ID directly; no TMDB needed.
+- `subs_per_page` is at most 30.
+- The free quota is 2,000 requests a day. Its two documents disagree on the download limit (300 or 50 per IP per day); go by what actually happens.
+- Each entry in the response's `subtitles` array has the same fields as above; downloading works the same way.
+- The key is in the URL, so this source's requests are always logged without the query string.
+
+### Test connection
+
+The two modes are two separate tests on the Sources page (`POST /api/admin/sources/justsubtitles/test` and `…/subdl/test`), and either can be tested regardless of which mode is in use:
+
+| Test | What it does | Result |
 | --- | --- | --- |
-| `justsubtitles` | 用 `direct` 的介面查 TMDB 編號 27205 的英文字幕 | `OK` 加 `{count}`；回應不是預期的形狀 `BAD_RESPONSE`；連不上 `UNREACHABLE` |
-| `subdl` | 用官方 API 查 `imdb_id=tt1375666` | `OK` 加 `{count}`；沒有金鑰 `NOT_CONFIGURED`；金鑰被拒絕 `INVALID_KEY`；超過額度 `RATE_LIMITED` |
+| `justsubtitles` | Uses the `direct` interface to look up English subtitles for TMDB ID 27205 | `OK` with `{count}`; response not in the expected shape: `BAD_RESPONSE`; can't connect: `UNREACHABLE` |
+| `subdl` | Uses the official API to look up `imdb_id=tt1375666` | `OK` with `{count}`; no key: `NOT_CONFIGURED`; key rejected: `INVALID_KEY`; over quota: `RATE_LIMITED` |
 
-TMDB 的測試（`…/tmdb/test`）：對 `tt1375666` 呼叫 find。有結果是 `OK`；沒有金鑰 `NOT_CONFIGURED`；回 401 是 `INVALID_KEY`。
+TMDB's test (`…/tmdb/test`): call find for `tt1375666`. Results: `OK`; no key: `NOT_CONFIGURED`; a 401: `INVALID_KEY`.
 
 ## YIFY Subtitles
 
-沒有 API，解析伺服器產生的網頁。網址是設定 `providers.yify.baseUrl`（預設 `https://yts-subs.com`）。
+No API; parse the server-rendered web pages. The URL is the setting `providers.yify.baseUrl` (default `https://yts-subs.com`).
 
-允許的主機：設定的主機、`subtitles.yts-subs.com`（以及設定主機的 `subtitles.` 子網域）。
+Allowed hosts: the configured host, `subtitles.yts-subs.com` (and the `subtitles.` subdomain of the configured host).
 
-### 查詢
+### Lookup
 
 ```
-GET <base>/movie-imdb/<IMDb 編號>
+GET <base>/movie-imdb/<IMDb ID>
 ```
 
-頁面裡有一張表，欄位依序是 Rating、Language、Release、Uploader、Download。每一列有連到 `/subtitles/<slug>` 的連結（一列裡有兩個指向同一個 slug 的連結，去重），`<slug>` 就是 `ref`。*Inception* 的頁面有 402 列（English 147、Chinese 6、Big 5 code 2、Chinese BG code 2，其餘是其他語言）。整頁約 290 KB，在 2 MB 的上限內。
+The page has a table whose columns are, in order, Rating, Language, Release, Uploader, Download. Each row has a link to `/subtitles/<slug>` (each row has two links to the same slug; deduplicate), and `<slug>` is the `ref`. The page for *Inception* has 402 rows (English 147, Chinese 6, Big 5 code 2, Chinese BG code 2, the rest other languages). The whole page is about 290 KB, within the 2 MB limit.
 
-- 用結構找（「有這五個欄位標題的表格」），不要依賴 class 名稱。範例在 `reference/providers/yify.movie-page.sample.html`。
-- 只留要找的語言的列，其他丟掉。
+- Find it by structure ("the table with these five column headers"); don't rely on class names. Sample in `reference/providers/yify.movie-page.sample.html`.
+- Keep only rows in the languages being looked for; drop the rest.
 
-| 表上的語言 | 我們的猜測 |
+| Language in the table | Our guess |
 | --- | --- |
 | `English` | `en` |
-| `Chinese` | `zh`（繁簡不明） |
+| `Chinese` | `zh` (Traditional or Simplified unknown) |
 | `Big 5 code` | `zh-Hant` |
 | `Chinese BG code` | `zh-Hans` |
 
-要找繁體中文時，三種中文都列出來。
+When looking for Traditional Chinese, list all three kinds of Chinese.
 
-### 下載
+### Download
 
 1. `GET <base>/subtitles/<slug>`
-2. 找 `a#btn-download-subtitle`，它的 `data-link` 屬性是 base64，解開是 zip 的網址：`https://subtitles.yts-subs.com/subtitles/<slug>.zip`
-3. 解出來的網址主機不在允許清單裡就放棄。
-4. 下載 zip。
+2. Find `a#btn-download-subtitle`; its `data-link` attribute is base64 that decodes to the zip URL: `https://subtitles.yts-subs.com/subtitles/<slug>.zip`
+3. If the decoded URL's host is not on the allowed list, give up.
+4. Download the zip.
 
-找不到那個按鈕、或 `data-link` 解不出一個網址時，**不要自己猜網址去試**。這一筆標成下載失敗（`DOWNLOAD_FAILED`），並把這個來源的狀況記成 `BAD_RESPONSE`：頁面的結構很可能改了，要人來看。
+If the button can't be found, or `data-link` doesn't decode to a URL, **don't guess URLs and try them**. Mark the entry as download failed (`DOWNLOAD_FAILED`) and record the source's status as `BAD_RESPONSE`: the page structure has very likely changed and needs a person to look.
 
-### 測試連線
+### Test connection
 
-抓 `tt1375666` 的頁面。解析到列：`OK`，`data` 是 `{rows: 列數}`。解析到 0 列而頁面不是 404，表示版面改了：`BAD_RESPONSE`。連不上：`UNREACHABLE`。
+Fetch the page for `tt1375666`. Rows parsed: `OK`, with `data` of `{rows: row count}`. 0 rows parsed while the page is not a 404 means the layout changed: `BAD_RESPONSE`. Can't connect: `UNREACHABLE`.
 
-## 射手網（偽）
+## Assrt (Shooter)
 
-官方 API，文件在 `https://assrt.net/api/doc`。需要 token（管理員在射手網註冊後從使用者面板取得）。
+Official API, documented at `https://assrt.net/api/doc`. Needs a token (the administrator gets it from the user panel after signing up at Assrt).
 
-允許的主機：`api.assrt.net`（備用 `api.makedie.me`），以及 API 回應裡下載網址的主機；後者限定 `assrt.net` 的子網域，實際出現其他網域時先記 log、不連，再由人決定要不要加進清單。
+Allowed hosts: `api.assrt.net` (backup `api.makedie.me`), plus the hosts of download URLs in API responses; the latter are limited to subdomains of `assrt.net`. If another domain actually shows up, log it and don't connect; a person then decides whether to add it to the list.
 
-### 限制
+### Limits
 
-- **每個 token 加 IP 每分鐘 20 次。** 我們排隊的間隔設成 3.4 秒，也就是每分鐘 18 次以內（見「共通規則」）。
-- 超過會回錯誤碼 `30900`。收到後把這個來源下一次可以送出的時間往後推 60 秒（把 `provider_slots.next_at` 改成 60 秒後），來源狀態標成 `RATE_LIMITED` 並帶上預計重試的時間（`retryAt`）；時間到了自動重試一次。介面上的說法照原型：字幕分頁的來源標籤寫「超過每分鐘 20 次的上限」，旁邊有「重試」；管理頁的來源狀況寫「超過每分鐘 20 次的上限，已自動延後」。
-- token 用 `Authorization: Bearer <token>` 標頭送，不放網址。
-- **使用條款要求標示來源。** 凡是顯示射手網結果的地方都要有「字幕服務由 assrt.net 提供」和連到 `https://assrt.net` 的連結。API 在 `ProviderStatus.credit` 給名稱和網址（`{name: 'assrt.net', url: 'https://assrt.net'}`），句子由前端寫。
+- **20 per minute per token plus IP.** Our queue interval is set to 3.4 seconds, i.e. fewer than 18 a minute (see "Common rules").
+- Going over returns error code `30900`. On receiving it, push this source's next allowed send time back 60 seconds (set `provider_slots.next_at` to 60 seconds later), mark the source status `RATE_LIMITED` with the expected retry time (`retryAt`), and retry automatically once when the time comes. Interface wording follows the prototype: the source label on the Subtitles tab reads "Over the limit of 20 a minute", with "Retry" next to it; the source status on the admin page reads "Over the limit of 20 a minute; postponed automatically".
+- The token is sent in the `Authorization: Bearer <token>` header, not in the URL.
+- **The terms of use require credit.** Everywhere Assrt results are shown must have "Subtitles provided by assrt.net" and a link to `https://assrt.net`. The API gives the name and URL in `ProviderStatus.credit` (`{name: 'assrt.net', url: 'https://assrt.net'}`); the front end writes the sentence.
 
-### 查詢
+### Lookup
 
 ```
-GET https://api.assrt.net/v1/sub/search?q=<關鍵字>&cnt=15&pos=0
+GET https://api.assrt.net/v1/sub/search?q=<keywords>&cnt=15&pos=0
 ```
 
-- `q` 至少 3 個字元。`cnt` 最大 15。
-- 還有 `is_file`、`no_muxer`、`filelist` 三個參數，確切意義以官方文件為準，第一版不用。
-- 它是關鍵字搜尋，不是用編號，所以會混進別的片。做法：
-  1. 查 `<英文片名> <年份>`。
-  2. 有中文片名（來自 TMDB）時再查一次中文片名。
-  3. 兩次結果用 `id` 去重。
-  4. 只留 `videoname` 或 `native_name` 裡出現年份、或出現片名（去掉標點、不分大小寫）的結果。
-- 一部片最多用掉 2 次查詢額度。
+- `q` is at least 3 characters. `cnt` is at most 15.
+- There are also three parameters, `is_file`, `no_muxer` and `filelist`; their exact meaning is as in the official documentation; the first version doesn't use them.
+- It's a keyword search, not by ID, so other films get mixed in. Approach:
+  1. Search `<English title> <year>`.
+  2. If there is a Chinese title (from TMDB), search the Chinese title as well.
+  3. Deduplicate the two result sets by `id`.
+  4. Keep only results whose `videoname` or `native_name` contains the year, or the title (punctuation removed, case-insensitive).
+- One film uses at most 2 lookups of quota.
 
-結果的欄位（範例在 `reference/providers/assrt.search.sample.json`）：
+Result fields (sample in `reference/providers/assrt.search.sample.json`):
 
-| 欄位 | 用法 |
+| Field | Use |
 | --- | --- |
 | `id` | `ref` |
-| `videoname` | 版本名稱。空的時候用 `native_name` |
-| `native_name` | 片名 |
-| `lang.desc` | 來源的語言說明，原樣當作 `languageLabel` |
-| `lang.langlist` | 一個物件，鍵表示有哪些語言：`langcht` 繁體、`langchs` 簡體、`langeng` 英文、`langdou` 雙語（鍵名憑記憶，以實際回應為準）。有繁體就猜 `zh-Hant`，只有簡體猜 `zh-Hans`，只有英文猜 `en` |
-| `subtype` | 格式說明。含 `VobSub` 的是圖形字幕，**略過** |
-| `release_site`、`vote_score`、`upload_time` | 顯示與排序 |
+| `videoname` | Release name. Use `native_name` when empty |
+| `native_name` | Title |
+| `lang.desc` | The source's language description, used as is for `languageLabel` |
+| `lang.langlist` | An object whose keys show which languages are present: `langcht` Traditional, `langchs` Simplified, `langeng` English, `langdou` bilingual (key names from memory; go by the actual response). If Traditional is present, guess `zh-Hant`; only Simplified, guess `zh-Hans`; only English, guess `en` |
+| `subtype` | Format description. Anything containing `VobSub` is image-based subtitles: **skip** |
+| `release_site`, `vote_score`, `upload_time` | Display and sorting |
 
-### 下載
+### Download
 
 ```
 GET https://api.assrt.net/v1/sub/detail?id=<id>
 ```
 
-回應多了 `filename`、`url`（整包的下載網址）和 `filelist`（壓縮檔裡每個檔案各自的下載網址，`f` 是檔名、`s` 是大小、`url` 是網址）。
+The response adds `filename`, `url` (download URL for the whole package) and `filelist` (separate download URLs for each file in the archive: `f` is the file name, `s` the size, `url` the URL).
 
-- **優先用 `filelist`**：挑副檔名是字幕的那些，一個檔案一個網址，不必解壓縮。射手網的檔案很多是 RAR，這樣可以避開。
-- `filelist` 是空的才下載 `url` 再解壓縮。
-- 這些網址是臨時的，所以 `resolveDownload` 在真正要下載前才呼叫，網址只放在工作的內容裡，不存進 `subtitle_candidates.download_url`。
-- 每抓一筆要用一次查詢額度。「全部自動對齊並排名」會抓很多筆，所以射手網的候選會一筆一筆慢慢出現，這是正常的。
+- **Prefer `filelist`**: pick the entries with subtitle extensions, one URL per file, no extraction needed. Many Assrt files are RAR, and this avoids them.
+- Only download `url` and extract it when `filelist` is empty.
+- These URLs are temporary, so `resolveDownload` is called only right before the actual download, and the URLs are kept only in the job's payload, never stored in `subtitle_candidates.download_url`.
+- Each fetch uses one lookup of quota. "Auto-align and rank them all" fetches many entries, so Assrt's candidates appear slowly, one at a time; that is normal.
 
-### 錯誤碼
+### Error codes
 
-| 代碼 | 意思 | 我們的處理 |
+| Code | Meaning | What we do |
 | --- | --- | --- |
-| `1` | 使用者不存在 | `NOT_CONFIGURED` |
-| `101` | 關鍵字少於 3 個字元 | 不該發生；略過那次查詢 |
-| `20000` | 缺少參數 | `BAD_RESPONSE` |
-| `20001` | token 無效 | `NOT_CONFIGURED` |
-| `20400` | 端點不存在 | `BAD_RESPONSE` |
-| `20900` | 找不到字幕 | 那一筆標成下載失敗 |
-| `30000`、`30001`、`30002`、`30300` | 伺服器、資料庫、搜尋或 API 暫時無法使用 | `UNREACHABLE` |
-| `30900` | 超過額度 | `RATE_LIMITED`，見上 |
+| `1` | User doesn't exist | `NOT_CONFIGURED` |
+| `101` | Keyword shorter than 3 characters | Shouldn't happen; skip that lookup |
+| `20000` | Missing parameter | `BAD_RESPONSE` |
+| `20001` | Invalid token | `NOT_CONFIGURED` |
+| `20400` | Endpoint doesn't exist | `BAD_RESPONSE` |
+| `20900` | Subtitle not found | Mark that entry as download failed |
+| `30000`, `30001`, `30002`, `30300` | Server, database, search or API temporarily unavailable | `UNREACHABLE` |
+| `30900` | Over quota | `RATE_LIMITED`, see above |
 
-### 測試連線
+### Test connection
 
-呼叫 `GET /v1/user/quota`。成功是 `OK`，`data` 是 `{quota: 剩餘額度}`；沒有 token 是 `NOT_CONFIGURED`；token 無效（`20001`）是 `INVALID_KEY`。
+Call `GET /v1/user/quota`. Success is `OK`, with `data` of `{quota: remaining quota}`; no token is `NOT_CONFIGURED`; invalid token (`20001`) is `INVALID_KEY`.
 
-## 字幕庫（協助式）
+## Zimuku (assisted)
 
-字幕庫用驗證碼擋自動存取，所以**系統完全不連它**（D27）。
+Zimuku blocks automated access with a CAPTCHA, so **the system never connects to it** (D27).
 
-- 設定 `providers.zimuku.enabled` 決定字幕分頁要不要顯示這張卡片。
-- 設定 `providers.zimuku.searchUrl` 是一個含 `{q}` 的網址樣板。它的網域也常換，**沒有預設值**，由管理員填現在能用的。沒填就不顯示按鈕。
-- 按鈕在新分頁開啟 `searchUrl`，`{q}` 換成「片名 年份」（有中文片名就用中文片名）。連結帶 `rel="noopener noreferrer"`。
-- 卡片上寫兩個步驟：開啟搜尋頁、通過驗證後下載壓縮檔；把壓縮檔拖到上傳區。
+- The setting `providers.zimuku.enabled` decides whether the Subtitles tab shows this card.
+- The setting `providers.zimuku.searchUrl` is a URL template containing `{q}`. Its domain also changes often, so there is **no default**; an administrator fills in one that currently works. If it's empty, the button isn't shown.
+- The button opens `searchUrl` in a new tab, with `{q}` replaced by "title year" (the Chinese title if there is one). The link carries `rel="noopener noreferrer"`.
+- The card lists two steps: open the search page, pass the check and download the archive; drag the archive onto the upload area.
 
-## 上傳
+## Upload
 
-- 接受 `.srt`、`.ass`、`.ssa`、`.vtt`、`.zip`、`.rar`、`.7z`，上限 20 MB。（介面上的句子照原型只列 `.srt`、`.ass`、`.vtt`；`.ssa` 也收，只是不特別寫出來。）
-- `api` 把檔案先存到 `/data/tmp/uploads/<隨機名稱>.part/`，算出它的 sha256，**當場建立一條候選**（`provider = 'upload'`、`provider_ref` 是 sha256、`release_name` 是檔名、`fetch_state = 'fetching'`），再把資料夾改名成 `/data/tmp/uploads/<候選 id>/`，`NOTIFY paiban_media`，立刻回傳候選清單。使用者馬上看得到一列「處理中」。
-- 後續處理和從來源下載的檔案完全一樣。壓縮檔裡有好幾個字幕檔時，原本那條候選變成其中一個，其餘的各新增一條。
-- 處理成功，那一列變成可以「加入」。處理失敗，那一列顯示原因（`fetchError`）和「移除」（`DELETE /api/candidates/:id`）。這樣讀不了的檔案不會無聲無息地消失。
-- 同一個檔案再上傳一次：不會多一列。已經處理好的原樣回傳；上次失敗的重新處理一次。
+- Accepts `.srt`, `.ass`, `.ssa`, `.vtt`, `.zip`, `.rar`, `.7z`, up to 20 MB. (Following the prototype, the interface text lists only `.srt`, `.ass`, `.vtt`; `.ssa` is accepted too, just not mentioned.)
+- `api` first saves the file to `/data/tmp/uploads/<random name>.part/`, computes its sha256, **creates a candidate on the spot** (`provider = 'upload'`, `provider_ref` is the sha256, `release_name` is the file name, `fetch_state = 'fetching'`), then renames the folder to `/data/tmp/uploads/<candidate id>/`, `NOTIFY paiban_media`, and returns the candidate list immediately. The user sees a "Processing…" row right away.
+- Further processing is exactly the same as for files downloaded from sources. When an archive contains several subtitle files, the original candidate becomes one of them and a new candidate is added for each of the rest.
+- If processing succeeds, the row can be "Add"ed. If it fails, the row shows the reason (`fetchError`) and "Remove" (`DELETE /api/candidates/:id`). That way an unreadable file doesn't silently disappear.
+- Uploading the same file again: no extra row. If it was processed already, it's returned as is; if it failed last time, it's processed again.
 
-## 下載與處理（`subtitle.resolve` 下載；`subtitle.fetch` / `subtitle.ingest` 處理）
+## Download and processing (`subtitle.resolve` downloads; `subtitle.fetch` / `subtitle.ingest` process)
 
-不論檔案從哪來，都走同一條路。參考實作在 `reference/subtitles/text.mjs`，測試素材在 `fixtures/`。
+Wherever a file comes from, it goes down the same path. The reference implementation is in `reference/subtitles/text.mjs`, and the test fixtures are in `fixtures/`.
 
-1. **下載**（上傳的跳過；由 `api` 做，見「誰做哪一步」）：先取號排隊，再做主機檢查、大小上限、逾時。抓不到就是 `DOWNLOAD_FAILED`。
-2. **判斷是不是壓縮檔**：看檔頭，不看副檔名。
-3. **解壓縮**到 `/data/tmp/work/<job>/`，有這些限制，違反任何一條就整包拒絕（`ARCHIVE_INVALID`）：
-   - 最多 200 個項目；解開後總共不超過 50 MB；單一檔案不超過 10 MB
-   - 項目路徑不能是絕對路徑、不能含 `..`、不能是符號連結
-   - 打不開、格式壞掉也是 `ARCHIVE_INVALID`
-   - 只取 `.srt`、`.ass`、`.ssa`、`.vtt`；其他（`.sub`/`.idx`、`.txt`、`.nfo`、`__MACOSX/`）忽略
-   - 打得開但一個字幕檔都沒有：`NO_SUBTITLE`
-   - 三種格式都用映像檔裡的 `bsdtar`（libarchive 3.7.4，階段 0 驗證過能解 zip、7z、RAR5；RAR4 沒有樣本）。它本身不替我們設任何限制，所以：先用 `bsdtar -tf` / `-tvf` 列出項目，依上面的規則檢查（宣告的大小也算）；通過後只取字幕檔，一個一個用 `bsdtar -x -O` 讀到程式裡，邊讀邊算實際的位元組數（標頭可以造假），由程式自己用固定的檔名寫進工作目錄。`bsdtar` 從頭到尾不寫磁碟，壓縮檔裡的路徑和符號連結沒有機會落地
-4. **轉成文字**：依序看 BOM → 嚴格的 UTF-8 → 試 Big5、GB18030、Shift_JIS、EUC-KR、Windows-1252，取解出來最像語言的那個。記下原本的編碼。
-5. **解析成句子**：SRT、VTT 用我們自己的小解析器（格式簡單：時間行 `-->`、可有可無的編號、VTT 的 `NOTE`/`STYLE` 區塊和時間後面的設定略過；測試涵蓋）；ASS 只取 `Dialogue`，去掉繪圖指令和樣式標記，`\N` 變成換行（D34）。
-6. **正規化**：
-   - 換行統一成 `\n`，去掉每句頭尾空白，丟掉沒有文字的句子
-   - 負的時間夾到 0；結束時間不晚於開始時間的，結束時間設成開始後 1 秒
-   - 依開始時間排序，重新編號 1 到 n（這個編號就是 `Cue.id`，同步文件的逐句修改用它當鍵）
-   - 文字內容不動（SRT 裡的 `<i>` 之類的標記保留，匯出時原樣寫回；畫面上顯示時再處理）
-   - 一句都沒有就當成失敗（`PARSE_FAILED`）
-7. **判斷語言**（依內容）：中文字夠多就是中文，再用繁簡轉換比對哪一種字比較多；否則看是不是英文。
-8. **寫檔**：在工作目錄裡準備好 `original.<ext>`（原始位元組）和 `cues.json`（句子清單），確認那部片沒有在被刪除，再把整個資料夾搬到 `/data/subtitles/candidates/<id>/`。
-9. **多個字幕檔**：一個下載項目裡有好幾個字幕檔時，原本那條候選代表其中一個，其餘的各新增一條候選（`provider_ref` 加上 `#<檔名>`）。原本那條代表哪一個：依內容判斷出來的語言在所選語言裡排最前面的那個檔案；分不出來（或是上傳的檔案，沒有「所選語言」）就取依檔名排序的第一個。
-10. 更新候選：`fetch_state = 'ready'`、語言、句數、大小、原始編碼。這一筆更新帶條件，而且條件寫在同一個敘述裡（那一列還在、還是 `fetching`、那個下載的 `want` 不是 `remove`）；改不到就把剛搬過去的資料夾刪掉。清掉工作目錄。`NOTIFY`（`candidates`）。
+1. **Download** (skipped for uploads; done by `api`, see "Who does which step"): first take a slot in the queue, then do the host check, size limit and timeout. If it can't be fetched, that's `DOWNLOAD_FAILED`.
+2. **Decide whether it's an archive**: look at the file header, not the extension.
+3. **Extract** to `/data/tmp/work/<job>/`, with these limits; breaking any one rejects the whole package (`ARCHIVE_INVALID`):
+   - At most 200 entries; no more than 50 MB extracted in total; no single file over 10 MB
+   - Entry paths can't be absolute, can't contain `..`, and can't be symbolic links
+   - Can't be opened or corrupted format is also `ARCHIVE_INVALID`
+   - Take only `.srt`, `.ass`, `.ssa`, `.vtt`; ignore everything else (`.sub`/`.idx`, `.txt`, `.nfo`, `__MACOSX/`)
+   - Opens but contains no subtitle file at all: `NO_SUBTITLE`
+   - All three formats use `bsdtar` from the image (libarchive 3.7.4; Phase 0 verified it extracts zip, 7z and RAR5; no RAR4 sample). It sets no limits for us on its own, so: first list the entries with `bsdtar -tf` / `-tvf` and check them against the rules above (declared sizes count too); once they pass, take only the subtitle files, reading them one by one into the program with `bsdtar -x -O`, counting the actual bytes while reading (headers can lie), and the program itself writes them into the working directory under fixed file names. `bsdtar` never writes to disk, so the paths and symbolic links inside the archive never get a chance to land
+4. **Convert to text**: check in order BOM → strict UTF-8 → try Big5, GB18030, Shift_JIS, EUC-KR, Windows-1252 and take whichever decodes most like a language. Record the original encoding.
+5. **Parse into lines**: SRT and VTT use our own small parser (simple format: the `-->` timing line, an optional number, skipping VTT's `NOTE`/`STYLE` blocks and the settings after the timing; covered by tests); for ASS, take only `Dialogue`, strip drawing commands and style tags, and turn `\N` into a line break (D34).
+6. **Normalize**:
+   - Unify line breaks to `\n`, trim whitespace at the start and end of each line, drop lines with no text
+   - Clamp negative times to 0; for lines whose end is not later than the start, set the end to 1 second after the start
+   - Sort by start time and renumber 1 to n (this number is `Cue.id`, the key the sync doc's per-line edits use)
+   - Leave the text content alone (tags like `<i>` in SRT are kept and written back as is on export; they're handled when displayed on screen)
+   - Not a single line is a failure (`PARSE_FAILED`)
+7. **Detect the language** (from content): enough Chinese characters means Chinese, then compare with Traditional/Simplified conversion to see which kind of characters dominates; otherwise check whether it's English.
+8. **Write files**: in the working directory, prepare `original.<ext>` (original bytes) and `cues.json` (list of lines), check that the film isn't being deleted, then move the whole folder to `/data/subtitles/candidates/<id>/`.
+9. **Multiple subtitle files**: when one download item contains several subtitle files, the original candidate represents one of them and a new candidate is added for each of the rest (`provider_ref` with `#<file name>` appended). Which one the original represents: the file whose content-detected language comes earliest among the selected languages; if that can't be decided (or it's an upload, with no "selected languages"), the first by file name.
+10. Update the candidate: `fetch_state = 'ready'`, language, line count, size, original encoding. This update is conditional, and the conditions are in the same statement (the row still exists, is still `fetching`, and the download's `want` is not `remove`); if it updates nothing, delete the folder just moved. Clean up the working directory. `NOTIFY` (`candidates`).
 
-任何一步失敗：候選變成 `fetch_state = 'failed'`，`fetch_error` 是上面括號裡的代碼；清掉工作目錄；`NOTIFY`。這個工作不自動重試。失敗的候選不能「加入」：使用者可以把它移除，或重新搜尋（同一個來源裡失敗的會被新的結果取代）、重新上傳。
+If any step fails: the candidate becomes `fetch_state = 'failed'`, with `fetch_error` being the code in parentheses above; clean up the working directory; `NOTIFY`. This job doesn't retry automatically. A failed candidate can't be "Add"ed: the user can remove it, search again (failed ones from the same source are replaced by the new results), or upload again.
 
-### 加入
+### Adding
 
-`POST /api/candidates/:id/add`，在 `api` 裡做：
+`POST /api/candidates/:id/add`, done in `api`:
 
-1. 候選還沒抓（`new`）：改成 `fetching`，交給 `api` 的下載（`subtitle.resolve`）。還在抓（`fetching`）：等。**最多等 30 秒**；等不到回 `CANDIDATE_UNAVAILABLE`（`reason: 'TIMEOUT'`），背景的工作照常繼續，使用者晚一點再按一次就好。抓失敗（`failed`）：回 `CANDIDATE_UNAVAILABLE`，`reason` 是 `fetch_error`。
-2. 讀出候選的句子清單。**繁簡轉換在這裡做**，不在抓檔時做：要不要轉是加入的人的偏好。內容是簡體而且要轉的話，用 `opencc-js` 的 `cn` → `twp`（字和用語都換成台灣的說法）轉出新的清單。
-3. 算最後那份清單的 sha256。同一部片已經有相同的就回 `SUBTITLE_DUPLICATE`。**先算再寫檔**，這樣一般的重複在磁碟上什麼都還沒建立。
-4. 建立 `/data/subtitles/<新 id>/`：`original.<ext>`（從候選複製，原封不動）、`cues.json`（最後的清單）。有轉換的話，轉換前的清單另存成 `cues.original.json`，`converted_s2t = true`。
-5. 挑檢查點，建立同步文件（候選對齊過就用那次的分段），寫入 `subtitles`。格式欄記的是原始檔的格式，`.ssa` 記成 `ass`。
-6. 第 5 步的寫入失敗時（那部片剛好被刪了；或兩個人同時加入同一條，後到的撞到唯一限制），把第 4 步建立的資料夾刪掉，再回對應的錯誤（`NOT_FOUND` 或 `SUBTITLE_DUPLICATE`）。
+1. Candidate not fetched yet (`new`): change it to `fetching` and hand it to `api`'s download (`subtitle.resolve`). Still fetching (`fetching`): wait. **Wait at most 30 seconds**; if it doesn't finish, return `CANDIDATE_UNAVAILABLE` (`reason: 'TIMEOUT'`); the background job carries on as usual, and the user just presses it again a bit later. Fetch failed (`failed`): return `CANDIDATE_UNAVAILABLE` with `reason` being `fetch_error`.
+2. Read the candidate's list of lines. **Traditional/Simplified conversion happens here**, not at fetch time: whether to convert is the preference of the person adding. If the content is Simplified and should be converted, use `opencc-js` `cn` → `twp` (characters and wording both changed to Taiwan usage) to produce a new list.
+3. Compute the sha256 of the final list. If the same film already has an identical one, return `SUBTITLE_DUPLICATE`. **Compute before writing files**, so an ordinary duplicate has created nothing on disk yet.
+4. Create `/data/subtitles/<new id>/`: `original.<ext>` (copied from the candidate, untouched) and `cues.json` (the final list). If converted, save the pre-conversion list separately as `cues.original.json`, and `converted_s2t = true`.
+5. Pick checkpoints, create the sync doc (if the candidate was aligned, use the segments from that run), and write to `subtitles`. The format column records the original file's format; `.ssa` is recorded as `ass`.
+6. If the write in step 5 fails (the film was just deleted; or two people added the same candidate at once and the later one hit the unique constraint), delete the folder created in step 4, then return the matching error (`NOT_FOUND` or `SUBTITLE_DUPLICATE`).
 
-### 編碼這一步為什麼不能省
+### Why the encoding step can't be skipped
 
-把 Big5 的檔案直接交給 ffmpeg：解碼字幕時會報 `Invalid UTF-8 in decoded subtitles text`；如果用串流複製（我們封裝時就是），**不會報錯，但封進去的是亂碼**。所以進到系統裡的字幕一律先變成 UTF-8，封裝用的 SRT 也一律由我們自己從句子清單產生。
+Hand a Big5 file straight to ffmpeg: when decoding subtitles it reports `Invalid UTF-8 in decoded subtitles text`; with stream copy (which is how we pack), **no error is reported, but what gets packed in is garbled**. So every subtitle entering the system is first turned into UTF-8, and the SRT used for packing is always generated by us from the list of lines.
 
-## 和下載的版本相符
+## Matching the downloaded version
 
-候選的 `matchesRelease` 是給使用者的提示，也是排名前的排序依據：
+A candidate's `matchesRelease` is a hint for the user and also a sort key before ranking:
 
-- 版本名稱含 `YIFY` 或 `YTS`（不分大小寫），**而且**
-- 名稱裡的解析度（`720p`、`1080p`、`2160p`）和下載的版本相同，或名稱裡沒有寫解析度
+- The release name contains `YIFY` or `YTS` (case-insensitive), **and**
+- The resolution in the name (`720p`, `1080p`, `2160p`) is the same as the downloaded version's, or the name has no resolution
 
-另外比對片源：名稱裡的 `BluRay`、`BRRip`、`BDRip`、`BrRip` 算藍光；`WEB`、`WEBRip`、`WEB-DL` 算網路。和下載的版本同一種的排前面。
+Also compare the source medium: `BluRay`, `BRRip`, `BDRip`, `BrRip` in the name count as Blu-ray; `WEB`, `WEBRip`, `WEB-DL` count as web. Ones of the same kind as the downloaded version sort first.
 
-還沒對齊前的排序：所選語言的順序 → 版本相符 → 片源相同 → 來源的評分（有的話）→ JustSubtitles、YIFY、射手網。
+Sort order before alignment: order of the selected languages → version match → same source medium → the source's rating (if any) → JustSubtitles, YIFY, Assrt.
 
-## 全部自動對齊並排名
+## Auto-align and rank them all
 
 `POST /api/torrents/:id/candidates/rank`:
 
-1. 取所選語言的候選，依上面的順序最多取 30 條。選了繁體中文時，這部片所有中文的候選（`zh-Hant`、`zh-Hans`、`zh`）都算在內：來源標的繁簡不可靠，而且簡體可以在加入時轉成繁體。
-2. 建立一列 `tasks`（種類 `rank`，`input` 記下這次要排的候選 id）。這部片已經有一次排名在跑的話，不建立新的，直接回現況。
-3. 每一條候選的 `align_state` 設成 `queued`。還沒抓的改成 `fetching`，交給 `api` 的下載（之後由 `media` 處理）。然後 `NOTIFY paiban_media`：檔案抓好而且 `align_state` 是 `queued` 的候選，由 `media` 做 `subtitle.rank`。`api` 不直接做這一步。
-4. `subtitle.rank` 的工作對一條候選做一次完整的自動對齊（[08-media-pipeline.md](08-media-pipeline.md)），把分數寫回 `align_score`、結果寫回 `align_result`，`align_state = 'done'`（或 `failed`）。抓檔失敗的候選，`align_state` 也記成 `failed`。
-5. 每完成一條就 `NOTIFY`（`candidates`），清單上的分數一條一條出現；同時更新那一列 `tasks` 的進度（完成數 / 總數）。
-6. 這次要排的候選裡，還存在的都有了結果（`done` 或 `failed`），`tasks` 那一列就是 `done`。個別候選失敗不算整次排名失敗；途中被移除或被新的搜尋結果取代的候選不算在內。結算由 `media` 做（[08-media-pipeline.md](08-media-pipeline.md) 的「對帳」）。
+1. Take the candidates in the selected languages, at most 30 in the order above. When Traditional Chinese is selected, all of the film's Chinese candidates (`zh-Hant`, `zh-Hans`, `zh`) count: sources' Traditional/Simplified labels are unreliable, and Simplified can be converted to Traditional when adding.
+2. Create a `tasks` row (kind `rank`, with `input` recording the candidate IDs to rank this time). If the film already has a ranking running, don't create a new one; just return the current state.
+3. Set each candidate's `align_state` to `queued`. Those not fetched yet change to `fetching` and are handed to `api`'s download (then processed by `media`). Then `NOTIFY paiban_media`: candidates whose files are fetched and whose `align_state` is `queued` get `subtitle.rank` done by `media`. `api` doesn't do this step itself.
+4. A `subtitle.rank` job runs one full auto-align on one candidate ([08-media-pipeline.md](08-media-pipeline.md)), writes the score back to `align_score` and the result to `align_result`, `align_state = 'done'` (or `failed`). Candidates whose fetch failed also get `align_state` recorded as `failed`.
+5. `NOTIFY` (`candidates`) after each one completes, so scores appear in the list one by one; at the same time update that `tasks` row's progress (completed / total).
+6. When every candidate in this ranking that still exists has a result (`done` or `failed`), the `tasks` row is `done`. Individual candidates failing doesn't make the whole ranking fail; candidates removed along the way or replaced by new search results don't count. The final tally is done by `media` ("Reconciliation" in [08-media-pipeline.md](08-media-pipeline.md)).
 
-`CandidateList.ranking` 是從這部片最近一次的排名工作算出來的：沒有過是 `idle`，還在排隊或進行中是 `running`，結束了是 `done`。
+`CandidateList.ranking` is computed from the film's most recent ranking task: `idle` if there has never been one, `running` while queued or in progress, `done` when finished.
 
-「建議」的標記（`Candidate.recommended`）是讀取時算的，和原型相同：依語言分組（`zh` 併進 `zh-Hant`；`zh-Hans`、`en` 各一組），每一組裡 `align_score` 最高的那一條。抓過檔的候選，語言已經是依內容判斷的結果，所以分組是可靠的。整組都沒有分數就不標。
+The "Recommended" mark (`Candidate.recommended`) is computed on read, same as the prototype: group by language (`zh` merged into `zh-Hant`; `zh-Hans` and `en` each a group), and in each group the one with the highest `align_score`. For candidates whose files have been fetched, the language is already the content-detected result, so the grouping is reliable. If nothing in a group has a score, nothing is marked.
 
-對齊一條通常 1 到 3 秒；射手網的候選受額度限制會比較慢。需要人聲資料，所以分析還沒完成時這個按鈕不能按。排名的工作用背景的佇列 `subtitle.rank`，不會擋住使用者在工作台按的「自動對齊」。
+Aligning one usually takes 1 to 3 seconds; Assrt's candidates are slower because of the quota limit. Speech data is needed, so this button can't be pressed until analysis is complete. Ranking jobs use the background queue `subtitle.rank` and don't block the "Auto-align" the user presses in the workbench.
 
-候選已經對齊過的話，「加入」時它的同步文件就從那次的結果開始，使用者進工作台看到的已經是對過的字幕。
+If a candidate has already been aligned, when it is "Add"ed its sync doc starts from that result, so what the user sees on entering the workbench is already-aligned subtitles.
 
-## 來源狀況
+## Source status
 
-每個來源最近一次查詢或測試的結果存在 `source_health` 資料表（每個來源一列，每次覆寫），API 的形狀是 `SourceHealth`（`packages/shared/src/contracts/api.ts`）：狀態（`ok`、`warn`、`down`）、時間、代碼、資料。和其他地方一樣，存的是代碼和數字，句子由前端寫。管理員的總覽頁和來源設定頁讀它。字幕庫固定是 `manual`；停用的來源是 `off`。
+Each source's most recent lookup or test result is stored in the `source_health` table (one row per source, overwritten each time); the API shape is `SourceHealth` (`packages/shared/src/contracts/api.ts`): state (`ok`, `warn`, `down`), time, code, data. As elsewhere, it stores codes and numbers; the front end writes the sentences. The administrator's Overview page and Sources page read it. Zimuku is always `manual`; disabled sources are `off`.
 
-| 發生什麼 | 狀態 |
+| What happened | State |
 | --- | --- |
-| 查詢或測試成功 | `ok` |
-| 超過額度、沒有設定金鑰 | `warn` |
-| 連不上、回應看不懂、金鑰被拒絕 | `down` |
+| Lookup or test succeeded | `ok` |
+| Over quota, no key set | `warn` |
+| Can't connect, response can't be understood, key rejected | `down` |
 
-## 已查證與未查證
+## Verified and unverified
 
-| 項目 | 狀況 |
+| Item | Status |
 | --- | --- |
-| JustSubtitles 介面的網址、參數、回應欄位、30 筆上限、下載網址 | 2026-10-04 用瀏覽器查過；**2026-10-05 階段 0 從伺服器端（`User-Agent: Paiban/…`，沒有偽裝成瀏覽器）實際呼叫**：欄位相同、`EN` 30 筆、沒有擋非瀏覽器的請求。不存在的編號回 200（不是 500）。下載了一個壓縮檔看格式：zip、一個 UTF-8 的 `.srt`，看完已刪 |
-| JustSubtitles 片名搜尋 | 階段 0 實際呼叫：外層是 `{results: [...]}`，見上 |
-| SubDL 官方 API | 依它的文件；沒有金鑰，沒有實際呼叫過 |
-| YIFY Subtitles 的頁面結構和下載連結 | 2026-10-04 用瀏覽器查過；**2026-10-05 階段 0 從伺服器端實際抓頁面和下載**：表格欄位順序、`a#btn-download-subtitle` 的 `data-link`（base64）、解出來的主機 `subtitles.yts-subs.com` 都和文件相同，沒有驗證碼或挑戰頁。壓縮檔：zip、一個 UTF-8（有 BOM）的 `.srt`，看完已刪 |
-| 射手網 API 的端點、限制、錯誤碼、標示來源的要求 | 依官方文件；沒有 token，沒有實際呼叫過。`langlist` 的鍵名是憑記憶 |
-| TMDB 的 find 端點 | 依官方文件；沒有金鑰，沒有實際呼叫過 |
-| 從架站的那台機器能不能連到這些網站 | JustSubtitles、YIFY Subtitles 可以（階段 0，在開發機上；部署機器是不是同一台待確認）。TMDB、射手網、SubDL 沒有金鑰，還沒有確認 |
+| JustSubtitles interface URL, parameters, response fields, 30-result limit, download URL | Checked with a browser on 2026-10-04; **actually called from the server side in Phase 0 on 2026-10-05 (`User-Agent: Paiban/…`, not posing as a browser)**: same fields, 30 results for `EN`, non-browser requests not blocked. A nonexistent ID returns 200 (not 500). Downloaded one archive to see the format: zip, one UTF-8 `.srt`; deleted after looking |
+| JustSubtitles title search | Actually called in Phase 0: the outer shape is `{results: [...]}`, see above |
+| Official SubDL API | Per its documentation; no key, never actually called |
+| YIFY Subtitles page structure and download link | Checked with a browser on 2026-10-04; **pages and downloads actually fetched from the server side in Phase 0 on 2026-10-05**: table column order, the `data-link` (base64) of `a#btn-download-subtitle`, and the decoded host `subtitles.yts-subs.com` all match the document; no CAPTCHA or challenge page. Archive: zip, one UTF-8 (with BOM) `.srt`; deleted after looking |
+| Assrt API endpoints, limits, error codes, credit requirement | Per the official documentation; no token, never actually called. The `langlist` key names are from memory |
+| TMDB find endpoint | Per the official documentation; no key, never actually called |
+| Whether the hosting machine can reach these sites | JustSubtitles and YIFY Subtitles can (Phase 0, on the development machine; whether the deployment machine is the same one is still to be confirmed). TMDB, Assrt and SubDL: no keys, not confirmed yet |

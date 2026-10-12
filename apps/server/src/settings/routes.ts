@@ -81,7 +81,7 @@ export function settingsRoutes(app: FastifyInstance, deps: Deps): void {
   });
 }
 
-/** A subtitle source or TMDB, tried once (docs/07-subtitle-providers.md, each source's "測試連線"). */
+/** A subtitle source or TMDB, tried once (docs/07-subtitle-providers.md, each source's "Test connection"). */
 async function testSubtitle(
   deps: Deps,
   id: 'tmdb' | 'justsubtitles' | 'subdl' | 'yify' | 'assrt',

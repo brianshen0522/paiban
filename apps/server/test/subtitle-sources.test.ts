@@ -66,7 +66,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await fake.close();
   await db.drop();
-  // Nothing the sources were sent with ever reached a log line (docs/12-auth.md, "金鑰").
+  // Nothing the sources were sent with ever reached a log line (docs/12-auth.md, "Keys").
   for (const v of Object.values(KEYS)) expect(logged).not.toContain(v);
   expect(logged).not.toContain('PLACEHOLDER');
 });

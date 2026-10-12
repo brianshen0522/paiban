@@ -105,7 +105,7 @@ export class TorrentWorker {
     return join(this.config.dataDir, 'torrents', hash);
   }
 
-  /** Start-up (docs/06, "重啟"): resume what was downloading, re-add what is seeding. */
+  /** Start-up (docs/06, "Restarts"): resume what was downloading, re-add what is seeding. */
   async recover(): Promise<void> {
     const rows = await many<Row>(
       this.pool,
@@ -216,7 +216,7 @@ export class TorrentWorker {
     for (const a of [...this.active.values()]) await this.progress(a, settings.downloads.stallMinutes);
     for (const [id, t] of this.seeding) await this.seedProgress(id, t, settings.downloads.seedMode);
 
-    // 6. live view for the detail pages someone has open (docs/11-pages.md, "下載細節")
+    // 6. live view for the detail pages someone has open (docs/11-pages.md, "Download details")
     await this.live();
   }
 
@@ -247,7 +247,7 @@ export class TorrentWorker {
     }
   }
 
-  /** Starting one download (docs/06, "開始一個下載"). */
+  /** Starting one download (docs/06, "Starting a download"). */
   private async begin(r: Row, trackers: string[]): Promise<void> {
     const res = await this.pool.query(
       `update torrents set state = 'downloading', phase = 'metadata', started_at = now(), last_progress_at = now(), clean_stop = false
@@ -276,7 +276,7 @@ export class TorrentWorker {
   /**
    * YTS downloads start from a magnet link with the configured trackers. One added by hand starts
    * from its stored info dictionary with its own trackers, and fetches only its largest video file
-   * (docs/06-torrent-worker.md, "手動加入").
+   * (docs/06-torrent-worker.md, "Adding by hand").
    */
   private add(
     r: Row,
@@ -331,7 +331,7 @@ export class TorrentWorker {
     t.on('done', () => void this.complete(a));
   }
 
-  /** Checks once the torrent's own metadata arrives (docs/06, "拿到種子資訊"). */
+  /** Checks once the torrent's own metadata arrives (docs/06, "On getting the torrent info"). */
   private async onMetadata(a: Active): Promise<void> {
     if (a.hasMetadata) return;
     a.hasMetadata = true;
@@ -404,7 +404,7 @@ export class TorrentWorker {
     }
   }
 
-  /** A real pause: remember the pieces, leave the client, keep the files (docs/06, "暫停"). */
+  /** A real pause: remember the pieces, leave the client, keep the files (docs/06, "Pausing"). */
   private async pause(id: string): Promise<void> {
     const a = this.active.get(id);
     if (!a) {
@@ -426,7 +426,7 @@ export class TorrentWorker {
     await this.wake(id);
   }
 
-  /** Every kind of failure ends the same way, and none of them deletes anything (docs/06, "失敗時的收尾"). */
+  /** Every kind of failure ends the same way, and none of them deletes anything (docs/06, "Cleaning up after a failure"). */
   private async fail(a: Active, code: string, message: string): Promise<void> {
     if (a.busy) return;
     a.busy = true;
@@ -453,7 +453,7 @@ export class TorrentWorker {
     await this.wake(id, true, notes);
   }
 
-  /** Finished (docs/06, "完成"). The preview plan frozen at admission moves to media_files (D40). */
+  /** Finished (docs/06, "Completion"). The preview plan frozen at admission moves to media_files (D40). */
   private async complete(a: Active): Promise<void> {
     if (a.busy) return;
     a.busy = true;
@@ -537,7 +537,7 @@ export class TorrentWorker {
     return r ? versionLabel(r) : '';
   }
 
-  /** docs/03-data-model.md, "刪除一個下載時發生的事". Re-runnable after a crash. */
+  /** docs/03-data-model.md, "What happens when a download is deleted". Re-runnable after a crash. */
   private async remove(r: Row): Promise<void> {
     const a = this.active.get(r.id);
     if (a) {
@@ -658,7 +658,7 @@ export class TorrentWorker {
       ]);
   }
 
-  /** SIGTERM (docs/06, "重啟"): save every bitfield, mark clean stops, leave state 'downloading'. */
+  /** SIGTERM (docs/06, "Restarts"): save every bitfield, mark clean stops, leave state 'downloading'. */
   async shutdown(): Promise<void> {
     this.stopping = true;
     await this.chain;

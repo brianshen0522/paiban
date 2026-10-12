@@ -37,7 +37,7 @@ const OFFICIAL: Partial<Record<LlmProvider, string>> = {
   openai: 'https://api.openai.com/v1',
   openrouter: 'https://openrouter.ai/api/v1',
 };
-/** Models that accept the server-side fallback on a refusal (docs/08-media-pipeline.md, "語言模型"). */
+/** Models that accept the server-side fallback on a refusal (docs/08-media-pipeline.md, "Language model"). */
 const FALLBACK_MODELS = new Set(['claude-fable-5-1', 'claude-opus-5-5', 'claude-opus-5', 'claude-sonnet-5-5']);
 /** A JSON answer of a few hundred lines is well under this; anything near it is not one. */
 const MAX_ANSWER_BYTES = 4 * 1024 * 1024;

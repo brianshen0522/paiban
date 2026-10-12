@@ -10,7 +10,7 @@ import { bytes } from '../lib/format';
 import { keys, useExports, useMe, useStorage } from '../lib/queries';
 import { ExportRow } from './workspace/ExportTab';
 
-/** docs/10-storage.md, "介面上的呈現" (the page everyone sees). */
+/** docs/10-storage.md, "How it appears in the interface" (the page everyone sees). */
 export function StoragePage() {
   const s = useStorage();
   if (s.isError)
@@ -86,7 +86,7 @@ export function StoragePage() {
   );
 }
 
-/** "我建立的匯出檔": after a film is removed, this is the only place its exports can be downloaded. */
+/** "Exports I made": after a film is removed, this is the only place its exports can be downloaded. */
 function MyExports() {
   const q = useExports();
   return (

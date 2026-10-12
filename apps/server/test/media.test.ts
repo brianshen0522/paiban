@@ -156,7 +156,7 @@ describe.skipIf(!TOOLS)('the media service', { timeout: 180_000 }, () => {
       for (const p of pairs) expect(Math.abs(truth[p.cue].start - p.y)).toBeLessThan(0.5);
       const status = (await call(t.app, 'GET', `/api/media/${f.mid}`, { cookie: mei })).json();
       expect(status.asr).toEqual({ state: 'ready', language: 'en' });
-      // It shows among the background tasks (docs/11-pages.md, "系統狀態").
+      // It shows among the background tasks (docs/11-pages.md, "System status (20)").
       const asrTasks = async () =>
         (await db.pool.query(`select state from tasks where kind = 'asr' and input->>'mediaId' = $1`, [f.mid])).rows;
       await until(async () => (await asrTasks())[0]?.state === 'done', 10_000);

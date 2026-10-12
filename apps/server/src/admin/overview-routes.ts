@@ -16,7 +16,7 @@ type Problem = AdminOverview['problems'][number];
 const SERVICE_SILENCE_MS = 30_000;
 
 /**
- * The administrator's front page (docs/11-pages.md, "總覽"): four tiles, everything that needs
+ * The administrator's front page (docs/11-pages.md, "Overview (14)"): four tiles, everything that needs
  * attention, the sources and the latest activity. Sentences are written by the web app.
  */
 export function overviewRoutes(app: FastifyInstance, deps: Deps): void {

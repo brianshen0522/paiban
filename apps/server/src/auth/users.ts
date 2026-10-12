@@ -15,7 +15,7 @@ import { readSettings } from '../settings/settings.js';
 const QUALITIES = ['720p', '1080p', '2160p'] as const;
 const LANGS = ['zh-Hant', 'zh-Hans', 'en'] as const;
 
-/** Stored prefs merged over the defaults (docs/13-settings.md, "個人偏好"). */
+/** Stored prefs merged over the defaults (docs/13-settings.md, "Personal preferences"). */
 export function prefsOf(stored: Record<string, unknown>, defaultLangs: UserPrefs['langs']): UserPrefs {
   const langs = Array.isArray(stored.langs)
     ? stored.langs.filter((l): l is UserPrefs['langs'][number] => LANGS.includes(l))

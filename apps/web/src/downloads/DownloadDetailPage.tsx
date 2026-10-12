@@ -27,7 +27,7 @@ const VIEWS = ['map', 'pieces', 'speed'] as const;
 type View = (typeof VIEWS)[number];
 
 /**
- * One download in detail (docs/11-pages.md, "下載細節"; Brian, 2026-10-06): where the peers are,
+ * One download in detail (docs/11-pages.md, "Download details"; Brian, 2026-10-06): where the peers are,
  * which pieces are done, how fast it goes. The live part polls every 2 seconds while the page is
  * open and the download runs; nothing is computed for downloads nobody looks at.
  */

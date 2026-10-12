@@ -35,7 +35,7 @@ export async function ytsClient(deps: Deps): Promise<YtsClient> {
   return new YtsClient(deps.outbound, yts.baseUrl);
 }
 
-/** Runs a YTS call and keeps the source's health row current (docs/07, "來源狀況"). */
+/** Runs a YTS call and keeps the source's health row current (docs/07, "Source status"). */
 export async function tracked<T>(deps: Deps, fn: () => Promise<T>): Promise<T> {
   try {
     const out = await fn();
@@ -245,7 +245,7 @@ const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 /**
  * The poster through the server (D30). Only from the configured YTS host or one of its
- * subdomains, only images, at most 2 MB (docs/05-yts.md, "海報").
+ * subdomains, only images, at most 2 MB (docs/05-yts.md, "Posters").
  */
 export async function fetchPoster(
   deps: Deps,

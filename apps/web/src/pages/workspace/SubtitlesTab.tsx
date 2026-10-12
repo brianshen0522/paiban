@@ -39,7 +39,7 @@ export const langName = (l: string): string => {
 export const providerName = (p: string): string => t.subs.providers[p] ?? p;
 const scorePct = (s: number | null) => (s == null ? null : Math.round(s * 100));
 
-/** docs/11-pages.md, "字幕": the film's subtitles, the search over every source, the assisted source and uploads. */
+/** docs/11-pages.md, "Subtitles (07, 08, 31)": the film's subtitles, the search over every source, the assisted source and uploads. */
 export function SubtitlesTab({ ws }: { ws: Workspace }) {
   return (
     <>

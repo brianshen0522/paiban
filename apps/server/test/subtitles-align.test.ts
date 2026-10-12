@@ -9,7 +9,7 @@ import { normalizeCues, parseSrt } from '../src/subtitles/text.js';
 
 /**
  * The server's automatic alignment with the real ffsubsync 0.5.1 on the fixture clip's cached
- * speech, against the last column of the table in docs/08-media-pipeline.md ("在測試素材上的結果"):
+ * speech, against the last column of the table in docs/08-media-pipeline.md ("Results on the test fixtures"):
  * the same segments and speeds, offsets within 0.01 s, and both engines agreeing. Needs ffsubsync:
  * it is in the image (`pnpm test:image`); elsewhere this file is skipped, loudly.
  */

@@ -3,8 +3,8 @@ import { writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 
 /**
- * Archives from subtitle sites and uploads (docs/07-subtitle-providers.md, "下載與處理", step 3;
- * docs/12-auth.md, "上傳與壓縮檔"). bsdtar from the image reads zip, 7z and RAR5, but it enforces
+ * Archives from subtitle sites and uploads (docs/07-subtitle-providers.md, "Download and processing (`subtitle.resolve` downloads; `subtitle.fetch` / `subtitle.ingest` process)", step 3;
+ * docs/12-auth.md, "Uploads and archives"). bsdtar from the image reads zip, 7z and RAR5, but it enforces
  * none of our limits (it extracts symlinks, any number of entries, any size: docs/agent-notes.md),
  * so the rules are ours:
  *
@@ -15,7 +15,7 @@ import { basename, join } from 'node:path';
  *      (headers can lie), and write them ourselves into the job's work folder under names we make.
  *
  * bsdtar never writes to disk here, so a hostile name or link cannot land anywhere.
- * Started with argument arrays, never a shell (docs/12-auth.md, "執行外部程式").
+ * Started with argument arrays, never a shell (docs/12-auth.md, "Running external programs").
  */
 
 export type ArchiveLimits = { maxEntries: number; maxFileBytes: number; maxTotalBytes: number };

@@ -7,7 +7,7 @@ import { Yify } from './yify.js';
 export { ASSRT_CREDIT } from './assrt.js';
 export * from './common.js';
 
-/** The searchable sources in the order the page and the ranking list them (docs/07, "和下載的版本相符"). 字幕庫 is never contacted (D27). */
+/** The searchable sources in the order the page and the ranking list them (docs/07, "Matching the downloaded version"). Zimuku (字幕庫) is never contacted (D27). */
 export const PROVIDER_ORDER: ProviderKey[] = ['justsubtitles', 'yify', 'assrt'];
 
 export function providerFor(env: ProviderEnv, settings: Settings, key: ProviderKey): SubtitleProvider {
@@ -23,7 +23,7 @@ export function healthSource(settings: Settings, key: ProviderKey): SourceId {
   return key === 'justsubtitles' && settings.providers.justsubtitles.mode === 'subdl' ? 'subdl' : key;
 }
 
-/** `POST /api/admin/sources/:id/test` for the subtitle sources and TMDB (docs/13-settings.md, "測試連線"). */
+/** `POST /api/admin/sources/:id/test` for the subtitle sources and TMDB (docs/13-settings.md, "Test connection"). */
 export async function testSubtitleSource(
   env: ProviderEnv,
   settings: Settings,

@@ -1,76 +1,76 @@
-# 原型
+# Prototype
 
-兩個可以直接操作的原型。它們是**畫面和行為的依據**，不是產品的程式碼：每一個都是把所有東西塞在一起的單一 HTML 檔，後端全是模擬的。照它們的樣子和行為做，不要照它們的寫法做。
+Two prototypes you can operate directly. They are **the basis for screens and behavior**, not product code: each is a single HTML file with everything crammed in, and the back end is entirely simulated. Build what they look like and how they behave, not the way they are written.
 
-## 怎麼看
+## How to view it
 
-用瀏覽器直接打開：
+Open them directly in a browser:
 
-| 檔案 | 內容 |
+| File | Contents |
 | --- | --- |
-| `platform/index.html` | 整個平台：登入、註冊、搜尋、電影頁、下載、片庫、工作區（字幕、同步、匯出）、儲存空間、個人設定，以及七個管理頁 |
-| `workbench/index.html` | 字幕同步工作台，獨立的版本 |
+| `platform/index.html` | The whole platform: sign in, registration, search, film page, downloads, library, workspace (subtitles, sync, export), storage, profile, and the seven admin pages |
+| `workbench/index.html` | The subtitle sync workbench, standalone version |
 
-登入頁下方有「原型捷徑」，可以直接用管理員或成員的身分進入。右上角的帳號選單可以切換身分、重設示範資料。
+Below the sign-in page there are "prototype shortcuts" (原型捷徑) that let you go straight in as an administrator or a member. The account menu in the top right can switch identities and reset the demo data.
 
-原型裡：
+In the prototypes:
 
-- 電影是 14 部公有領域的老片，使用者、字幕、匯出檔都是示範資料
-- 搜尋、下載、字幕搜尋、排名、匯出都是模擬的；下載進度是加速 10 倍的動畫
-- **同步工作台是真的可以操作的**，用的是一段 92 秒的合成影片（`fixtures/clip.mp4`，已經嵌在 HTML 裡）。同步頁上方的選單可以切換三種「字幕哪裡錯了」的情境
-- 字型從 Google Fonts 載入；沒有網路時會用系統字型，版面一樣
+- The films are 14 old public-domain films; users, subtitles and exports are all demo data
+- Search, downloads, subtitle search, ranking and export are all simulated; download progress is an animation sped up 10 times
+- **The sync workbench really works**, using a synthetic 92-second video (`fixtures/clip.mp4`, already embedded in the HTML). The menu at the top of the sync page switches between three "what's wrong with the subtitles" scenarios
+- Fonts load from Google Fonts; without a network, system fonts are used, and the layout is the same
 
-## 資料夾
+## Folders
 
 ```
 platform/
-  index.html          建置好的原型
-  src/                原始碼
-    app1.js           示範資料、模擬的後端(用量計算、下載排程、候選字幕)
-    app2.js           登入、外框、搜尋、電影頁、下載、片庫、工作區、儲存空間、個人設定
-    app3.js           七個管理頁
-    app4.js           路由、所有動作、表單驗證、提示訊息的文字
-    app.css           平台的樣式(設計 token 在最上面)
-    bench.html / bench.css / bench-ui.js    嵌進平台的工作台
-    core.js / scenarios.js / data.json      對齊核心、三種示範情境、示範片段的資料
-    page.html         組裝用的樣板
-  screenshots/        30 張截圖,編號對應 docs/11-pages.md
-  build.py            組裝成單一 HTML
-  e2e.cjs             自動化檢查,72 項
+  index.html          The built prototype
+  src/                Source
+    app1.js           Demo data, simulated back end (usage calculation, download scheduling, candidate subtitles)
+    app2.js           Sign in, shell, search, film page, downloads, library, workspace, storage, profile
+    app3.js           The seven admin pages
+    app4.js           Routing, all actions, form validation, toast message text
+    app.css           Platform styles (design tokens at the top)
+    bench.html / bench.css / bench-ui.js    The workbench embedded in the platform
+    core.js / scenarios.js / data.json      Sync core, three demo scenarios, demo clip data
+    page.html         Template used for assembly
+  screenshots/        30 screenshots, numbered to match docs/11-pages.md
+  build.py            Assembles into a single HTML file
+  e2e.cjs             Automated checks, 72 of them
 workbench/
   index.html
-  src/                core.js、scenarios.js、ui.js、style.css、template.html、data.json、test_core.js
-  screenshots/        7 張
+  src/                core.js, scenarios.js, ui.js, style.css, template.html, data.json, test_core.js
+  screenshots/        7 of them
   build.py
-  e2e.cjs             自動化檢查,40 項
+  e2e.cjs             Automated checks, 40 of them
 ```
 
-找某一句文案或某個行為時，直接在 `src/` 裡搜尋那句中文。
+To find a piece of copy or a behavior, search `src/` directly for that Chinese sentence.
 
-`core.js` 是對齊核心的原始版本；整理成 TypeScript、補上測試的版本在 `packages/shared/src/sync-core/core.ts`，以那個為準。
+`core.js` is the original version of the sync core; the version cleaned up into TypeScript with tests added is `packages/shared/src/sync-core/core.ts`, and that one is authoritative.
 
-## 重新建置與檢查
+## Rebuilding and checking
 
 ```bash
-cd platform                # 或 workbench
-python3 build.py           # 產生 index.html
-python3 build.py --webm    # 產生 preview_webm.html,給自動化檢查用
-node e2e.cjs               # 需要 playwright 套件和它的 Chromium
+cd platform                # or workbench
+python3 build.py           # Generates index.html
+python3 build.py --webm    # Generates preview_webm.html, for the automated checks
+node e2e.cjs               # Needs the playwright package and its Chromium
 ```
 
-自動化檢查用 WebM 版的影片，因為交接時的 Playwright Chromium 不能解碼 H.264（Playwright 1.63 的可以，見 `docs/15-testing.md`）。跑完會重新產生 `screenshots/`。
+The automated checks use the WebM video, because the Playwright Chromium at handover couldn't decode H.264 (Playwright 1.63's can; see `docs/15-testing.md`). Running them regenerates `screenshots/`.
 
-## 原型和正式版不同的地方
+## Differences between the prototype and production
 
-列在 `docs/11-pages.md`（每一頁）和 `docs/09-sync-workbench.md`（工作台）的最後。最重要的幾項：
+Listed at the end of `docs/11-pages.md` (each page) and `docs/09-sync-workbench.md` (the workbench). The most important ones:
 
-- 原型裡標著「原型捷徑」「原型開關」「示範資料」的東西，正式版都不要
-- 下載設定的連入埠在正式版是唯讀的
-- 自動對齊在正式版由伺服器計算
-- 預覽檔的預留空間在正式版比原型顯示的大
-- 介面文案的標點在正式版用全形
-- 原型可以用中文片名搜尋（示範資料自帶中文片名）；真的 YTS 只認英文片名，正式版不做
-- 原型的個人偏好（語言、畫質、第二語言）改了不會影響其他頁面；正式版要接上
-- 原型有幾處用右下角的提示訊息顯示錯誤；正式版把錯誤放進頁面裡（對照表在 `docs/11-pages.md` 的「外框」）
-- 原型裡的大小是寫死的示範數字；正式版從位元組算，不會一模一樣
-- 檢查點在原型是 5 個、文案裡寫了「五」；正式版預設 8 個，文案不寫數字
+- Anything in the prototypes marked "prototype shortcut" (原型捷徑), "prototype toggle" (原型開關) or "demo data" (示範資料) must not be in production
+- The incoming port in Download settings is read-only in production
+- Auto-align is computed by the server in production
+- The preview file reservation in production is larger than the prototype shows
+- Interface copy uses full-width punctuation in production
+- The prototype can search by Chinese title (the demo data comes with Chinese titles); the real YTS only recognizes English titles, and production doesn't do this
+- Changing personal preferences (language, quality, second language) in the prototype doesn't affect other pages; production wires them up
+- In a few places the prototype shows errors as toast messages in the bottom right; production puts errors in the page (the mapping is in "Shell" in `docs/11-pages.md`)
+- Sizes in the prototype are hard-coded demo numbers; production calculates from bytes, so they won't match exactly
+- The prototype has 5 checkpoints and its copy says "five" (五); production defaults to 8 and the copy doesn't state a number

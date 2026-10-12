@@ -11,7 +11,7 @@ import { SubtitleWorker } from '../src/subtitles/worker.js';
 import { call, createUser, login, PUBLIC_URL, type TestApp, testApp, testDb } from './helpers.js';
 
 /**
- * The subtitle endpoints end to end (docs/04-api.md "字幕", docs/07, docs/09 "儲存", "確認"): the
+ * The subtitle endpoints end to end (docs/04-api.md "Subtitles", docs/07, docs/09 "Saving", "Confirm"): the
  * api's worker against the fake sources, the media service processing what it staged. Archives
  * need bsdtar and full alignment needs ffsubsync: those cases run in the image (`pnpm test:image`)
  * and are skipped here, loudly. Without ffsubsync the core engine still aligns.
@@ -221,7 +221,7 @@ describe('keys (docs/13-settings.md, "金鑰")', () => {
 
 describe('searching (docs/07)', () => {
   it('answers with what it started, even for a source that has nothing to ask and finishes at once', async () => {
-    // 射手網 without a token fails without a request; it used to be able to finish before the answer
+    // Assrt without a token fails without a request; it used to be able to finish before the answer
     // was read, and the answer then said "error" where it should say "running" (seen under load).
     for (let i = 0; i < 20; i++) {
       const r = await call(t.app, 'POST', `/api/torrents/${inception.tid}/subtitle-search`, {
@@ -325,7 +325,7 @@ describe('searching (docs/07)', () => {
     expect(fake.requests.filter((r) => r.source === 'assrt').length).toBe(1);
     const health = (await db.pool.query(`select state, code from source_health where source = 'assrt'`)).rows[0];
     expect(health).toEqual({ state: 'warn', code: 'RATE_LIMITED' });
-    // The person presses "重試": a fresh search once the slot frees up (pacing waits, it does not hammer).
+    // The person presses "Retrying": a fresh search once the slot frees up (pacing waits, it does not hammer).
     await db.pool.query('delete from provider_slots');
     await call(t.app, 'POST', `/api/torrents/${sample.tid}/subtitle-search`, {
       cookie: mei,

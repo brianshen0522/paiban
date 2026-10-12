@@ -1,144 +1,144 @@
-# 報告：分析、字幕、同步、匯出、語音辨識對齊，以及上線準備（2026-10-06）
+# Report: analysis, subtitles, sync, export, speech-recognition alignment, and launch preparation (2026-10-06)
 
-接續 [phase-1-3.md](phase-1-3.md)。Brian 前一晚的要求：一套完整能跑、準備上線的系統；字幕同步結合 Whisper／通義千問的語音辨識和語言模型，分批辨識、不跑整部片；前端做完；做 QA，有問題就停下來修好再繼續。
+Continues from [phase-1-3.md](phase-1-3.md). Brian's request from the night before: a complete, working system ready to launch; subtitle syncing that combines Whisper / Qwen speech recognition with a language model, recognizing in batches rather than running the whole film; a finished front end; and QA, stopping to fix any problem before continuing.
 
-## 更新（之後繼續做的）
+## Update (work continued afterwards)
 
-- **不同語言、又沒設定語言模型的字幕**：改用辨識出的句子「什麼時候開始」當裁判，不必懂語言。Tears of Steel 的法文、德文、俄文字幕各四種錯法共 12 次，原本全部選錯（最多差 104 秒），現在全部在 0.03 秒以內。
-- **語音辨識出現在「系統狀態」的背景任務裡**，失敗可以按「重試」（遷移 `0003_asr_tasks.sql`）。
-- **自動對齊的次數上限**：每人每 10 分鐘 20 次，超過時工作台說要等多久。
-- **前端拆包**：工作區和管理頁改成第一次打開時才下載，首頁要下載的 JavaScript 從 613 kB 降到 326 kB。
-- **測試穩定**：映像檔裡的測試限制同時 4 個 worker；送出節奏測試的容許誤差改成合理的值，理由寫在測試裡。之後整套 294 個測試在映像檔裡連跑三次都全過。
-- 8088 已重新部署，資料庫自動升級到 `0003`。
+- **Subtitles in a different language with no language model configured**: now uses "when each recognized sentence starts" as the judge, which doesn't require understanding the language. Tears of Steel's French, German and Russian subtitles, each with four kinds of errors, 12 runs in total, were all picked wrong before (off by up to 104 seconds); now all are within 0.03 seconds.
+- **Speech recognition appears among the background tasks on "System status"**, and a failure can be retried with "Retry" (migration `0003_asr_tasks.sql`).
+- **Auto-align rate limit**: 20 per person every 10 minutes; when exceeded, the workbench says how long to wait.
+- **Front-end code splitting**: the workspace and admin pages are now downloaded the first time they're opened, and the JavaScript the home page downloads dropped from 613 kB to 326 kB.
+- **Test stability**: tests in the image are limited to 4 concurrent workers; the tolerance of the send pacing test was changed to a reasonable value, with the reason written in the test. Afterwards, all 294 tests passed three runs in a row in the image.
+- 8088 has been redeployed, and the database was upgraded to `0003` automatically.
 
-## 結論
+## Conclusion
 
-從搜尋到拿到帶字幕的 MKV，整條流程在瀏覽器裡走通了，部署在 `http://localhost:8088`。
+The whole flow, from search to getting an MKV with subtitles, works end to end in the browser, deployed at `http://localhost:8088`.
 
-自動對齊多了語音辨識：
+Auto-align now includes speech recognition:
 
-- 同語言的字幕直接比對文字。
-- 不同語言的字幕交給語言模型（Claude，或 OpenAI 相容的服務，例如通義千問）。
+- Subtitles in the same language are compared by text directly.
+- Subtitles in a different language are handed to a language model (Claude, or an OpenAI-compatible service such as Qwen).
 
-在 Tears of Steel（Blender 開放電影）上，階段 0 的五種錯法原本最多錯 79 秒，現在都在 0.03 秒以內。
+On Tears of Steel (a Blender open movie), the five kinds of errors from phase 0 were off by up to 79 seconds before; now all are within 0.03 seconds.
 
-**沒驗證的**：
+**Not verified**:
 
-- 雲端語言模型的實際配對品質。我沒有金鑰，見「需要你做的」。
-- 真實字幕來源的查詢。
+- The real matching quality of cloud language models. I don't have a key; see "What you need to do".
+- Queries to the real subtitle sources.
 
-## 怎麼登入
+## How to sign in
 
-- 網址：`http://localhost:8088`（從別台電腦用這台的 IP 也可以）
-- 帳號、密碼：`deploy/.env` 裡的 `BOOTSTRAP_ADMIN_USERNAME`、`BOOTSTRAP_ADMIN_PASSWORD`。在這台機器上執行 `grep BOOTSTRAP deploy/.env` 就看得到。登入後請到「個人設定」改密碼。
+- URL: `http://localhost:8088` (from another computer, this machine's IP works too)
+- Username and password: `BOOTSTRAP_ADMIN_USERNAME` and `BOOTSTRAP_ADMIN_PASSWORD` in `deploy/.env`. Run `grep BOOTSTRAP deploy/.env` on this machine to see them. After signing in, please change the password in "Profile".
 
-## 做了什麼
+## What was done
 
-### 語音辨識加語言模型的自動對齊（你指定的做法）
+### Auto-align with speech recognition and a language model (the approach you specified)
 
-1. **辨識**：
-   - 分析完成後，用 faster-whisper（`base` 模型，裝在映像檔裡，執行時不連外）聽平均分布的 30 秒窗。
-   - 合計聽片長的 40%，最多 6 分鐘；兩小時的片子聽 12 段。
-   - 在這台 2010 年的 Xeon（沒有 AVX）上，每 30 秒的聲音約 6 秒，12 分鐘的片約 1 到 2 分鐘。
-   - 辨識有自己的佇列，不擋別部片的分析。
-2. **配對**：
-   - 同語言：比對文字（中文先統一成繁體字），不需要金鑰。
-   - 不同語言：由 api 呼叫語言模型，每個窗一個請求，只送台詞文字和秒數。
-   - 沒設定模型時，不同語言的字幕照舊只靠人聲偵測。
-3. **擬合**：
-   - 從配對算出速率（已知比例裡選）、位移和剪輯斷點，成為一個新的候選。
-   - 配對同時當裁判：反駁配對的候選出局；辨識在那段時間聽到兩句以上、卻沒有一句對得上的分段也不採信。
-4. **介面**：
-   - 工作台的訊息列會說「語音辨識聽到英文，和字幕配出 19 對，這次的結果符合其中 13 對」，模型失敗時說原因。
-   - 「來源設定」多了「自動對齊」卡片：辨識開關、模型選擇、金鑰、「測試模型」。
+1. **Recognition**:
+   - After analysis finishes, faster-whisper (the `base` model, installed in the image, no outbound access at run time) listens to evenly distributed 30-second windows.
+   - In total it listens to 40% of the film's length, at most 6 minutes; a two-hour film gets 12 windows.
+   - On this 2010 Xeon (no AVX), each 30 seconds of audio takes about 6 seconds, and a 12-minute film about 1 to 2 minutes.
+   - Recognition has its own queue and doesn't block analysis of other films.
+2. **Matching**:
+   - Same language: compare text (Chinese is first normalized to Traditional characters); no key needed.
+   - Different language: api calls the language model, one request per window, sending only the dialogue text and timestamps.
+   - With no model configured, subtitles in a different language still rely only on speech detection as before.
+3. **Fitting**:
+   - From the matches, compute the rate (chosen from known ratios), the offset and the cut breakpoints, forming a new candidate.
+   - The matches also act as a judge: candidates that contradict them are eliminated; segments where recognition heard two or more sentences in that time but none of them match are not trusted either.
+4. **Interface**:
+   - The workbench's message bar says things like "Speech recognition heard English and made 19 pairs with the subtitles; this result agrees with 13 of them", and gives the reason when the model fails.
+   - "Sources" has a new "Auto-align" card: recognition on/off, model choice, key, and "Test model".
 
-細節在 `docs/08-media-pipeline.md` 的「語音辨識」「語言模型」兩節。
+Details are in the "Speech recognition" and "Language model" sections of `docs/08-media-pipeline.md`.
 
-### 其他功能
+### Other features
 
-- **影片處理**：探測、波形、人聲偵測、預覽聲音檔與預覽影片、重算用量、系統狀態頁。
-- **字幕**：
-  - 六個來源：JustSubtitles、YIFY、射手網、字幕庫入口、上傳，加上 TMDB 對照。
-  - 壓縮檔（zip／7z／rar）、編碼與語言判斷、簡轉繁、全部自動對齊並排名、加入。
-  - 金鑰加密儲存。
-- **同步工作台**（docs/09 全部）：
-  - 播放、字幕清單、時間軸、自動對齊、吸附、位移與速率、對齊點、分段、檢查點。
-  - 復原／重做、確認，以及兩人同時改的衝突處理。
-- **匯出 MKV**：選字幕軌與預設軌、空間檢查、封裝（不重新編碼）、支援續傳的下載、刪除。
-- **上線準備**：
-  - `docs/deploy.md`：安裝、`.env` 每一項、開埠、HTTPS 兩種做法、更新、備份與還原、搬家、常見問題。
-  - `docs/guide.md`：五分鐘使用說明。
-  - 安全檢查清單逐項檢查。
-  - 相依套件檢查。
+- **Video processing**: probing, waveform, speech detection, preview audio and preview video, recalculating usage, the System status page.
+- **Subtitles**:
+  - Six sources: JustSubtitles, YIFY, Assrt, the Zimuku entry point, uploads, plus TMDB mapping.
+  - Archives (zip / 7z / rar), encoding and language detection, Simplified-to-Traditional conversion, auto-align and rank them all, adding.
+  - Keys stored encrypted.
+- **Sync workbench** (all of docs/09):
+  - Playback, subtitle lines, timeline, auto-align, snapping, offset and rate, anchors, segments, checkpoints.
+  - Undo / redo, confirmation, and conflict handling when two people edit at the same time.
+- **MKV export**: choosing subtitle tracks and the default track, space checks, packing (no re-encoding), downloads that support resuming, deletion.
+- **Launch preparation**:
+  - `docs/deploy.md`: installation, every `.env` entry, opening ports, two ways to do HTTPS, updates, backup and restore, moving to another machine, FAQ.
+  - `docs/guide.md`: a five-minute user guide.
+  - Went through the security checklist item by item.
+  - Checked dependencies.
 
-## 怎麼驗證的
+## How it was verified
 
-- **自動化測試**：
-  - 伺服器 292 個測試在映像檔裡跑（ffmpeg、ffsubsync、bsdtar、語音辨識都是真的）。
-  - 網頁 24 個、共用套件 19 個。
-  - 型別檢查和 lint 都通過。
-- **離線完整流程測試**（`pnpm test:image test/e2e-flow.test.ts`，約 1.5 分鐘），全部用假的 YTS 和本機做種，從搜尋一路到刪除：
-  - 搜尋 → 下載 → 分析 → 語音辨識 → 字幕查詢 → 加入 → 自動對齊 → 確認 → 匯出 → 用 Range 下載 MKV。
-  - 用 ffprobe 檢查 MKV 的軌道與語言標籤。
-  - 刪除之後確認沒有殘留。
-- **瀏覽器 QA**：開發環境，Tears of Steel 用本機做種假裝成一個版本。照使用者的操作走完：
-  - 設定 YTS、搜尋、下載 540 MB 的版本、等分析和辨識。
-  - 上傳故意弄錯的英文和法文字幕、排名、工作台自動對齊、確認、匯出、下載 MKV。
-  - 17 個頁面在 400 px 寬、桌面寬度，以及淺色、深色下都沒有橫向捲軸，也沒有程式錯誤。
-- **部署**：8088 已換成最新版，資料庫自動升級到 `0002_asr.sql`。用真的 YTS 搜尋得到 77,580 部片，只搜尋，沒有下載。
+- **Automated tests**:
+  - 292 server tests run in the image (ffmpeg, ffsubsync, bsdtar and speech recognition are all real).
+  - 24 web, 19 shared package.
+  - Type checking and lint both pass.
+- **Offline end-to-end flow test** (`pnpm test:image test/e2e-flow.test.ts`, about 1.5 minutes), entirely with fake YTS and local seeding, from search all the way to deletion:
+  - Search → download → analysis → speech recognition → subtitle search → add → auto-align → confirm → export → download the MKV with Range.
+  - Check the MKV's tracks and language tags with ffprobe.
+  - Confirm nothing is left after deletion.
+- **Browser QA**: in the dev environment, with Tears of Steel locally seeded and posing as a version. Walked through as a user would:
+  - Set up YTS, search, download the 540 MB version, wait for analysis and recognition.
+  - Upload deliberately mistimed English and French subtitles, rank, auto-align in the workbench, confirm, export, download the MKV.
+  - 17 pages at 400 px wide and at desktop width, in light and dark, with no horizontal scroll bar and no program errors.
+- **Deployment**: 8088 has been updated to the latest version, and the database was upgraded to `0002_asr.sql` automatically. Searching the real YTS finds 77,580 films; only searched, nothing downloaded.
 
-## QA 中發現並修好的問題
+## Problems found and fixed during QA
 
-| 問題 | 修正 |
+| Problem | Fix |
 | --- | --- |
-| 自動對齊在吵的片段採信人聲偵測編出的剪輯斷點：一份「晚 23.7 秒、中間少一段 12 秒」的字幕，後 33 句差 77 秒 | 辨識聽過、卻沒有任何一句對得上的分段不採信。同一份字幕現在前 66 句全對，最後 10 句差 12 秒（斷點之後只聽到 1 句，見下面的限制） |
-| 停用帳號或降級的管理員，已經開著的即時更新連線還會繼續收到事件 | 每 25 秒檢查一次登入狀態和身分，變了就切斷 |
-| 片子的工作區永遠看不到匯出檔（端點一直回空清單） | 接上真正的查詢（兩個代理各自發現並修了同一個問題） |
-| 語言模型服務的回應沒有大小上限，也會跟著轉址帶金鑰過去 | 不跟轉址，超過 1 MB 中斷；加測試確認記錄裡不會出現金鑰或台詞 |
-| 開發環境：假 YTS 讀到上一次的做種清單；長片版本列不出來 | 等做種寫好才啟動；額外的片列成獨立的版本 |
-| 來源設定頁「共用設定」卡片比其他的寬 | 修正 |
+| On noisy stretches, auto-align trusted cut breakpoints made up by speech detection: for subtitles "23.7 seconds late, with a 12-second chunk missing in the middle", the last 33 lines were off by 77 seconds | Segments where recognition listened but not a single sentence matched are not trusted. The same subtitles now have the first 66 lines all correct and the last 10 off by 12 seconds (only 1 sentence was heard after the breakpoint; see the limitations below) |
+| A disabled account or a demoted administrator kept receiving events on already-open live update connections | Sign-in state and identity are checked every 25 seconds, and the connection is cut if they changed |
+| A film's workspace never showed exports (the endpoint always returned an empty list) | Wired up the real query (two agents each found and fixed the same problem) |
+| Responses from the language model service had no size limit, and redirects were followed with the key carried along | Redirects aren't followed, and responses over 1 MB are aborted; added tests confirming that no key or dialogue appears in the logs |
+| Dev environment: fake YTS read the previous seeding list; the long-film version didn't show up in the list | Start only after the seeding list is written; extra films are listed as separate versions |
+| The "Shared settings" card on the Sources page was wider than the others | Fixed |
 
-## 已知限制與還沒驗證的
+## Known limitations and what isn't verified
 
-- **雲端語言模型沒測過**。協定用本機假伺服器測過。另外用本機 Ollama 跑了真的 Qwen 2.5 3B：英文辨識對法文字幕，格式正確、配對正確，但這台 CPU 一個請求要 283 秒，所以這台機器要用雲端服務。
-- ~~沒設定語言模型時，不同語言的字幕在配樂多的片子上仍可能被人聲偵測帶偏~~：已改善，見最上面的更新。
-- **片子很吵、辨識聽不到東西的段落，斷點找不準**。Tears of Steel 的 10 個窗裡有 2 個完全沒聽到話。剩下的要靠檢查點聽、用對齊點修。工作台會提醒「兩種方法不一致，請多聽幾個檢查點」。
-- **時間敏感的測試**：機器很忙時偶爾失敗，原因是負載：映像檔測試原本同時開 7 個 worker，跑 ffmpeg 的檔案搶走了時間。已限制成 4 個，之後連跑三次全過。`subtitles` 搜尋那一個（中文片名沒寫入）我沒能重現，四份同時跑也都通過。
-- **其他沒驗證的**：
-  - 真實字幕來源，需要你的 TMDB 金鑰和射手網 token。
-  - Safari／Firefox 的播放；螢幕閱讀器；ARM。
-  - 長時間運作的下載行為。
+- **Cloud language models haven't been tested**. The protocol was tested against a local fake server. A real Qwen 2.5 3B was also run on local Ollama: English recognition against French subtitles gave the right format and correct matches, but on this CPU one request took 283 seconds, so this machine needs a cloud service.
+- ~~With no language model configured, subtitles in a different language may still be thrown off by speech detection on films with a lot of music~~: improved; see the update at the top.
+- **On very noisy films, in stretches where recognition hears nothing, breakpoints can't be found accurately**. Of the 10 windows in Tears of Steel, 2 heard no speech at all. The rest depends on listening at checkpoints and fixing with anchors. The workbench warns "The two alignment methods disagree. Listen to a few more checkpoints."
+- **Time-sensitive tests**: they occasionally failed when the machine was busy, because of load: the image tests originally ran 7 workers at once, and the files running ffmpeg took the time. Limited to 4, after which three runs in a row all passed. The `subtitles` search one (Chinese title not written) I couldn't reproduce; four copies running at once all passed too.
+- **Other things not verified**:
+  - Real subtitle sources, which need your TMDB key and Assrt token.
+  - Playback in Safari / Firefox; screen readers; ARM.
+  - Download behavior over long periods of operation.
 
-## 和規格不同、需要你確認的地方
+## Differences from the spec that need your confirmation
 
-都記在 `docs/changes.md` 和 `docs/agent-notes.md`：
+All recorded in `docs/changes.md` and `docs/agent-notes.md`:
 
-- **語音辨識的細節**：
-  - 窗的數量和長度、用 `base` 模型。
-  - 排名不呼叫語言模型：一次排名最多 30 條，就是 30 次請求。
-  - 語言模型在 api 裡呼叫：只有它拿得到金鑰。
-  - 選了 Claude 時預設 `claude-opus-5-5`，並開啟官方的「拒答時改用其他模型」備援。
-- **字幕的抓檔由 api 做**（規格寫 media）：射手網的下載網址是臨時的，沒辦法交給另一個程式。
-- **匯出檔的預設檔名一律是 `.zh-TW.mkv`**：照規格，即使只有英文字幕也一樣。你要不要改成依預設軌的語言？
+- **Speech recognition details**:
+  - The number and length of windows, using the `base` model.
+  - Ranking doesn't call the language model: one ranking covers up to 30 subtitle tracks, which would be 30 requests.
+  - The language model is called in api: only it has access to the key.
+  - When Claude is selected, the default is `claude-opus-5-5`, with the official "switch to another model on refusal" fallback turned on.
+- **Subtitle fetching is done by api** (the spec says media): Assrt's download URLs are temporary and can't be handed to another program.
+- **The default export file name is always `.zh-TW.mkv`**: per the spec, even when there are only English subtitles. Do you want it to follow the default track's language instead?
 
-## 需要你做的
+## What you need to do
 
-1. 登入，改密碼。
-2. **來源設定 → 自動對齊**：要對不同語言的字幕，選 Claude 或通義千問（OpenAI 相容，網址填 `https://dashscope.aliyuncs.com/compatible-mode/v1`、模型例如 `qwen-plus`），填金鑰，按「測試模型」。
-3. **來源設定**：填 TMDB 金鑰、射手網 token，各按一次「測試」。
-4. 找一部 **Blender 基金會的開放電影**（例如 Tears of Steel、Sintel）試整條流程。開發與測試規則禁止我下載 YTS 上有版權的片子，那一步要你自己決定。
+1. Sign in and change the password.
+2. **Sources → Auto-align**: to align subtitles in a different language, choose Claude or Qwen (OpenAI-compatible, URL `https://dashscope.aliyuncs.com/compatible-mode/v1`, model e.g. `qwen-plus`), enter the key, and press "Test model".
+3. **Sources**: enter the TMDB key and the Assrt token, and press "Test" once for each.
+4. Find a **Blender Foundation open movie** (e.g. Tears of Steel, Sintel) to try the whole flow. The development and testing rules forbid me from downloading copyrighted films from YTS; that step is your call.
 
-## 關於拿去賣
+## About selling it
 
-不是法律意見。這套系統的核心是從 YTS 找片、用 BitTorrent 下載。YTS 上的內容大多沒有授權，下載時也同時在上傳。賣這樣的產品或服務，你和買的人都有明確的法律風險：
+This is not legal advice. The core of this system is finding films on YTS and downloading them with BitTorrent. Most content on YTS is unlicensed, and downloading also uploads at the same time. Selling such a product or service carries clear legal risk for both you and the buyers:
 
-- 在台灣涉及著作權法，平台提供者也可能被認定為幫助侵權。
-- 授權方面：ffmpeg 用的是 Debian 的版本，含 GPL 元件。若要散布映像檔，須依 GPL 提供原始碼。其他主要套件是 MIT 授權（Whisper、faster-whisper、ffsubsync、WebTorrent）。
-- 字幕來源也各有使用條款。
+- In Taiwan this falls under copyright law, and a platform provider may also be found to be contributing to infringement.
+- On licensing: ffmpeg is Debian's build, which includes GPL components. Distributing the image requires providing source code under the GPL. The other main packages are MIT-licensed (Whisper, faster-whisper, ffsubsync, WebTorrent).
+- The subtitle sources each have their own terms of use too.
 
-要商業化，建議先找律師，並考慮把電影來源換成有授權的內容。
+To commercialize, I suggest talking to a lawyer first, and considering replacing the film source with licensed content.
 
-## 建議（沒做，值得做）
+## Suggestions (not done, worth doing)
 
-- 四項建議都已經做了（見最上面的更新）。
-- 片子很吵、辨識聽不到的段落，可以在那附近多聽幾個窗再對一次（目前窗的位置是固定的）。
+- All four suggestions have been done (see the update at the top).
+- In noisy stretches where recognition hears nothing, it could listen to a few more windows nearby and align again (currently the window positions are fixed).

@@ -57,9 +57,9 @@ import { cuesToTraditional } from './text.js';
 import { SubtitleWorker } from './worker.js';
 
 /**
- * The subtitle endpoints (docs/04-api.md, "字幕"; docs/07-subtitle-providers.md). Every one checks
+ * The subtitle endpoints (docs/04-api.md, "Subtitles"; docs/07-subtitle-providers.md). Every one checks
  * that the caller holds the film the subtitle or candidate belongs to; administrators are no
- * exception (docs/12-auth.md, "誰能做什麼").
+ * exception (docs/12-auth.md, "Who can do what").
  */
 const IdParams = z.object({ id: z.uuid() });
 const Langs = z
@@ -241,13 +241,13 @@ export function subtitleRoutes(app: FastifyInstance, deps: Deps): void {
     }
     await publishCandidates(pool, events, id);
     // The answer says what this request started, so it is read before any source runs: one with
-    // nothing to ask (射手網 without a token) could otherwise finish in between and show as done.
+    // nothing to ask (Assrt without a token) could otherwise finish in between and show as done.
     const answer = await list(user, id, body.languages);
     for (const p of targets) worker.search(id, p, !!body.refresh);
     return answer;
   });
 
-  /** All chosen-language candidates fetched and aligned once, best score per language marked (docs/07, "全部自動對齊並排名"). */
+  /** All chosen-language candidates fetched and aligned once, best score per language marked (docs/07, "Auto-align and rank them all"). */
   app.post('/api/torrents/:id/candidates/rank', async (req) => {
     const user = requireUser(req);
     const { id } = parse(IdParams, req.params);
@@ -292,7 +292,7 @@ export function subtitleRoutes(app: FastifyInstance, deps: Deps): void {
     return list(user, id, languages);
   });
 
-  /** One subtitle file or archive; a candidate row from the moment it arrives (docs/07, "上傳"). */
+  /** One subtitle file or archive; a candidate row from the moment it arrives (docs/07, "Upload"). */
   app.post('/api/torrents/:id/uploads', async (req) => {
     const user = requireUser(req);
     const { id } = parse(IdParams, req.params);
@@ -351,7 +351,7 @@ export function subtitleRoutes(app: FastifyInstance, deps: Deps): void {
     return list(user, id);
   });
 
-  /** docs/07, "加入". The candidate's file is fetched first when it was not (up to 30 s). */
+  /** docs/07, "Adding". The candidate's file is fetched first when it was not (up to 30 s). */
   app.post('/api/candidates/:id/add', async (req) => {
     const user = requireUser(req);
     const { id } = parse(IdParams, req.params);
@@ -443,7 +443,7 @@ export function subtitleRoutes(app: FastifyInstance, deps: Deps): void {
       );
       if (!ins.rowCount) throw new ApiError('NOT_FOUND', 'the film is being removed');
     } catch (err) {
-      // Our own folder, written for a row that could not be added (docs/07, "加入" step 6).
+      // Our own folder, written for a row that could not be added (docs/07, "Adding" step 6).
       if (placed) await removeOwnSubtitleOutput(config.dataDir, 'subtitle', newId);
       if (pgCode(err) === UNIQUE_VIOLATION) throw new ApiError('SUBTITLE_DUPLICATE', 'this subtitle is already added');
       throw err;
@@ -566,10 +566,10 @@ export function subtitleRoutes(app: FastifyInstance, deps: Deps): void {
     return out;
   });
 
-  /** Computed in the media service; the stored document is not touched (docs/09, "自動對齊"). */
+  /** Computed in the media service; the stored document is not touched (docs/09, "Auto-align"). */
   app.post('/api/subtitles/:id/auto-align', async (req) => {
     const user = requireUser(req);
-    // Each press may ask a paid language model a dozen questions (docs/08, "語言模型").
+    // Each press may ask a paid language model a dozen questions (docs/08, "Language model").
     const wait = alignLimiter.retryAfter(user.id);
     if (wait > 0) throw new ApiError('RATE_LIMITED', 'too many alignments', { retryAfterSeconds: wait });
     alignLimiter.record(user.id);
@@ -595,7 +595,7 @@ export function subtitleRoutes(app: FastifyInstance, deps: Deps): void {
       const sp = await speechFor(pool, config.dataDir, s.torrent_id);
       if (!sp) throw new ApiError('MEDIA_NOT_READY', 'no speech data for this film');
       // A subtitle in another language than the one spoken is paired by the language model here,
-      // where the key is; the media service does the rest (docs/08, "語言模型").
+      // where the key is; the media service does the rest (docs/08, "Language model").
       const heard = await llmHeard(
         deps,
         app.llm,
@@ -664,7 +664,7 @@ export function subtitleRoutes(app: FastifyInstance, deps: Deps): void {
         [id, cur.doc_rev, cur.doc, user.id],
       );
       await audit(c, user, 'subtitle.confirm', { movieTitle: t.title, language: cur.language }, req.ip);
-      // The film's other holders hear about it (docs/09, "確認" step 4).
+      // The film's other holders hear about it (docs/09, "Confirm" step 4).
       const notes = await c.query<{ id: number; user_id: string }>(
         `insert into notifications (user_id, kind, data, link)
          select h.user_id, 'subtitle.confirmed', jsonb_build_object('actor', $3::text, 'movieTitle', $4::text, 'language', $5::text),

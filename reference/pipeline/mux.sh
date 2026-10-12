@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Export: the original video and audio, untouched, plus the confirmed subtitles as soft tracks.
 #
-#   TITLE="Sample Movie (2020)" ./mux.sh movie.mp4 out.mkv  zh.srt chi "繁體中文"  en.srt eng "English"
+#   TITLE="Sample Movie (2020)" ./mux.sh movie.mp4 out.mkv  zh.srt chi "Traditional Chinese"  en.srt eng "English"
 #
 # Subtitle arguments come in threes: file, ISO 639-2 language, track title. The first one is the
 # default track. Every subtitle file must already be UTF-8: with -c copy ffmpeg does not look

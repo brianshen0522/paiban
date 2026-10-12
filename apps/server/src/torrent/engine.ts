@@ -11,7 +11,7 @@ import { subtitleFiles, VIDEO_EXTENSIONS } from './schedule.js';
  */
 export type EngineFile = { path: string; length: number };
 
-/** One open connection, as the download page shows it (docs/11-pages.md, "下載細節"). */
+/** One open connection, as the download page shows it (docs/11-pages.md, "Download details"). */
 export type EnginePeer = {
   address: string;
   port: number;
@@ -82,7 +82,7 @@ export type AddOptions = {
   announce?: string[];
   /**
    * Only the largest video file, and the subtitle files beside it, are downloaded (torrents added
-   * by hand, docs/06-torrent-worker.md, "手動加入"). `length`, `progress`, `downloaded`, `done` and
+   * by hand, docs/06-torrent-worker.md, "Adding by hand"). `length`, `progress`, `downloaded`, `done` and
    * the `done` event are then those files' together.
    */
   onlyMainVideo?: boolean;

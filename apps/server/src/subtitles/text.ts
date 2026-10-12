@@ -3,7 +3,7 @@ import iconv from 'iconv-lite';
 import * as OpenCC from 'opencc-js';
 
 /**
- * Turning the bytes of a subtitle file into UTF-8 cues (docs/07-subtitle-providers.md, "下載與處理",
+ * Turning the bytes of a subtitle file into UTF-8 cues (docs/07-subtitle-providers.md, "Download and processing (`subtitle.resolve` downloads; `subtitle.fetch` / `subtitle.ingest` process)",
  * steps 4 to 7). A port of reference/subtitles/text.mjs, plus the SRT and WebVTT readers and the
  * normalization rules. Pure functions: no files, no database.
  *

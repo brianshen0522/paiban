@@ -23,7 +23,7 @@ import {
 } from './subtitle-jobs.js';
 
 /**
- * The media service's scheduling (docs/02-architecture.md "服務之間怎麼溝通", docs/08 "對帳").
+ * The media service's scheduling (docs/02-architecture.md "How the services talk to each other", docs/08 "Reconciliation").
  * The tables are the truth: a row in a waiting state is work to do. There is no separate queue;
  * a job claims its row with a conditional update, so running it twice does it once. Each kind of
  * work runs one at a time, so a long transcode never blocks analysis, an export or a recalculation.
@@ -43,7 +43,7 @@ export class MediaService {
     this.d = d;
   }
 
-  /** Start-up (docs/02, "啟動與關閉"): drafts away, interrupted work back to waiting. */
+  /** Start-up (docs/02, "Startup and shutdown"): drafts away, interrupted work back to waiting. */
   async start(): Promise<void> {
     const { pool, config, log } = this.d;
     await cleanScratchOnStart(config.dataDir, log);
@@ -117,7 +117,7 @@ export class MediaService {
           and not exists (select 1 from exports e where e.id::text = tasks.input->>'exportId' and e.state in ('queued', 'running'))`,
     );
     if (need.length) await pool.query(`select pg_notify('paiban_events', '{"type":"task"}')`);
-    // Subtitles: rankings whose candidates changed, candidates stuck while fetching (docs/08, "對帳" items 2 and 3).
+    // Subtitles: rankings whose candidates changed, candidates stuck while fetching (docs/08, "Reconciliation" items 2 and 3).
     await settleRanks(pool);
     await failStuckFetches(pool);
     for (const q of QUEUES) this.kick(q);
@@ -241,7 +241,7 @@ export class MediaService {
     return true;
   }
 
-  /** Speech recognition, after the analysis (docs/08, "語音辨識"). Its own queue: it takes minutes. */
+  /** Speech recognition, after the analysis (docs/08, "Speech recognition"). Its own queue: it takes minutes. */
   private async nextAsr(): Promise<boolean> {
     const rows = await many<MediaRow>(
       this.d.pool,
@@ -267,7 +267,7 @@ export class MediaService {
     return true;
   }
 
-  /** One export at a time, independent of the preview queue (docs/08-media-pipeline.md, "封裝"). */
+  /** One export at a time, independent of the preview queue (docs/08-media-pipeline.md, "Packing (`export.mux`)"). */
   private async nextExport(): Promise<boolean> {
     const rows = await many<{ id: string }>(
       this.d.pool,

@@ -49,7 +49,7 @@ const stopHeartbeat = startHeartbeat(pool, 'api');
 await moveOldLlmSetting({ pool, config, log });
 await app.listen({ host: '0.0.0.0', port: config.port });
 log.info({ port: config.port }, 'api listening');
-// Subtitle searches and downloads left unfinished by the previous run continue (docs/07, "誰做哪一步").
+// Subtitle searches and downloads left unfinished by the previous run continue (docs/07, "Who does which step").
 await app.subtitleWorker.start();
 // Translations left running carry on from their last finished chunk (docs/18-llm.md).
 await app.translationWorker.start();

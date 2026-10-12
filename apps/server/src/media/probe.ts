@@ -2,7 +2,7 @@ import { extname } from 'node:path';
 import { FALLBACK_RUNTIME_MIN, PREVIEW_BYTES_PER_SECOND } from '@paiban/shared';
 import { z } from 'zod';
 
-/** What ffprobe says, reduced to what the app decides with (docs/08-media-pipeline.md, "探測"). */
+/** What ffprobe says, reduced to what the app decides with (docs/08-media-pipeline.md, "Probe"). */
 export type ProbeInfo = {
   durationS: number | null;
   container: string;
@@ -110,7 +110,7 @@ export function streamCounts(json: unknown): StreamCounts {
   };
 }
 
-/** Reservation for each preview asset still to be made (docs/10-storage.md, "預覽預留"). */
+/** Reservation for each preview asset still to be made (docs/10-storage.md, "Preview reservation"). */
 export function assetReserve(durationS: number | null, runtimeMin: number, asset: 'audio' | '480p' | '720p'): number {
   const seconds = durationS && durationS > 0 ? durationS : (runtimeMin > 0 ? runtimeMin : FALLBACK_RUNTIME_MIN) * 60;
   return Math.ceil(PREVIEW_BYTES_PER_SECOND[asset] * seconds);

@@ -1,7 +1,7 @@
 import { type ReactNode, useEffect, useId, useRef } from 'react';
 
 /**
- * A floating window over the page (docs/18-llm.md, "浮動視窗"): a native modal <dialog>, so the
+ * A floating window over the page (docs/18-llm.md, "Floating window"): a native modal <dialog>, so the
  * page behind it is inert and focus stays inside. Esc closes it (unless `busy`); focus starts on
  * the first field and returns to the button that opened it.
  */

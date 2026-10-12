@@ -9,7 +9,7 @@ const PING_MS = 25_000;
  * Whether an open stream may go on: its session still exists and has not expired, the account is
  * not disabled, and the role is the one the stream was opened with. Checked at every ping, so a
  * disabled, removed, signed-out or demoted account stops receiving events within 25 seconds
- * (docs/12-auth.md, "停用帳號").
+ * (docs/12-auth.md, "Disable an account").
  */
 export async function streamStillAllowed(q: Queryable, sessionId: string, admin: boolean): Promise<boolean> {
   const r = await one<{ admin: boolean }>(

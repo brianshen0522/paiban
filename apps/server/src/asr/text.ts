@@ -152,7 +152,7 @@ export const MAX_LISTEN_SECONDS = 360;
 /**
  * Where to listen: windows of `length` seconds spread evenly over the film, one in the middle
  * of each equal part. Together they cover 40 % of a short film and at most six minutes of a
- * long one (docs/08-media-pipeline.md, "語音辨識"). The detected speech is deliberately not
+ * long one (docs/08-media-pipeline.md, "Speech recognition"). The detected speech is deliberately not
  * used to place them: on films with a lot of music it points at the music.
  */
 export function pickWindows(duration: number, length = 30): AsrWindow[] {

@@ -1,116 +1,116 @@
-# 18 語言模型設定與字幕翻譯
+# 18 Language model settings and subtitle translation
 
-Brian，2026-10-07：搜尋字幕常常只有英文的，想用語言模型翻成中文。同時把語言模型的設定從「來源設定 → 自動對齊」搬出來，變成管理頁獨立的「LLM 設定」，可以有多個設定檔、做負載平衡和備援。
+Brian, 2026-10-07: subtitle searches often find only English ones, and he wants to translate them into Chinese with a language model. At the same time, the language model settings move out of "Sources → Auto-align" into a separate admin page, "LLM settings", which can hold several profiles and do load balancing and fallback.
 
-## 設定檔
+## Profiles
 
-管理員在「LLM 設定」頁（`/admin/llm`）建立任意多個設定檔。每個設定檔：
+Administrators create any number of profiles on the "LLM settings" page (`/admin/llm`). Each profile:
 
-| 欄位 | 說明 |
+| Field | Description |
 | --- | --- |
-| 名稱 | 1 到 60 字，給人看的 |
-| 供應商 | OpenAI、Anthropic、Azure OpenAI、Azure AI Foundry、OpenRouter、Ollama、OpenAI 相容的自架服務（vLLM、LM Studio 等） |
-| 服務網址 | Ollama、自架、Azure OpenAI、Azure AI Foundry 必填；OpenAI、Anthropic、OpenRouter 選填（留空用官方網址，填了是前面的代理）。Ollama 填到埠號為止（`http://192.168.1.10:11434`），貼成 `…/v1` 也會自動去掉 |
-| API 版本 | 只有 Azure 兩種有，預設 `2024-10-21`（Azure OpenAI）、`2024-05-01-preview`（Azure AI Foundry） |
-| 金鑰 | 選填（自架常常沒有）。加密存放（AES-256-GCM，附加資料是 `llm:<設定檔 id>`，搬不到別的設定檔），存了之後不再顯示，只說「已設定」 |
-| 模型 | Azure OpenAI 填部署名稱（deployment） |
-| 優先順序 | 1 到 9，1 先用 |
-| 權重 | 1 到 100，同一個優先順序裡分攤請求的比例 |
-| 啟用 | 停用的不會被選到 |
-| 參數 | temperature（0 到 2，預設 0.2）、最大輸出長度（256 到 32000，預設 8000）、逾時（10 到 600 秒，預設 300：翻譯一段 50 句時，會先「思考」的模型可能要好幾分鐘；2026-10-07 實測同一段 glm-5.3 推理開著 264 秒、關閉推理的模型 24 秒）、同時送出的請求數（1 到 16，預設 3）、關閉推理（預設開：對 OpenAI 相容的服務送 `reasoning_effort: "none"`、對 Ollama 送 `think: false`，被拒時自動不帶）、長度上限（只有 Ollama，`num_ctx`，2048 到 131072，預設 16384） |
+| Name | 1 to 60 characters, for people to read |
+| Provider | OpenAI, Anthropic, Azure OpenAI, Azure AI Foundry, OpenRouter, Ollama, self-hosted OpenAI-compatible services (vLLM, LM Studio, etc.) |
+| Service URL | Required for Ollama, self-hosted, Azure OpenAI and Azure AI Foundry; optional for OpenAI, Anthropic and OpenRouter (empty uses the official URL; filled in, it is a proxy in front). For Ollama, fill it in up to the port (`http://192.168.1.10:11434`); a pasted `…/v1` is removed automatically |
+| API version | Only for the two Azure kinds; defaults `2024-10-21` (Azure OpenAI), `2024-05-01-preview` (Azure AI Foundry) |
+| Key | Optional (self-hosted services often have none). Stored encrypted (AES-256-GCM, with `llm:<profile id>` as associated data, so it can't be moved to another profile); once saved it is never shown again, only "Key set" |
+| Model | For Azure OpenAI, the deployment name |
+| Priority | 1 to 9; 1 is used first |
+| Weight | 1 to 100; the share of requests within the same priority |
+| Enabled | Disabled profiles are never picked |
+| Parameters | temperature (0 to 2, default 0.2), maximum output length (256 to 32000, default 8000), timeout (10 to 600 seconds, default 300: translating one chunk of 50 lines can take several minutes with models that "think" first; measured on 2026-10-07, the same chunk took 264 seconds on glm-5.3 with reasoning on, and 24 seconds on a model with reasoning off), concurrent requests (1 to 16, default 3), turn off reasoning (on by default: sends `reasoning_effort: "none"` to OpenAI-compatible services and `think: false` to Ollama, and drops it automatically when rejected), context length (Ollama only, `num_ctx`, 2048 to 131072, default 16384) |
 
-### 不照規矩回答的服務
+### Services that don't follow the rules
 
-- 送出時一律帶 `stream: false`。有些轉接多家模型的閘道仍然回 `text/event-stream`：一整段 JSON 後面接 `data: [DONE]`，或一段一段的 `data:`（`delta`）。兩種都照樣讀（Brian，2026-10-07 實際遇到）。
-- 有些閘道會把 `response_format: json_object` 換成自己的指示（要模型回 `{"answer": …}`），蓋掉我們要的格式。回答不符格式時，拿掉 `response_format` 再問一次，並記住這個網址不要帶。
+- Requests always carry `stream: false`. Some gateways that route to many models still answer with `text/event-stream`: one whole JSON body followed by `data: [DONE]`, or a series of `data:` chunks (`delta`). Both are read as usual (Brian, 2026-10-07, actually ran into this).
+- Some gateways replace `response_format: json_object` with their own instruction (asking the model to answer `{"answer": …}`), overriding the format we want. When an answer doesn't match the format, ask again without `response_format`, and remember not to send it to this URL.
 
-### 為什麼 Ollama 是自己一種（Brian，2026-10-07）
+### Why Ollama is its own kind (Brian, 2026-10-07)
 
-Ollama 也有 OpenAI 相容的介面，但翻譯走它自己的 `/api/chat`：
+Ollama also has an OpenAI-compatible interface, but translation uses its own `/api/chat`:
 
-- 長度上限：Ollama 預設的上下文很小，超過的部分會被悄悄截掉、不報錯；翻譯一段（50 句加前後 20 句參考、簡介和回答）很容易超過，結果是少句。相容介面不能調，原生介面每次帶 `options.num_ctx`。
-- `think: false` 比 `reasoning_effort` 可靠，舊版 Ollama 不一定認得後者。
-- `format` 直接給回答的 JSON schema，模型比較不會漏句或多句。
-- 模型清單從 `/api/tags` 取。
-- 舊一點的 Ollama 拒絕某個欄位（400）時，依序拿掉 `think`、把 `format` 換成 `"json"`、再拿掉 `format` 重試，並記住。
+- Context length: Ollama's default context is small, and anything beyond it is silently cut off without an error; one translation chunk (50 lines plus 20 lines of context before and after, the summary and the answer) easily exceeds it, and the result is missing lines. The compatible interface can't adjust it; the native interface sends `options.num_ctx` with every request.
+- `think: false` is more reliable than `reasoning_effort`; older Ollama versions don't necessarily recognize the latter.
+- `format` takes the answer's JSON schema directly, so the model is less likely to drop or add lines.
+- The model list comes from `/api/tags`.
+- When an older Ollama rejects a field (400), retry by dropping `think`, then replacing `format` with `"json"`, then dropping `format`, in that order, and remember.
 
-### 分配：負載平衡與備援
+### Distribution: load balancing and fallback
 
-每一個請求：
+For each request:
 
-1. 拿出啟用的設定檔，依優先順序分層。
-2. 從最前面那一層，依權重隨機挑一個「現在沒有在冷卻、而且同時請求數還沒滿」的。都滿了就等。
-3. 失敗時：
-   - 被限流（429）、連不上、逾時、5xx：那個設定檔冷卻 60 秒，換同一層的其他設定檔；同一層都不行就換下一層。
-   - 金鑰被拒（401、403）：冷卻 10 分鐘（等管理員改設定）。
-   - 回答看不懂、模型拒答：不冷卻，換下一個設定檔重試這個請求。
-   - 能用的設定檔都在冷卻時：冷卻原因是限流、逾時、連不上的，等冷卻結束再送（例如逾時後一分鐘內按「繼續」不會立刻失敗）；是金鑰被拒、設定不完整的，等也沒用，直接回報那個原因。
-4. 一個請求最多試 4 次（不同設定檔）。全部失敗就把最後一個錯誤回給呼叫的人。
+1. Take the enabled profiles and group them into layers by priority.
+2. From the first layer, pick one at random by weight among those "not cooling down right now and not at their concurrent request limit". If all are full, wait.
+3. On failure:
+   - Rate-limited (429), unreachable, timed out, 5xx: that profile cools down for 60 seconds, and another profile in the same layer is tried; if none in the layer works, move to the next layer.
+   - Key rejected (401, 403): cool down for 10 minutes (waiting for an administrator to fix the settings).
+   - Unreadable answer, model refused: no cooldown; retry this request with the next profile.
+   - When all usable profiles are cooling down: if the cooldown reason is rate limiting, timeout or unreachable, wait for the cooldown to end and then send (e.g. pressing "Resume" within a minute after a timeout doesn't fail immediately); if it is a rejected key or incomplete settings, waiting won't help, so report that reason directly.
+4. One request is tried at most 4 times (with different profiles). If all fail, the last error is returned to the caller.
 
-冷卻狀態只記在記憶體（`api` 重啟就清掉），設定頁上每個設定檔顯示「冷卻到幾點、為什麼」。
+Cooldown state is kept only in memory (cleared when `api` restarts); the settings page shows "cooling down until when, and why" for each profile.
 
-每次呼叫（不論成敗）寫一列 `llm_usage`：時間、設定檔、用途（翻譯、自動對齊、測試）、使用者、請求數、成功與否、錯誤代碼、花了多久。設定頁列出最近 50 列。程式不會自動刪這些列（它們不是檔案；量大時管理員可以手動清，第一版不做）。
+Every call (successful or not) writes a row to `llm_usage`: time, profile, purpose (translation, auto-align, test), user, number of requests, success or failure, error code, how long it took. The settings page lists the latest 50 rows. The program never deletes these rows automatically (they aren't files; when there are many, administrators can clear them by hand, which the first version doesn't provide).
 
-### 誰用這些設定檔
+### Who uses these profiles
 
-翻譯和自動對齊（[08-media-pipeline.md](08-media-pipeline.md) 的「語言模型」）共用同一組設定檔。原本「來源設定 → 自動對齊」裡的單一語言模型設定拿掉；升級時 `api` 啟動會把它搬成第一個設定檔（Anthropic → Anthropic；OpenAI 相容 → 自架；金鑰重新加密），然後刪掉舊的設定和 `llmKey`。只搬資料，不會發出任何請求。
+Translation and auto-align ("Language model" in [08-media-pipeline.md](08-media-pipeline.md)) share the same set of profiles. The single language model setting in "Sources → Auto-align" is removed; on upgrade, `api` moves it into the first profile at startup (Anthropic → Anthropic; OpenAI-compatible → self-hosted; the key is re-encrypted), then deletes the old setting and `llmKey`. It only moves data and sends no requests.
 
-### 浮動視窗
+### Floating window
 
-新增或編輯設定檔都在一個浮動視窗（`<dialog>`）裡，由上到下：
+Adding or editing a profile happens in a floating window (`<dialog>`), from top to bottom:
 
-1. 名稱。
-2. 供應商（選單）。選自架或 Azure 時才出現「服務網址」（必填）；選 Azure 時多「API 版本」。
-3. 金鑰（密碼框，選填）。編輯時已設定的顯示「已設定，留空表示不變」，旁邊有「清除金鑰」。
-4. 模型：文字框加「取得模型清單」按鈕。按下去用目前填的網址和金鑰（還沒填金鑰時用存著的）向服務要模型清單，結果變成文字框的建議（`<datalist>`），也可以直接打字。Azure OpenAI 要不到部署清單時，說「Azure 不提供部署清單，請直接輸入部署名稱」。
-5. 優先順序、權重、啟用。
-6. 參數（可收合）。
-7. 「測試」：用視窗裡目前的值（還沒存也可以）送一題小翻譯，顯示「成功，花了 1.2 秒：〈模型的回答〉」或失敗的原因。
-8. 「儲存」「取消」。
+1. Name.
+2. Provider (menu). "Service URL" (required) only appears for self-hosted or Azure; Azure adds "API version".
+3. Key (password box, optional). When editing a profile with a key set, it shows "Set. Leave empty to keep it", with "Clear key" next to it.
+4. Model: a text box plus a "Fetch models" button. Pressing it asks the service for its model list using the URL and key currently filled in (the stored key if no key is filled in yet); the result becomes suggestions for the text box (`<datalist>`), and you can also type directly. When Azure OpenAI can't return a deployment list, it says "Azure doesn't list deployments. Type the deployment name."
+5. Priority, weight, enabled.
+6. Parameters (collapsible).
+7. "Test": sends one small translation using the values currently in the window (even unsaved), and shows "Succeeded in 1.2 seconds: 〈the model's answer〉" or the reason for failure.
+8. "Save", "Cancel".
 
-## 字幕翻譯
+## Subtitle translation
 
-### 從哪裡開始
+### Where it starts
 
-工作區「字幕」分頁的每一條字幕都有「翻譯」。按下去出現浮動視窗：
+Every subtitle on the workspace's "Subtitles" tab has "Translate". Pressing it opens a floating window:
 
-- 目標語言（選單，預設繁體中文；列出常見語言，也可以打語言代碼）。
-- 形式：「只有譯文」或「雙語」（譯文在上、原文在下，同一句）。
-- 「開始翻譯」。
+- Target language (menu, default Traditional Chinese; lists common languages, and a language code can also be typed).
+- Form: "Translation only" or "Bilingual" (translation above, original below, in the same line).
+- "Start translation".
 
-沒有任何可用的設定檔時，按鈕停用並說「管理員還沒有設定語言模型」。
+When there is no usable profile, the button is disabled and says "An administrator hasn't set up a language model".
 
-### 給模型的內容
+### What the model is given
 
-- 背景：TMDB 的片名（中文和原文）、年份、類型、簡介（`language=zh-TW`；沒有中文時用 YTS 的英文簡介）。
-- 分段：每段 50 句要翻的。前面附最多 10 句和它們已經翻好的譯文，後面附最多 10 句原文，標明「只供參考，不要翻譯」。
-- 各段依序翻，後一段用前一段的譯文當參考，所以用詞和人名前後一致。
-- 要求回 JSON：`{"lines": [{"id": 12, "text": "..."}, ...]}`，每句一筆，id 是要翻的那幾句的編號，換行用 `\n`。
-- 檢查：id 必須剛好是要翻的那幾句，一句不少；少句、多句、格式不對就重試這一段（換設定檔，最多 3 次），還是不行就整個翻譯失敗。
+- Background: TMDB's title (Chinese and original), year, genres, summary (`language=zh-TW`; YTS's English summary when there is no Chinese one).
+- Chunks: 50 lines to translate per chunk. Before them, up to 10 lines with their already-finished translations; after them, up to 10 lines of original text, marked "for reference only, do not translate".
+- Chunks are translated in order, and each chunk uses the previous chunk's translation as reference, so wording and names stay consistent.
+- The answer must be JSON: `{"lines": [{"id": 12, "text": "..."}, ...]}`, one entry per line, where id is the number of a line to translate, and line breaks are `\n`.
+- Check: the ids must be exactly the lines to translate, none missing; on missing lines, extra lines or a bad format, retry this chunk (with another profile, up to 3 times), and if it still fails, the whole translation fails.
 
-### 結果
+### Results
 
-- 全部翻完才寫成一條新的字幕：來源是「AI 翻譯」（`provider = 'translated'`），版本名稱是「AI 翻譯（〈模型〉）· 〈原字幕的版本名稱〉」（開始翻譯的人介面用英文時是「AI translation (〈模型〉) · …」），語言是目標語言，句子和原字幕一對一（同樣的編號和時間）。
-- 同步結果（分段、逐句修改、檢查點）從原字幕目前的版本複製過來，所以原字幕對好了，翻譯版就不用再對；狀態是草稿，要確認同步才能匯出。
-- 原字幕裡刪除的句子照樣翻（刪除的狀態跟著同步結果複製）。
-- 和其他字幕一樣可以移除。
+- Only when everything is translated is it written as new subtitles: the source is "AI translation" (`provider = 'translated'`), the version name is 「AI 翻譯（〈model〉）· 〈original subtitles' version name〉」 ("AI translation (〈model〉) · …" when the person who started the translation uses the English interface), the language is the target language, and the lines map one-to-one to the original subtitles (same numbers and times).
+- The sync result (segments, per-line edits, checkpoints) is copied from the original subtitles' current version, so if the original is synced, the translation doesn't need syncing again; the status is draft, and the sync must be confirmed before export.
+- Lines deleted in the original subtitles are still translated (the deleted state is copied along with the sync result).
+- Like other subtitles, it can be removed.
 
-### 進行中
+### In progress
 
-- 在 `api` 裡背景執行（金鑰只有 `api` 讀得到）。字幕分頁顯示「翻譯中：第 3 段 / 共 20 段」和「取消」。
-- 譯好的段落隨時存進 `translations.lines`；失敗或 `api` 重啟後按「繼續」從斷掉的那一段接著翻，不重翻已經好的。
-- 取消：停止送新的請求，這筆翻譯標成已取消，沒有寫出任何字幕檔，所以沒有東西要刪。
-- 同一條字幕、同一個目標語言和形式，同時只能有一筆在翻（`TRANSLATION_RUNNING`）。
-- 同樣的組合已經有一筆失敗或取消的，再按「翻譯」就是繼續那一筆（從斷掉的那一段接著翻、不算次數），不另開一筆（Brian，2026-10-07：原本會出現一筆在跑、一筆失敗，其實是同一件事）。提示說「這條字幕之前翻到一半，接著從第 N 段翻」。字幕分頁的清單每個組合只列最新的一筆。
+- Runs in the background in `api` (only `api` can read the keys). The Subtitles tab shows "Translating: chunk 3 / 20" and "Cancel".
+- Translated chunks are saved to `translations.lines` as they finish; after a failure or an `api` restart, pressing "Resume" continues from the chunk where it stopped, without retranslating finished ones.
+- Cancel: stops sending new requests and marks this translation as cancelled; no subtitle file has been written, so there is nothing to delete.
+- For the same subtitles, the same target language and form, only one translation can run at a time (`TRANSLATION_RUNNING`).
+- If the same combination already has a failed or cancelled one, pressing "Translate" again resumes that one (continuing from the chunk where it stopped, not counted against the limit) instead of starting a new one (Brian, 2026-10-07: previously there would be one running and one failed, which were really the same thing). The notice says "These subtitles were half translated before; continuing from chunk N". The Subtitles tab's list shows only the latest one for each combination.
 
-### 誰可以翻
+### Who can translate
 
-這部片的持有人。每人每小時最多開始 5 次翻譯（管理員在 LLM 設定頁改，0 到 100），超過回 `RATE_LIMITED`。「繼續」不算次數。
+Holders of the film. Each person can start at most 5 translations per hour (administrators change this on the LLM settings page, 0 to 100); beyond that, `RATE_LIMITED` is returned. "Resume" doesn't count.
 
-## 端點
+## Endpoints
 
-見 [04-api.md](04-api.md) 的「語言模型」「翻譯」兩節與合約 `packages/shared/src/contracts/api.ts`。
+See the "Language models" and "Translation" sections of [04-api.md](04-api.md) and the contract `packages/shared/src/contracts/api.ts`.
 
-## 測試
+## Tests
 
-自動化測試用本機的假模型服務（OpenAI 相容），不連外。要測：分配（權重、冷卻、換層、全部失敗）、取得模型清單、測試按鈕、分段與參考句的組法、少句重試、取消、從斷點繼續、結果字幕的內容與同步結果、次數限制、舊設定的搬移。
+Automated tests use a local fake model service (OpenAI-compatible) and don't go online. To test: distribution (weights, cooldowns, moving between layers, all failing), fetching the model list, the test button, how chunks and reference lines are assembled, retry on missing lines, cancel, resuming from where it stopped, the content and sync result of the resulting subtitles, the rate limit, migrating the old setting.

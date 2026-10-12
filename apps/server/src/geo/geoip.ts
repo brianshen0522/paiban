@@ -5,7 +5,7 @@ import { createGunzip } from 'node:zlib';
 
 /**
  * Which country an IP address is in, for the peer map on the download page (docs/11-pages.md,
- * "下載細節"). The table is DB-IP's free "IP to Country Lite" (CC BY 4.0: the map credits
+ * "Download details"). The table is DB-IP's free "IP to Country Lite" (CC BY 4.0: the map credits
  * DB-IP.com), downloaded when the image is built, so a lookup never leaves the machine. Rows are
  * `first,last,CC`; DB-IP writes `ZZ` for addresses that belong to no country.
  */

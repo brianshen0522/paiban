@@ -1,50 +1,50 @@
-# 15 測試
+# 15 Testing
 
-## 三條不能破的線
+## Three lines that must not be crossed
 
-1. **自動化測試不連外部網路。** 不連 YTS、不連任何字幕來源、不連 TMDB、不連公開的 BitTorrent 網路。CI 在沒有網路的環境也要全部通過。
-2. **測試和開發不使用有版權的影片，自動化測試也不使用從真實來源下載的字幕。** 只用 `fixtures/` 的合成素材；需要真實電影時用 Blender 基金會的開放電影（階段 0）。
-3. **測試不需要真的金鑰。** 需要金鑰的程式路徑用假的值加上錄下來的回應來測。
+1. **Automated tests don't connect to the outside network.** No YTS, no subtitle source, no TMDB, no public BitTorrent network. CI must pass completely in an environment with no network.
+2. **Testing and development don't use copyrighted video, and automated tests don't use subtitles downloaded from real sources either.** Only the synthetic material in `fixtures/`; when a real film is needed, use the Blender Foundation's open movies (Phase 0).
+3. **Tests don't need real keys.** Code paths that need a key are tested with fake values plus recorded responses.
 
-對真實來源的確認是**手動**做的（階段 0、5），結果寫進報告。錄下來的回應（JSON、HTML）把金鑰的值換成 `PLACEHOLDER` 之後變成測試素材。確認時下載的字幕壓縮檔只是拿來看格式：每個來源一兩個，放在 `.scratch/`，看完就刪，不進 repo（D29）。
+Checks against real sources are done **by hand** (Phases 0 and 5), and the results go into the reports. Recorded responses (JSON, HTML) become test fixtures after the key values are replaced with `PLACEHOLDER`. Subtitle archives downloaded during those checks are only used to look at the format: one or two per source, kept in `.scratch/`, deleted once looked at, never in the repo (D29).
 
-## 分層
+## Layers
 
-| 層 | 工具 | 測什麼 | 跑多快 |
+| Layer | Tool | What it tests | How fast |
 | --- | --- | --- | --- |
-| 單元 | Vitest | 純邏輯：對齊核心、字幕的編碼與解析、各來源的回應解析、預留量的計算、檔名和網址的驗證、排程規則、權限函式 | 幾秒 |
-| 資料庫 | Vitest + 真的 PostgreSQL（compose 起一個測試用的）。PGlite 可以拿來跑不需要並行的案例，但它只有一條連線，測不到「兩個連線同時」 | 遷移、遷移和 `db/schema.sql` 等價、`storage_usage`、`storage_admit`、`provider_take_slot`、交易與並行、外鍵的連帶行為 | 幾秒到十幾秒 |
-| 服務整合 | Vitest，把三個程式在同一個測試裡啟動，共用一個暫存的 `/data` | 下載到分析到匯出的工作流程；重啟；取消 | 一兩分鐘 |
-| 端對端 | Playwright，對著 `docker compose` 起來的整個系統 | 使用者看得到的行為 | 幾分鐘 |
+| Unit | Vitest | Pure logic: the sync core, subtitle encoding and parsing, parsing each source's responses, computing reservations, validating file names and URLs, scheduling rules, permission functions | A few seconds |
+| Database | Vitest + a real PostgreSQL (compose starts one for testing). PGlite can run cases that don't need concurrency, but it has only one connection, so it can't test "two connections at once" | Migrations, migrations equivalent to `db/schema.sql`, `storage_usage`, `storage_admit`, `provider_take_slot`, transactions and concurrency, cascading behavior of foreign keys | A few seconds to a dozen or so |
+| Service integration | Vitest, starting the three programs in the same test with a shared temporary `/data` | The workflow from download to analysis to export; restarts; cancellation | A minute or two |
+| End-to-end | Playwright, against the whole system brought up by `docker compose` | Behavior the user can see | A few minutes |
 
-每一層都不該依賴上一層已經測過的細節。例如端對端測試不需要再驗證 Big5 轉碼的每個邊角，那是單元測試的事。
+No layer should depend on details the layer below has already tested. For example, end-to-end tests don't need to re-verify every corner of Big5 decoding; that's the unit tests' job.
 
-## 離線的完整流程
+## Offline end-to-end flow
 
-整條主流程（搜尋 → 下載 → 分析 → 找字幕 → 同步 → 匯出 → 下載 MKV）要能在沒有網路的情況下跑完。需要三個替身，都只在測試和開發的 compose 設定裡出現：
+The whole main flow (search → download → analysis → find subtitles → sync → export → download MKV) must run to the end with no network. It needs three stand-ins, all of which appear only in the test and development compose setup:
 
-**假的 YTS**：一個很小的 HTTP 服務，提供 `list_movies.json` 和 `movie_details.json`，回應形狀和真的相同（[05-yts.md](05-yts.md)）。片單用原型的 14 部老片。其中一部的三個版本，info hash 指向下面本機做種的三個檔案。
+**Fake YTS**: a very small HTTP service that serves `list_movies.json` and `movie_details.json`, with responses shaped like the real ones ([05-yts.md](05-yts.md)). The film list is the prototype's 14 old films. The three versions of one of them have info hashes that point to the three files from local seeding below.
 
-**本機做種**：一個 WebTorrent 用戶端做種三個檔案，當作同一部片的三個版本，關掉 DHT、tracker、LSD：
+**Local seeding**: one WebTorrent client seeds three files as three versions of the same film, with DHT, trackers and LSD turned off:
 
-| 檔案 | 假 YTS 把它標成 | 用途 |
+| File | Fake YTS labels it as | Purpose |
 | --- | --- | --- |
-| `fixtures/clip.webm` | 720p x264 8-bit | 端對端測試的主角：瀏覽器真的播得出來（見下面的注意事項），而且算「能直接播」 |
-| `fixtures/clip.mp4` | 1080p x264 8-bit | 服務整合測試（不經過瀏覽器的）：分析結果要和 `fixtures/data.json` 完全相同 |
-| `fixtures/clip.hevc10.mp4` | 2160p x265 10-bit | 「不能直接播」的版本：聲音檔、預覽檔、預留 |
+| `fixtures/clip.webm` | 720p x264 8-bit | The lead in end-to-end tests: the browser really can play it (see the notes below), and it counts as "can play directly" |
+| `fixtures/clip.mp4` | 1080p x264 8-bit | Service integration tests (the ones that don't go through a browser): the analysis results must equal `fixtures/data.json` exactly |
+| `fixtures/clip.hevc10.mp4` | 2160p x265 10-bit | The "can't play directly" version: audio file, preview file, reservation |
 
-`torrent` 程式用測試專用的掛鉤（環境變數 `TORRENT_TEST_PEERS=seed:51801`）在加入種子後直接 `addPeer`。做法照 `reference/torrent/local-swarm-test.mjs`。種子的 info hash 取決於檔案內容和分塊大小，所以由做種的服務在啟動時算出來，寫到假 YTS 讀得到的地方。
+The `torrent` program uses a test-only hook (environment variable `TORRENT_TEST_PEERS=seed:51801`) to call `addPeer` directly after adding the torrent. Do it the way `reference/torrent/local-swarm-test.mjs` does. A torrent's info hash depends on the file contents and the piece size, so the seeding service computes it at startup and writes it somewhere the fake YTS can read.
 
-**假的字幕來源**：一個 HTTP 服務，依路徑回傳錄下來的回應和 `fixtures/archive.zip`（`tools/fakes/src/subtitles.ts`；開發時 `pnpm dev` 會一起起來，在 8091 埠）。只有 *Inception*（`tt1375666`、TMDB `27205`）有結果，和錄下來的回應一致；本機做種的那部片（假 YTS 的 *Charade*，`tt9000002`）也被當成 *Inception* 回答（`answerAsInception`），否則完整流程在找字幕這一步就找不到東西（片名和年份對不上不影響：來源依 IMDb／TMDB 編號查）。射手網的範例是手寫的，片名是「Sample Movie」（2010）。可以讓任何一個來源回 500、回挑戰頁、不回應、回額度錯誤（`30900`），也記下每個請求收到的時間，用來驗證排隊和「從來沒連過」。
+**Fake subtitle source**: an HTTP service that returns recorded responses and `fixtures/archive.zip` by path (`tools/fakes/src/subtitles.ts`; in development `pnpm dev` starts it too, on port 8091). Only *Inception* (`tt1375666`, TMDB `27205`) has results, matching the recorded responses; the film from local seeding (the fake YTS's *Charade*, `tt9000002`) is also answered as *Inception* (`answerAsInception`), because otherwise the full flow would find nothing at the find-subtitles step (the title and year not matching doesn't matter: sources look things up by IMDb/TMDB ID). The Assrt example is handwritten, with the title "Sample Movie" (2010). Any one source can be made to return 500, return a challenge page, not respond, or return a quota error (`30900`), and it records the time each request is received, to verify queuing and "never connected".
 
-**怎麼把正式的程式指到這些替身**：正式的程式只連 `https://`、不連內部位址、只連白名單裡的主機，替身全部會被擋掉。所以有三個只給開發和測試用的環境變數（[02-architecture.md](02-architecture.md)、[12-auth.md](12-auth.md)）：
+**How the production code is pointed at these stand-ins**: the production code only connects over `https://`, never to internal addresses, and only to hosts on the allowlist, so all the stand-ins would be blocked. So there are three environment variables just for development and testing ([02-architecture.md](02-architecture.md), [12-auth.md](12-auth.md)):
 
 ```yaml
-# 只出現在開發和測試的 compose 檔。正式的 compose 檔裡沒有這幾行。
+# Only in the development and test compose file. The production compose file has none of these lines.
 environment:
-  NODE_ENV: test                      # 或 development。是 production 的話,下面任何一個有值就拒絕啟動
-  ALLOW_LOCAL_SOURCES: "1"            # api、media:允許 http:// 和內部位址
-  SOURCE_OVERRIDES: >-                # api、media:固定的來源主機 → 替身
+  NODE_ENV: test                      # or development. If it's production, refuse to start when any of the below has a value
+  ALLOW_LOCAL_SOURCES: "1"            # api, media: allow http:// and internal addresses
+  SOURCE_OVERRIDES: >-                # api, media: fixed source host → stand-in
     {"www.justsubtitles.com": "http://fake-sources:8090/justsubtitles",
      "search.justsubtitles.com": "http://fake-sources:8090/justsubtitles-search",
      "dl.subdl.com": "http://fake-sources:8090/subdl-dl",
@@ -57,96 +57,96 @@ environment:
   TORRENT_TEST_PEERS: "seed:51801"    # torrent
 ```
 
-- `SOURCE_OVERRIDES` 的替換發生在共用的對外用戶端裡，而且在主機白名單檢查**之後**：程式照常組出 `https://www.justsubtitles.com/api/subtitles/27205?lang=EN`，白名單照常檢查，最後一步才把主機那一段換成替身的網址。所以白名單和各來源組網址的程式都還是被測到。
-- YTS 的網址本來就是設定值，測試的第一步用管理員的身分把它設成 `http://fake-yts:8080`；`ALLOW_LOCAL_SOURCES` 讓這個值通過驗證。
-- 這三個變數的值是伺服器之間的位址，不是金鑰。
+- The `SOURCE_OVERRIDES` substitution happens inside the shared outbound client, and **after** the host allowlist check: the code builds `https://www.justsubtitles.com/api/subtitles/27205?lang=EN` as usual, the allowlist checks it as usual, and only in the last step is the host part replaced with the stand-in's address. So the allowlist and each source's URL-building code are still tested.
+- The YTS address is a setting to begin with; the first step of the test signs in as an administrator and sets it to `http://fake-yts:8080`; `ALLOW_LOCAL_SOURCES` lets that value pass validation.
+- The values of these three variables are addresses between servers, not keys.
 
-有了這三個，端對端測試的劇本就是：
+With these three in place, the end-to-end test script is:
 
-1. 管理員登入，設定 YTS 網址（假的）和容量上限。
-2. 搜尋，進電影頁，下載 `clip.webm` 對應的那個版本。
-3. 等到片庫裡出現、分析完成。
-4. 進工作區，搜尋字幕（假的來源回傳幾條候選，其中一條其實是 `late.zh-TW` 的 Big5 版）。
-5. 排名，加入建議的那一條。
-6. 進同步，自動對齊，把檢查點都標成準，確認。
-7. 匯出，等完成，下載 MKV。
-8. 用 ffprobe 檢查下載回來的檔案：一條影像、一條聲音、一條字幕；把字幕抽出來，和 `truth.zh-TW.srt` 比，每句開始時間的差在 0.1 秒內（扣掉封裝時共同的位移）。
+1. The administrator signs in and sets the YTS address (the fake one) and the storage limit.
+2. Search, go to the film page, download the version that corresponds to `clip.webm`.
+3. Wait until it appears in the Library and analysis is done.
+4. Go to the workspace and search for subtitles (the fake source returns a few candidates, one of which is really the Big5 version of `late.zh-TW`).
+5. Rank, and add the suggested one.
+6. Go to Sync, auto-align, mark all the checkpoints as correct, confirm.
+7. Export, wait for it to finish, download the MKV.
+8. Check the downloaded file with ffprobe: one video track, one audio track, one subtitle track; extract the subtitles and compare them with `truth.zh-TW.srt`: each line's start time is within 0.1 seconds (after subtracting the offset shared by all tracks when packing).
 
-這一個測試通過，就表示每一段都接得起來。
+When this one test passes, every part connects.
 
-## 瀏覽器測試的注意事項
+## Notes on browser tests
 
-- **不要依賴測試用的 Chromium 能解 H.264。** 交接時的 Playwright Chromium 不能；2026-10-05 階段 0 實測 Playwright 1.63 內建的 Chromium（153）可以（H.264 High + AAC 立體聲和 5.1、`moov` 在檔尾，能播、能拖動），但換版本可能又變。需要真的播放的測試，做種的檔案仍然用 `fixtures/clip.webm`。「能不能直接播」的規則把 WebM（VP9 加 Opus）算成能直接播，就是為了讓這條路不依賴環境（[08-media-pipeline.md](08-media-pipeline.md)）。另一個做法是用安裝在系統上的 Chrome（`channel: 'chrome'`），但那要求每台跑測試的機器都裝了 Chrome。
-- **用 WebM 時分數可能差 1 個百分點。** WebM 的聲音重新編碼過，人聲偵測的結果和 `clip.mp4` 有極小的差異（9,242 個影格裡 28 個不同）。位移和速率不受影響。用 WebM 的測試比對分數時容許正負 1 個百分點；要比對到完全相等的（分析結果對 `data.json`）用 `clip.mp4`，放在不經過瀏覽器的測試裡。
-- 需要讓影片自動播放：啟動瀏覽器時加 `--autoplay-policy=no-user-gesture-required`。
-- 不要用固定的 `waitForTimeout` 等非同步的結果；等畫面上的狀態（分數變了、狀態標籤變了）。原型的 `e2e.cjs` 裡有固定等待，那是原型，不要照抄。
-- 每個測試結束時檢查 console 沒有錯誤。
-- 版面檢查：1280 px 和 400 px 各跑主要頁面，確認 `document.documentElement.scrollWidth <= window.innerWidth`；淺色和深色各截一張圖。
+- **Don't depend on the test Chromium being able to decode H.264.** At handover, Playwright's Chromium couldn't; on 2026-10-05 Phase 0 measured that the Chromium (153) bundled with Playwright 1.63 can (H.264 High + AAC stereo and 5.1, `moov` at the end of the file, plays and seeks), but another version might change that again. Tests that need real playback still seed `fixtures/clip.webm`. The "can it play directly" rule counts WebM (VP9 plus Opus) as playable directly precisely so that this path doesn't depend on the environment ([08-media-pipeline.md](08-media-pipeline.md)). Another option is the Chrome installed on the system (`channel: 'chrome'`), but that requires every machine that runs the tests to have Chrome installed.
+- **With WebM the score may differ by 1 percentage point.** WebM's audio has been re-encoded, so speech detection differs very slightly from `clip.mp4` (28 out of 9,242 frames differ). Offset and rate aren't affected. Tests that use WebM allow plus or minus 1 percentage point when comparing scores; comparisons that must be exactly equal (analysis results against `data.json`) use `clip.mp4`, in tests that don't go through a browser.
+- Videos need to autoplay: launch the browser with `--autoplay-policy=no-user-gesture-required`.
+- Don't use a fixed `waitForTimeout` to wait for asynchronous results; wait for state on the screen (the score changed, the status tag changed). The prototype's `e2e.cjs` has fixed waits; that's a prototype, don't copy it.
+- At the end of each test, check that the console has no errors.
+- Layout check: run the main pages at both 1280 px and 400 px and confirm `document.documentElement.scrollWidth <= window.innerWidth`; take one screenshot each in light and dark.
 
-## 從原型和參考程式帶過來的測試
+## Tests carried over from the prototype and reference code
 
-這些是現成的，搬進專案、改成專案的測試工具即可：
+These already exist; move them into the project and switch them to the project's test tooling:
 
-| 來源 | 內容 | 搬到哪裡 |
+| Source | Contents | Where it goes |
 | --- | --- | --- |
-| `packages/shared/src/sync-core/core.test.ts` | 對齊核心，17 項 | `packages/shared`（階段 1 搬過去，從 `node:test` 改成 Vitest） |
-| `reference/subtitles/text.test.mjs` | 編碼、語言、繁簡、ASS，5 項 | `apps/server` 的字幕模組 |
-| `db/schema.test.mjs` | 用量、admission、預覽計畫、請求排隊、約束，11 項 | `apps/server` 的資料庫測試，改成對 Drizzle 遷移出來的 schema |
-| `reference/torrent/local-swarm-test.mjs` | WebTorrent 的行為 | `torrent` 的整合測試 |
-| `prototype/workbench/e2e.cjs` | 工作台，40 項 | Playwright；見 [09-sync-workbench.md](09-sync-workbench.md) 的「驗收」 |
-| `prototype/platform/e2e.cjs` | 每一頁的主要流程，72 項 | Playwright；劇本要改成對著真的後端 |
+| `packages/shared/src/sync-core/core.test.ts` | Sync core, 17 tests | `packages/shared` (moved in Phase 1, switched from `node:test` to Vitest) |
+| `reference/subtitles/text.test.mjs` | Encoding, language, Traditional/Simplified, ASS, 5 tests | The subtitle module in `apps/server` |
+| `db/schema.test.mjs` | Usage, admission, preview plan, request queuing, constraints, 11 tests | The database tests in `apps/server`, switched to the schema produced by the Drizzle migrations |
+| `reference/torrent/local-swarm-test.mjs` | WebTorrent behavior | Integration tests for `torrent` |
+| `prototype/workbench/e2e.cjs` | Workbench, 40 checks | Playwright; see "Acceptance" in [09-sync-workbench.md](09-sync-workbench.md) |
+| `prototype/platform/e2e.cjs` | Main flow of every page, 72 checks | Playwright; the scripts must be changed to run against the real back end |
 
-## 一定要有的測試
+## Tests that must exist
 
-各文件裡的「驗收」和「要測的情況」都要變成測試。下面把最容易被漏掉、而且出錯代價最高的集中列一次。
+Every "Acceptance" and "Cases to test" in the documents must become tests. Below, the ones most easily missed and costliest to get wrong are gathered in one place.
 
-**不自動刪除**
-- 掃描原始碼：只有指定的模組呼叫刪除 `/data` 底下檔案的函式。
-- 掃描原始碼：**沒有任何刪除是由「時間到了」或「東西舊了」決定的。** 刪除模組的函式不接受、也不計算任何「多久以前」的條件；呼叫它們的地方不比較時間戳。定時跑的迴圈本身不在禁止之列：`torrent` 每 2 秒看一次有沒有 `want = 'remove'` 的列、工作每 2 秒檢查自己該不該停，執行的都是某個人已經按下去的刪除或取消（[10-storage.md](10-storage.md) 的「哪些清理不算自動刪除」）。
-- 把上限調到低於用量：磁碟上的檔案數量和大小前後相同。
-- 三個程式各重啟一次：`/data` 底下除了 `tmp/` 和 `*.part`，沒有任何東西消失。
+**No automatic deletion**
+- Scan the source: only the designated module calls functions that delete files under `/data`.
+- Scan the source: **no deletion is decided by "time is up" or "this is old".** The deletion module's functions neither accept nor compute any "how long ago" condition; the places that call them don't compare timestamps. Loops that run on a timer are not themselves forbidden: `torrent` looks every 2 seconds for rows with `want = 'remove'`, and jobs check every 2 seconds whether they should stop; what they carry out is always a deletion or cancellation that someone has already pressed (see "Which clean-ups don't count as "automatic deletion"" in [10-storage.md](10-storage.md)).
+- Lower the limit below usage: the number and size of files on disk are the same before and after.
+- Restart each of the three programs once: nothing under `/data` disappears except `tmp/` and `*.part`.
 
-**容量**
-- [10-storage.md](10-storage.md) 的「要測的情況」。
+**Storage**
+- "Cases to test" in [10-storage.md](10-storage.md).
 
-**金鑰與外部請求**
-- JustSubtitles 回應裡帶 `api_key` 的網址：解析後沒有 query string；資料庫裡沒有；log 裡沒有。
-- 用假的金鑰跑每個來源一次，在全部的 log 輸出裡搜尋那個字串：找不到。
-- 對白名單以外的主機、對內部位址的請求被擋下，包含經過轉址之後的。
-- 字幕庫：整個測試過程中，對它的主機沒有任何請求。
+**Keys and outbound requests**
+- A JustSubtitles response URL carrying `api_key`: after parsing there is no query string; it's not in the database; it's not in the logs.
+- Run each source once with a fake key and search all log output for that string: it isn't found.
+- Requests to hosts outside the allowlist and to internal addresses are blocked, including after redirects.
+- Zimuku: during the whole test run, no request goes to its host.
 
-**權限**
-- 走過所有路由：沒登入一律 401（公開的幾個除外）；成員對管理路由一律 403；不是持有人對那部片的任何端點一律 403，**呼叫的人是管理員也一樣**。這個測試從路由表自動產生，新增路由時不需要記得補。
+**Permissions**
+- Walk every route: not signed in is always 401 (except the few public ones); a member on admin routes is always 403; someone who isn't a holder is always 403 on any endpoint for that film, **even when the caller is an administrator**. This test is generated automatically from the route table, so nobody has to remember to add to it when a route is added.
 
-**測試用的開關不會跑到正式環境**
-- `NODE_ENV=production` 時設了 `ALLOW_LOCAL_SOURCES`、`SOURCE_OVERRIDES` 或 `TORRENT_TEST_PEERS`：程式報錯結束，不是默默忽略。
-- 沒有設 `ALLOW_LOCAL_SOURCES` 時：`http://` 和內部位址的 YTS 網址存不進去，對外用戶端也不連。
+**Testing switches never reach production**
+- With `NODE_ENV=production`, setting `ALLOW_LOCAL_SOURCES`, `SOURCE_OVERRIDES` or `TORRENT_TEST_PEERS`: the program exits with an error rather than silently ignoring it.
+- Without `ALLOW_LOCAL_SOURCES`: a YTS address that is `http://` or internal can't be saved, and the outbound client won't connect to it either.
 
-**工作不會做兩次，也不會掉**
-- 同一列被排入兩次：只做一次。
-- `media` 在轉檔途中被強制終止再啟動：那個工作從頭再做，沒有殘留的 `.part`，預留量沒有算兩次。
-- `api` 在字幕查詢途中被重啟：沒有來源永遠停在「查詢中」。
-- 正在轉檔的片被刪除：ffmpeg 停下來，刪除完成之後 `/data` 底下沒有那部片的任何東西，也沒有新冒出來的孤兒。
+**Jobs are never done twice, and never lost**
+- The same row is queued twice: it's done only once.
+- `media` is force-killed in the middle of transcoding and started again: that job starts over from the beginning, no `.part` is left behind, and the reservation isn't counted twice.
+- `api` is restarted in the middle of a subtitle lookup: no source stays at "Searching…" forever.
+- A film being transcoded is deleted: ffmpeg stops, after the deletion finishes there is nothing of that film under `/data`, and no new orphans show up.
 
-**只接受 YTS 的 hash**
-- `POST /api/torrents` 帶一個不在那部片版本清單裡的 hash：被拒絕，資料庫裡沒有新增任何東西。
-- 請求裡多帶 `sizeBytes`、`magnet` 之類的欄位：被忽略或拒絕，實際用的是伺服器查到的值。
+**Only YTS hashes are accepted**
+- `POST /api/torrents` with a hash that isn't in that film's version list: rejected, and nothing new is added to the database.
+- A request with extra fields like `sizeBytes` or `magnet`: they are ignored or rejected, and the values actually used are the ones the server looked up.
 
-**同步文件**
-- 套用文件的函式對同一份輸入永遠得到同樣的輸出；不修改輸入。
-- 伺服器匯出時算的時間，和瀏覽器顯示的時間，來自同一個函式（`applyDoc`）。
+**Sync doc**
+- The function that applies the doc always gives the same output for the same input, and doesn't modify the input.
+- The times the server computes when exporting and the times the browser shows come from the same function (`applyDoc`).
 
-## 指令
+## Commands
 
-專案建立後，把實際的指令寫進 `AGENTS.md` 的「指令」一節。至少要有：
+Once the project is set up, write the actual commands into the "Commands" section of `AGENTS.md`. At minimum:
 
 ```
 pnpm install
 pnpm typecheck
 pnpm lint
-pnpm test              # 單元 + 資料庫 + 服務整合
-pnpm test:e2e          # 會先用測試設定把 compose 起起來
-pnpm dev               # 本機開發:假的 YTS、本機做種、假的字幕來源一起起來
+pnpm test              # unit + database + service integration
+pnpm test:e2e          # brings compose up with the test setup first
+pnpm dev               # local development: fake YTS, local seeding and fake subtitle source all start together
 ```
 
-`pnpm dev` 起來之後，不需要任何金鑰和網路就能走完整個流程，這是開發時最常用的狀態。
+Once `pnpm dev` is up, the whole flow can be walked through without any keys or network. This is the state used most often during development.

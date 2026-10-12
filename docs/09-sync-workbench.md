@@ -1,398 +1,400 @@
-# 09 同步工作台
+# 09 Sync workbench
 
-這是整個產品最重要的一頁（D6）：使用者在這裡把字幕對準，全部在瀏覽器裡完成。
+This is the most important page in the whole product (D6): this is where people line up subtitles, entirely in the browser.
 
-**原型是這一頁的行為依據。** `prototype/workbench/index.html` 是可以實際操作的工作台（用一段 92 秒的示範片段），`prototype/platform/index.html` 裡的「同步」分頁是它嵌進平台後的樣子。這份文件把原型的行為寫成規則，並補上原型沒有、正式版需要的部分。兩者衝突時以這份文件為準。
+**The prototype is the behavioral basis for this page.** `prototype/workbench/index.html` is a workbench you can actually operate (using a 92-second demo clip), and the "Sync" tab in `prototype/platform/index.html` is how it looks embedded in the platform. This document turns the prototype's behavior into rules and adds what the prototype lacks and the real version needs. Where the two conflict, this document wins.
 
-邏輯在 `packages/shared/src/sync-core/core.ts`（有 17 個測試）；原型的畫面程式在 `prototype/workbench/src/ui.js`。
+The logic is in `packages/shared/src/sync-core/core.ts` (17 tests); the prototype's UI code is in `prototype/workbench/src/ui.js`.
 
-## 使用者怎麼用
+## How people use it
 
-畫面上方固定有五個步驟的提示：
+A five-step guide is fixed at the top of the screen:
 
-1. 播放，看字幕差多少
-2. 按「自動對齊」
-3. 用檢查點聽幾句
-4. 不準就微調
-5. 確認同步
+1. Play and see how far off the subtitles are
+2. Press "Auto-align"
+3. Listen to a few lines with checkpoints
+4. Fine-tune if anything is off
+5. Confirm sync
 
-大部分字幕走完 1、2、3、5 就結束了，只有少數需要第 4 步。介面的責任是讓這條路一直很明顯，同時在需要時提供夠用的手動工具。
+Most subtitles are done after steps 1, 2, 3 and 5; only a few need step 4. The interface's job is to keep this path obvious at all times, while offering enough manual tools when they're needed.
 
-## 版面
+## Layout
 
-桌面（參考 `prototype/platform/screenshots/09-sync.png`）：
+Desktop (see `prototype/platform/screenshots/09-sync.png`):
 
-（Brian，2026-10-06 改：原本工具排在時間軸下面，聽檢查點時要往下捲去按「這句準」、再往上捲看影片。現在正在用的工具就在影片下面。）
+(Changed by Brian, 2026-10-06: the tools used to sit below the timeline, so listening to checkpoints meant scrolling down to press "This one is right" and back up to watch the video. Now the tool in use is right below the video.)
 
 ```
-┌ 步驟提示 ─────────────── 這部片的資訊、儲存狀態、狀態、[確認同步] ┐
-│  影片(字幕疊在上面)                    │  字幕清單                │
-│  播放、±1 秒、時間、速度、第二語言         │  搜尋、[同步|逐句編輯]    │
-│  訊息列(剛剛做了什麼、結果如何)            │  (和左欄一樣高,          │
-│  [自動對齊|檢查點|位移與速率|對齊點與分段|   │   清單在裡面捲動)        │
-│   比較與復原] ← 一次一個工具               │                         │
-├ 對齊分數、縮放、跟著播放位置 ──────────────────────────────────────┤
-│  全片概覽                                                         │
-│  時間軸:刻度、波形、人聲、字幕區塊、檢查點、對齊點、播放位置          │
-├ 確認後的摘要 ────────────────────────────────────────────────────┤
-└ 快捷鍵(收合) ───────────────────────────────────────────────────┘
+┌ Step guide ──────────── film info, save state, status, [Confirm sync] ┐
+│  Video (subtitles overlaid)               │  Subtitle lines           │
+│  Play, ±1 s, time, speed, second language │  Search, [Sync|Edit lines]│
+│  Message bar (what just happened, result) │  (same height as the left │
+│  [Auto-align|Checkpoints|Offset and rate| │   column; the list        │
+│   Anchors and segments|Compare and undo]  │   scrolls inside it)      │
+│   ← one tool at a time                    │                           │
+├ Sync score, zoom, follow playback ─────────────────────────────────────┤
+│  Whole-film overview                                                   │
+│  Timeline: ticks, waveform, speech, subtitle blocks, checkpoints,      │
+│            anchors, playback position                                  │
+├ Summary after confirming ──────────────────────────────────────────────┤
+└ Keyboard shortcuts (collapsed) ────────────────────────────────────────┘
 ```
 
-- 影片的高度最多是視窗高度減 600 px（至少 240 px），畫面在裡面加黑邊。這樣在 1920 × 1080 的螢幕上，影片、播放列、訊息列和工具一開頁就同時看得到；矮一點的螢幕往下捲一次之後也是。
-- 工具是一組分頁，一次顯示一個。剛打開時是「自動對齊」；已經對過（分段不是預設值）或已確認的字幕是「檢查點」。自動對齊成功後、按「聽下一個」或某個檢查點（包括快捷鍵 N）時，自動換到「檢查點」。「檢查點」分頁的標籤旁寫「通過數/總數」。左右方向鍵在分頁之間移動（不會去跳影片時間）。
-- 「檢查點」分頁：「聽下一個」、編號圓點、「這句準」「這句不準」排在同一列，下面一行說明怎麼用。
+- The video is at most the window height minus 600 px (at least 240 px) tall, letterboxed inside that. That way, on a 1920 × 1080 screen, the video, play bar, message bar and tools are all visible as soon as the page opens; on shorter screens, after scrolling down once.
+- The tools are a set of tabs, one shown at a time. On first open it's "Auto-align"; for subtitles that have already been aligned (segments aren't the default) or are confirmed, it's "Checkpoints". After auto-align succeeds, and on pressing "Listen to next" or a checkpoint (including the N shortcut), it switches to "Checkpoints" automatically. The "Checkpoints" tab label shows "passed/total". The left and right arrow keys move between tabs (they don't seek the video).
+- "Checkpoints" tab: "Listen to next", the numbered dots, "This one is right" and "This one is off" sit in one row, with a line below explaining how to use them.
 
-最上面那一列是工作台自己的頁首：左邊是步驟提示，右邊是這部片的資訊（片長、編碼、影格率、句數，例如「01:52:10 · H.264 · 23.976 fps · 1,204 句」）、儲存狀態、狀態標籤（「草稿」或「已確認」）和「確認同步」。要同步哪一條字幕，不在這裡選，在工作台上方的那張卡片選（[11-pages.md](11-pages.md) 的「同步」）。
+The topmost row is the workbench's own header: on the left the step guide; on the right this film's info (runtime, codec, frame rate, line count, e.g. "01:52:10 · H.264 · 23.976 fps · 1,204 lines"), the save state, the status tag ("Draft" or "Confirmed") and "Confirm sync". Which subtitles to sync isn't chosen here; it's chosen in the card above the workbench ([11-pages.md](11-pages.md), "Sync (09)").
 
-時間軸下方有一排圖例：波形、偵測到的人聲、字幕（第 1 段）、字幕（第 2 段），最後一句是「在字幕列左右拖曳可以直接移動字幕」。
+Below the timeline is a row of legend items: Waveform, Detected speech, Subtitles (segment 1), Subtitles (segment 2), and finally "Drag left or right on the subtitle row to move the subtitles".
 
-手機（400 px）：全部直向堆疊：影片、播放列、訊息列、工具分頁、字幕清單、時間軸。工具的分頁一列左右滑。不能出現橫向捲軸。
+Mobile (400 px): everything stacks vertically: video, play bar, message bar, tool tabs, subtitle lines, timeline. The tool tabs are one row that swipes sideways. No horizontal scrollbar may appear.
 
-工作區的頁首在同步分頁也縮小：海報變成 44 px 寬的縮圖；選字幕的卡片是一列（選單、狀態、預覽說明、語音辨識的狀態），有警告或進度條時才多一列。
+The workspace header also shrinks on the Sync tab: the poster becomes a 44 px wide thumbnail; the subtitle-picker card is one row (menu, status, preview note, speech recognition status), with a second row only when there is a warning or progress bar.
 
-## 載入
+## Loading
 
-進入這一頁時並行抓：
+On entering this page, fetch in parallel:
 
-| 資料 | 端點 | 用途 |
+| Data | Endpoint | Used for |
 | --- | --- | --- |
-| 字幕、句子清單、同步文件 | `GET /api/subtitles/:id` | |
-| 影片狀態與來源 | `GET /api/media/:id` | 決定播哪個檔 |
-| 波形 | `GET /api/media/:id/peaks` | 時間軸 |
-| 人聲 | `GET /api/media/:id/speech` | 時間軸、分數、吸附 |
-| 第二條字幕（有選的話） | `GET /api/subtitles/:id` | 對照顯示 |
+| Subtitles, line list, sync doc | `GET /api/subtitles/:id` | |
+| Media status and sources | `GET /api/media/:id` | Deciding which file to play |
+| Waveform | `GET /api/media/:id/peaks` | Timeline |
+| Speech | `GET /api/media/:id/speech` | Timeline, score, snapping |
+| Second subtitles (if chosen) | `GET /api/subtitles/:id` | Shown alongside |
 
-波形和人聲是選配，而且各自獨立：
+The waveform and speech are optional, and independent of each other:
 
-| 情況 | 工作台 |
+| Situation | Workbench |
 | --- | --- |
-| 兩個都有 | 全部功能 |
-| 只有波形（人聲偵測失敗） | 時間軸有波形，但沒有人聲帶、分數、色點、吸附和自動對齊 |
-| 都沒有（分析失敗、沒有聲音軌、或還沒做） | 同上，而且沒有波形 |
+| Both present | All features |
+| Waveform only (speech detection failed) | Timeline has the waveform, but no speech band, score, colored dots, snapping or auto-align |
+| Neither (analysis failed, no audio track, or not done yet) | Same as above, and no waveform |
 
-用不了的控制項停用並說明原因（依 `MediaStatus.errors.analysis` 的代碼），旁邊給「重新分析」。分析還在進行時顯示「正在分析聲音，完成後這裡會出現波形。」，完成的事件到了就自己補上，不用重新整理。原型的示範片段一定有波形和人聲，所以這一段的句子都是新的。
+Controls that can't be used are disabled with the reason given (based on the code in `MediaStatus.errors.analysis`), with "Analyze again" next to them. While analysis is still running, show "Analyzing the audio. The waveform appears here when it is done.", and fill it in when the completion event arrives, with no reload needed. The prototype's demo clip always has a waveform and speech, so all the wording in this section is new.
 
-`analysis` 是 `none`（自動分析關掉，還沒有人要求過）時，工作區一開啟，前端就呼叫一次 `POST /api/media/:id/analyze`。
+When `analysis` is `none` (automatic analysis is off and nobody has asked for it yet), the frontend calls `POST /api/media/:id/analyze` once when the workspace opens.
 
-## 播哪個檔
+## Which file to play
 
-`MediaStatus.sources` 已經依優先順序排好，前端照順序用第一個：
+`MediaStatus.sources` is already sorted by priority; the frontend uses the first one in order:
 
-| 情況 | 來源 | 畫面 |
+| Situation | Source | Screen |
 | --- | --- | --- |
-| 能直接播（MP4 的 H.264 加 AAC；測試用的 WebM 也算） | 原始檔 | 正常 |
-| 不能直接播，預覽檔好了 | 預覽檔 | 正常。同步分頁上方的說明寫明用的是預覽檔、時間和原檔完全一致（句子在 [11-pages.md](11-pages.md) 的「同步」） |
-| 不能直接播，預覽檔還沒好，聲音檔好了 | 聲音檔 | **只有聲音的模式**：影片區塊顯示片名、「只有聲音」標籤，以及為什麼沒有畫面（Brian，2026-10-10：只有標籤看起來像壞了）：轉檔中是「瀏覽器不能直接播這個版本，預覽影片正在轉檔（12%）。轉好之前可以先聽聲音對字幕，轉好了會提示你切換。」加一條進度條；沒有在轉是「…目前只有聲音。要看畫面，按「轉預覽檔」。」字幕照樣疊在上面，其他功能完全相同。上方顯示預覽檔的進度，轉好後提示可以切換（不自動切，免得打斷操作） |
-| 都還沒好 | 無 | 顯示進度；字幕清單和時間軸可以看，不能播放 |
+| Plays directly (H.264 plus AAC in MP4; the test WebM counts too) | Original file | Normal |
+| Doesn't play directly, preview file ready | Preview file | Normal. The note at the top of the Sync tab says the preview file is in use and its timing is exactly the same as the original (wording in [11-pages.md](11-pages.md), "Sync (09)") |
+| Doesn't play directly, preview file not ready, audio file ready | Audio file | **Audio-only mode**: the video area shows the title, the "Audio only" tag, and why there's no picture (Brian, 2026-10-10: the tag alone looked broken): while converting, "The browser can't play this version directly; the preview video is converting (12%). Until it's done you can sync subtitles by sound, and you'll be told when you can switch." plus a progress bar; when nothing is converting, "Browsers can't play this version directly, so there's only sound. To see the picture, press "Make preview file"." Subtitles are still overlaid and every other feature is the same. The top shows the preview file's progress, and when it's ready offers to switch (no automatic switch, so as not to interrupt work) |
+| Nothing ready yet | None | Show progress; the subtitle lines and timeline can be viewed, but nothing plays |
 
-預覽影片沒有在做也沒有做好（自動轉檔關掉、當時空間不足、失敗過、或被管理員刪掉）時，顯示「轉預覽檔」按鈕和需要的空間（`MediaStatus.previewNeedBytes`）。按下去是 `POST /api/media/:id/proxy`；空間不夠時在按鈕旁邊說明差多少，並連到儲存空間頁。`MediaStatus.errors.proxy` 是 `PREVIEW_NO_SPACE` 時，先說明原因：「下載完成時空間不足，沒有產生預覽檔。」（原型沒有這個按鈕，這些句子是新的。）
+When the preview video is neither being made nor done (automatic conversion off, not enough space at the time, failed before, or deleted by an administrator), show the "Make preview file" button and the space needed (`MediaStatus.previewNeedBytes`). Pressing it calls `POST /api/media/:id/proxy`; when space is short, say next to the button how much is missing and link to the Storage page. When `MediaStatus.errors.proxy` is `PREVIEW_NO_SPACE`, explain the cause first: "There was not enough space when the download finished, so no preview file was made." (The prototype has no such button; this wording is new.)
 
-`<video>` 載入失敗（`error` 事件）時退到下一個來源；全部失敗就顯示錯誤並保留清單和時間軸。原型的「無聲計時器」只是為了讓原型在不能播影片的環境也能示範，正式版不需要。
+When `<video>` fails to load (`error` event), fall back to the next source; if all fail, show an error and keep the list and timeline. The prototype's "silent timer" exists only so the prototype can demo in environments that can't play video; the real version doesn't need it.
 
-### 時間
+### Time
 
-- 唯一的時鐘是媒體元素的 `currentTime`。
-- 字幕的顯示用 `requestVideoFrameCallback`（有的話）對準實際畫面；沒有就用 `requestAnimationFrame`。只有聲音的模式用 `requestAnimationFrame`。
-- 時間軸和概覽在同一個迴圈裡重畫，而且只在時間變了或狀態變了的時候畫。
+- The only clock is the media element's `currentTime`.
+- Subtitle display uses `requestVideoFrameCallback` (when available) to match the actual frame; otherwise `requestAnimationFrame`. Audio-only mode uses `requestAnimationFrame`.
+- The timeline and overview redraw in the same loop, and only when the time or state has changed.
 
-## 同步文件
+## Sync doc
 
-型別 `SyncDoc`（`packages/shared/src/sync-core/core.ts`）：
+Type `SyncDoc` (`packages/shared/src/sync-core/core.ts`):
 
 ```ts
 {
   v: 1,
-  segments:    [{ from, scale, offset }],              // from 是句子的索引;第一段的 from 一定是 0;依 from 遞增
-  edits:       { [句子編號]: { dStart?, dEnd?, text?, deleted? } },
-  anchors:     [{ cue, t }],                           // cue 是句子的索引:「索引 cue 的那一句就是在 t 秒」
-  checkpoints: [{ cue, status: 'todo' | 'ok' | 'bad' }]   // cue 也是索引
+  segments:    [{ from, scale, offset }],              // from is a line index; the first segment's from is always 0; ascending by from
+  edits:       { [line id]: { dStart?, dEnd?, text?, deleted? } },
+  anchors:     [{ cue, t }],                           // cue is a line index: "the line at index cue is at t seconds"
+  checkpoints: [{ cue, status: 'todo' | 'ok' | 'bad' }]   // cue is an index too
 }
 ```
 
-一句字幕最後的時間：
+A line's final time:
 
 ```
-開始 = 原始開始 × 它那一段的 scale + 那一段的 offset + (edits 裡的 dStart 或 0)
-結束 = 原始結束 × 它那一段的 scale + 那一段的 offset + (edits 裡的 dEnd   或 0)
-結束至少比開始晚 0.2 秒
+start = original start × its segment's scale + that segment's offset + (dStart in edits, or 0)
+end   = original end   × its segment's scale + that segment's offset + (dEnd   in edits, or 0)
+end is at least 0.2 seconds after start
 ```
 
-幾個設計上的重點：
+A few design points:
 
-- **原始字幕永遠不改。** 所有調整都記在同步文件裡，隨時可以回到原樣。
-- **逐句修改存的是差值**，不是絕對時間。所以之後整段再位移時，單獨調過的句子會跟著走，不會留在原地。
-- `segments`、`anchors`、`checkpoints` 用句子的**索引**（第幾句，從 0 開始）；只有 `edits` 用句子的**編號**（`Cue.id`）當鍵。兩者在正規化之後是固定的對應（編號 = 索引 + 1），但程式裡不要假設，一律分清楚。介面上顯示的「第 n 句」是索引加 1。
-- 時間都四捨五入到毫秒再存。
+- **The original subtitles are never changed.** Every adjustment is recorded in the sync doc, so you can always go back to the original.
+- **Per-line edits store deltas**, not absolute times. So when the whole segment is shifted later, lines adjusted individually move along with it instead of staying put.
+- `segments`, `anchors` and `checkpoints` use the line's **index** (its position, starting from 0); only `edits` uses the line's **id** (`Cue.id`) as the key. After normalization the two map in a fixed way (id = index + 1), but code must not assume that; always keep them distinct. "Line n" shown in the interface is the index plus 1.
+- Times are all rounded to milliseconds before storing.
 
-一份「什麼都沒動」的文件是 `identityDoc()`：一段，`scale` 1，`offset` 0。字幕剛加入時就是這樣，除非它在排名時已經對齊過。
+A doc where "nothing has been touched" is `identityDoc()`: one segment, `scale` 1, `offset` 0. That's what subtitles are when first added, unless they were already aligned during ranking.
 
-## 功能
+## Features
 
-每一項都列出原型的行為。訊息列的文字照原型（`ui.js` 裡 `say(…)` 的內容）。
+Each item lists the prototype's behavior. Message bar text follows the prototype (the contents of `say(…)` in `ui.js`).
 
-### 播放
+### Playback
 
-| 控制 | 行為 |
+| Control | Behavior |
 | --- | --- |
-| 播放 / 暫停 | 按鈕文字跟著變。空白鍵 |
-| −1 秒 / +1 秒 | ← →；加 Shift 是 5 秒 |
-| 時間 | `00:00:00,000 / 全長`，等寬字型 |
-| 速度 | 0.5×、0.75×、1×、1.25×、1.5× |
-| 第二語言 | 見「對照另一條字幕」 |
+| Play / Pause | Button text changes accordingly. Space |
+| −1 s / +1 s | ← →; with Shift, 5 seconds |
+| Time | `00:00:00,000 / total length`, monospace font |
+| Speed | 0.5×, 0.75×, 1×, 1.25×, 1.5× |
+| Second language | See "Showing other subtitles alongside" |
 
-### 字幕清單
+### Subtitle lines
 
-- 每一列：序號、開始時間（點一下跳到那一句）、文字、一個表示這句和人聲重疊程度的色點（50% 以上綠、25% 以上黃、以下紅）。
-- 目前播放到的那一句有標示，播放時清單自動捲到它（使用者正在清單裡操作時不捲）。
-- 選取的那一句展開一排動作。
-- 搜尋框即時篩選文字，不分大小寫；開著對照的第二條字幕時，它的文字也算（原型每句自帶兩種語言，所以一律兩種都搜）。沒有符合時顯示「找不到含有「…」的台詞。」
-- **一部片有一千多句，清單必須虛擬化**（TanStack Virtual）。原型只有 26 句，沒有做。
-- ↑ ↓ 選上一句、下一句。
+- Each row: number, start time (click to jump to that line), text, and a colored dot showing how much the line overlaps speech (50% or more green, 25% or more yellow, below that red).
+- The line currently playing is marked, and during playback the list scrolls to it automatically (not while the user is working in the list).
+- The selected line expands a row of actions.
+- The search box filters text as you type, case-insensitive; when second subtitles are shown alongside, their text counts too (in the prototype every line carries both languages, so it always searches both). When nothing matches, show "No lines contain "…"."
+- **A film has over a thousand lines, so the list must be virtualized** (TanStack Virtual). The prototype has only 26 lines and doesn't do this.
+- ↑ ↓ select the previous and next line.
 
-兩種模式，用清單上方的切換鈕：
+Two modes, via the toggle button above the list:
 
-| 模式 | 選取的那一句展開的動作 | 在時間軸上拖字幕區塊 |
+| Mode | Actions on the selected line | Dragging a subtitle block on the timeline |
 | --- | --- | --- |
-| **同步**（預設） | 播放這句、對到現在、從這句分段 | 移動整段的位移 |
-| **逐句編輯** | 文字輸入框；開始和結束各有 −50、+50、設為現在；刪除這句 / 還原這句；播放這句 | 只移動那一句 |
+| **Sync** (default) | Play this line, Anchor to now, Start a segment here | Moves the whole segment's offset |
+| **Edit lines** | Text input; −50, +50 and Set to now for both start and end; Delete this line / Restore this line; Play this line | Moves only that line |
 
-「播放這句」從那句開始前 1 秒播到結束後 0.4 秒就停。
+"Play this line" plays from 1 second before the line starts to 0.4 seconds after it ends, then stops.
 
-刪除的句子在清單裡劃掉、時間軸上不畫、匯出時不包含；編號在匯出時重新排。這是用來拿掉廣告行和製作者資訊的。
+Deleted lines are struck through in the list, not drawn on the timeline and left out of exports; numbering is redone on export. This is for removing ad lines and credits.
 
-### 時間軸
+### Timeline
 
-用 canvas 畫，由上到下：時間刻度、波形、人聲帶、字幕區塊、（區塊上方）檢查點、（區塊下方）對齊點，加上一條播放位置的線。
+Drawn on a canvas, top to bottom: time ticks, waveform, speech band, subtitle blocks, checkpoints (above the blocks), anchors (below the blocks), plus a playback position line.
 
-- 字幕區塊的顏色依它屬於第幾段（三種顏色輪流）；選取的那一句有粗框；正在播放的那一句比較亮；和人聲重疊不到 25% 的區塊底部有一條紅線。
-- 區塊夠寬時裡面寫序號，更寬時加上文字。
-- 分段的交界畫一條虛線並標「第 n 段」。
-- **在字幕區塊那一列按住左右拖**：
-  - 同步模式：移動一整段的位移。按在某個區塊上，動的是那個區塊所屬的那一段；按在區塊之間的空白處，動的是選取的那一句所在的那一段。
-  - 逐句編輯模式：按在區塊上只移動那一句；按在空白處和同步模式一樣移動整段。
-  - 移動量以 10 毫秒為單位。放開時訊息列報告結果：「拖曳後的位移是 −2.36 秒。對齊分數 80%。」或「第 14 句移到 01:23.456。」
-- **在其他地方按住拖**：移動播放位置。
-- **點一下不拖**：跳到那個時間；點在區塊上同時選取那一句。
-- 拖動 3 個像素以上才算拖，免得點一下就誤動。
-- 縮小、放大（每次一倍）、全片。縮放以播放位置為中心。最小視野 8 秒。
-- 「跟著播放位置」：預設勾選。勾選時，在播放中而且視野不是全片的情況下，播放位置走出視野、或超過視野的 85%，就捲動一次；捲完之後播放位置落在視野的 20% 處。
+- A subtitle block's color depends on which segment it belongs to (three colors in rotation); the selected line has a thick border; the line currently playing is brighter; blocks overlapping speech by less than 25% have a red line along the bottom.
+- When a block is wide enough it shows its number, and when wider still, its text.
+- Segment boundaries get a dashed line labeled "segment n".
+- **Pressing and dragging sideways on the subtitle block row**:
+  - Sync mode: moves a whole segment's offset. Pressing on a block moves the segment that block belongs to; pressing in the gap between blocks moves the segment of the selected line.
+  - Edit lines mode: pressing on a block moves only that line; pressing in a gap moves the whole segment, as in sync mode.
+  - Movement is in 10 ms steps. On release, the message bar reports the result: "Offset after dragging is −2.36 s. Sync score 80%." or "Line 14 moved to 01:23.456."
+- **Pressing and dragging anywhere else**: moves the playback position.
+- **Clicking without dragging**: jumps to that time; clicking on a block also selects that line.
+- Only movement of 3 pixels or more counts as a drag, so a click doesn't move things by accident.
+- Zoom out, zoom in (by a factor of two each time), whole film. Zoom is centered on the playback position. The minimum view is 8 seconds.
+- "Follow playback": checked by default. When checked, during playback and when the view isn't the whole film, if the playback position leaves the view or passes 85% of it, the view scrolls once; after scrolling the playback position sits at 20% of the view.
 
-**概覽**在時間軸上方，一條細長的全片縮圖：人聲，以及每句字幕依重疊程度上色。它讓使用者一眼看出「前半準、後半不準」這種情況。上面框出時間軸目前的視野，點或拖可以跳過去。
+The **overview** sits above the timeline: a thin strip thumbnail of the whole film showing speech, and each subtitle line colored by overlap. It lets the user see at a glance situations like "the first half is right, the second half is off". It outlines the timeline's current view; clicking or dragging jumps there.
 
-長片的繪製：每個像素只畫它涵蓋範圍內波形的最小值和最大值；字幕區塊只畫視野內的。兩小時的片在全片視野下要維持順暢。
+Drawing long films: each pixel draws only the min and max of the waveform in the range it covers; only subtitle blocks within the view are drawn. A two-hour film must stay smooth at whole-film view.
 
-### 自動對齊
+### Auto-align
 
-- 按鈕「自動對齊」，旁邊一個「允許分段」的勾選（預設勾）。快捷鍵 A。這一組工具下面有一行說明：「自動對齊會試所有常見影格率和整片位移；吸附只在目前位置前後 1.5 秒內微調。」
-- 呼叫 `POST /api/subtitles/:id/auto-align`，通常 1 到 5 秒，期間按鈕顯示進行中。
-- 回來的分段**取代**目前的 `segments`，清掉所有對齊點，所有檢查點回到「還沒聽」。逐句修改保留。
-- 訊息列報告結果，例如：「自動對齊完成：位移 −2.36 秒。對齊分數 51% → 80%。接著用檢查點聽幾句確認。」有分段時逐段列出。
-- `agree` 是 false 時多加一句：「兩種對齊方法的結果不一致，請多聽幾個檢查點。」（新）
-- 沒有成功（`ALIGN_FAILED`）時，文件不動，訊息列說：「自動對齊沒有成功。可以再試一次，或用對齊點手動對。」（新）
-- 這是一個可以復原的動作。套用之後的那一次儲存帶 `reason: 'auto-align'`。
+- An "Auto-align" button with an "Allow segments" checkbox next to it (checked by default). Shortcut A. Below this group is a line of explanation: "Auto-align tries all common frame rates and whole-film offsets; snap to speech only fine-tunes within 1.5 seconds of the current position."
+- Calls `POST /api/subtitles/:id/auto-align`, usually 1 to 5 seconds, during which the button shows it's in progress.
+- The returned segments **replace** the current `segments`, all anchors are cleared, and all checkpoints go back to "not heard yet". Per-line edits are kept.
+- The message bar reports the result, e.g. "Auto-align done: offset −2.36 s. Sync score 51% → 80%. Next, listen to a few lines with checkpoints to check." When there are segments, each is listed.
+- When `agree` is false, one more sentence: "The two alignment methods disagree. Listen to a few more checkpoints." (new)
+- When it fails (`ALIGN_FAILED`), the doc is untouched and the message bar says: "Auto-align didn't work. Try again, or align by hand with anchors." (new)
+- This is an undoable action. The save right after applying it carries `reason: 'auto-align'`.
 
-原型是在瀏覽器裡直接算的；正式版交給伺服器，原因在 [08-media-pipeline.md](08-media-pipeline.md)。
+The prototype computes it right in the browser; the real version hands it to the server, for reasons given in [08-media-pipeline.md](08-media-pipeline.md).
 
-### 依另一條字幕對齊（新）
+### Align by other subtitles (new)
 
-- 同一部片有其他字幕時，「自動」這一組多一列：「依另一條字幕」的選單（已確認同步的排前面，每一項寫語言、已確認或草稿、發行名稱）和「依這條對齊」按鈕。選單下面一行說明；選到草稿時改說「這條字幕還沒確認同步；它對不準，依它對齊的結果也會跟著不準。」
-- 呼叫 `POST /api/subtitles/:id/auto-align`，帶 `referenceId`。不需要人聲資料，所以片子還沒分析完也能按。怎麼算見 [08-media-pipeline.md](08-media-pipeline.md) 的「依另一條字幕對齊」。
-- 套用方式和自動對齊一樣（取代分段、清掉對齊點、檢查點回到還沒聽、可以復原）。訊息列另外說是怎麼對的：同語言時「和英文字幕的文字配出 N 對，這次的結果符合其中 M 對。」，不同語言時「兩條字幕語言不同，只依英文字幕每句出現的時間對齊。」
-- 參考字幕沒對準，結果就跟著錯。所以伺服器有人聲資料時另外檢查參考字幕本身（`reference.offBy`，見 08），它離片中人聲超過 1 秒時多加一句：「注意：英文字幕本身和片中人聲差了約 23.7 秒，可能沒對準；這次的結果也會跟著差這麼多。先聽幾個檢查點；不對的話按「復原」，改用「自動對齊」，或先把英文字幕對好。」（QA 時真的遇到：一條標成已確認、其實還晚 23.7 秒的字幕當了參考。）
-- 結果有 `extraLines` 時，訊息列說「第 1、2 句在另一條字幕裡找不到對應，看起來是片頭片尾的製作資訊。」，並給一個按鈕「刪除這 N 句」：一步刪掉這幾句，按復原可以拿回來。不按就什麼都不刪。
+- When the same film has other subtitles, the "Automatic" group gets one more row: a "By other subtitles" menu (confirmed ones first; each entry shows language, confirmed or draft, and release name) and an "Align to these" button. A line of explanation sits below the menu; when a draft is picked it instead says "These subtitles aren't confirmed yet; if they are off, aligning to them will be off too."
+- Calls `POST /api/subtitles/:id/auto-align` with `referenceId`. It doesn't need speech data, so it can be pressed before the film's analysis is done. How it's computed: see [08-media-pipeline.md](08-media-pipeline.md), "Align by other subtitles".
+- It applies the same way as auto-align (replaces segments, clears anchors, checkpoints go back to not heard yet, undoable). The message bar also says how it was aligned: for the same language, "Matched N pairs with the English subtitles' text; this result fits M of them."; for different languages, "The two subtitles are in different languages, so this aligned only by when each English line appears."
+- If the reference subtitles are off, the result is off too. So when the server has speech data, it also checks the reference subtitles themselves (`reference.offBy`, see 08); when they're more than 1 second away from the film's speech, one more sentence is added: "Note: the English subtitles themselves are about 23.7 seconds off from the speech in the film and may not be synced; this result will be off by as much. Listen to a few checkpoints first; if it's wrong, press "Undo" and use "Auto-align" instead, or sync the English subtitles first." (This really happened in QA: subtitles marked confirmed that were actually 23.7 seconds late were used as the reference.)
+- When the result has `extraLines`, the message bar says "Lines 1 and 2 have no match in the other subtitles; they look like opening or closing credits." and offers a "Delete these N lines" button: it deletes those lines in one step, and Undo brings them back. If it isn't pressed, nothing is deleted.
 
-### 吸附到人聲
+### Snap to speech
 
-在目前這一段現有的位移前後 1.5 秒內，找和人聲最貼合的位置（`bestLinear`，速率不變）。在瀏覽器裡算。差不到 5 毫秒就說「已經貼齊人聲，沒有移動。」
+Within 1.5 seconds either side of the current segment's existing offset, find the position that best fits speech (`bestLinear`, rate unchanged). Computed in the browser. If the difference is under 5 ms, say "Already lined up with speech. Nothing moved."
 
-用途：使用者手動拖到差不多的位置後，讓系統收尾。
+Purpose: after the user has dragged it roughly into place by hand, let the system finish the job.
 
-### 位移與速率
+### Offset and rate
 
-作用範圍是**選取的那一句所在的那一段**；只有一段時就是全片。標題旁的小標籤寫出範圍（「全片」或「第 2 段，第 14–26 句」）。
+The scope is **the segment containing the selected line**; with only one segment, that's the whole film. A small tag next to the title shows the scope ("Whole film" or "Segment 2, lines 14–26").
 
-- −500、−50、+50、+500 毫秒的按鈕。快捷鍵 `,` `.`（50）和 Shift 加 `,` `.`（500）。
-- 一個可以直接輸入秒數的欄位。輸入不是數字時說「位移要填秒數，例如 -2.4。」
-- 速率下拉選單，列出已知的比例：
+- Buttons for −500, −50, +50 and +500 ms. Shortcuts `,` `.` (50) and Shift plus `,` `.` (500).
+- A field where seconds can be typed directly. When the input isn't a number, say "Enter the offset in seconds, e.g. -2.4."
+- A rate drop-down listing the known ratios:
 
-  | 選項 | 比例 |
+  | Option | Ratio |
   | --- | --- |
-  | 不變 | 1 |
-  | 字幕 25 fps → 影片 23.976 | 25 / 23.976 |
-  | 字幕 23.976 → 影片 25 fps | 23.976 / 25 |
-  | 字幕 24 fps → 影片 23.976 | 24 / 23.976 |
-  | 字幕 23.976 → 影片 24 fps | 23.976 / 24 |
-  | 字幕 25 fps → 影片 24 | 25 / 24 |
-  | 字幕 24 fps → 影片 25 | 24 / 25 |
+  | Unchanged | 1 |
+  | Subtitles 25 fps → video 23.976 | 25 / 23.976 |
+  | Subtitles 23.976 → video 25 fps | 23.976 / 25 |
+  | Subtitles 24 fps → video 23.976 | 24 / 23.976 |
+  | Subtitles 23.976 → video 24 fps | 23.976 / 24 |
+  | Subtitles 25 fps → video 24 | 25 / 24 |
+  | Subtitles 24 fps → video 25 | 24 / 25 |
 
-  選單上除了「不變」，每個選項後面都附上比例，例如「字幕 25 fps → 影片 23.976(×1.0427)」。目前的速率不在清單裡時（由對齊點算出來的），多一個「自訂(×1.0432)」。
-- **改速率時，選取的那一句留在原地**（以它為支點重算位移），這樣畫面不會整個跳走。
+  In the menu, every option except "Unchanged" is followed by its ratio, e.g. "Subtitles 25 fps → video 23.976 (×1.0427)". When the current rate isn't in the list (computed from anchors), there's an extra "Custom (×1.0432)".
+- **When the rate changes, the selected line stays where it is** (the offset is recomputed with it as the pivot), so the view doesn't jump away.
 
-位移的寫法有兩個地方和 [17-ui.md](17-ui.md) 的通則不同：輸入欄位裡是純數字（`-2.36`，半形負號、不帶單位，因為它要能被編輯）；確認後的摘要用三位小數（`−2.360 秒`），因為那是存下來的精確值。其他地方（訊息列、分段的標籤）都是兩位小數加單位。
+Offsets are written differently from the general rules in [17-ui.md](17-ui.md) in two places: in the input field it's a plain number (`-2.36`, ASCII minus sign, no unit, because it has to be editable); in the summary after confirming it has three decimals (`−2.360 s`), because that's the exact stored value. Everywhere else (message bar, segment labels) it's two decimals plus the unit.
 
-改位移或速率會清掉那一段的對齊點。
+Changing the offset or rate clears that segment's anchors.
 
-### 對齊點
+### Anchors
 
-「把選取的句子對到現在」（快捷鍵 Enter）：暫停在某句開口的瞬間，選取那一句，按下去。
+"Anchor the selected line to now" (shortcut Enter): pause the moment someone starts a line, select that line, and press it.
 
-- 那一段有 1 個對齊點：只決定位移。
-- 有 2 個以上：用最小平方法同時算出速率和位移（`fitAnchors`）。算出的速率和已知比例差不到 0.002 就取那個比例；超出 0.9 到 1.1 的範圍就不採用。
-- 同一句再按一次是更新它的對齊點。
-- 對齊點在時間軸上畫成字幕區塊下方的小三角形。
-- 下方的說明文字隨數量變：「暫停在某句開口的瞬間，選取那句，再按「對到現在」。」→「這一段有 1 個對齊點。再對一句相隔遠的，就能一併算出速率。」→「這一段有 n 個對齊點，速率由它們算出。」
+- 1 anchor in the segment: it determines only the offset.
+- 2 or more: least squares computes rate and offset together (`fitAnchors`). If the computed rate is within 0.002 of a known ratio, that ratio is used; outside the 0.9 to 1.1 range it's rejected.
+- Pressing it again on the same line updates that line's anchor.
+- Anchors are drawn on the timeline as small triangles below the subtitle blocks.
+- The explanation below changes with the count: "Pause the moment someone starts a line, select that line, then press "Anchor to now"." → "This segment has 1 anchor. Anchor another line far from it to work out the rate too." → "This segment has n anchors; the rate is worked out from them."
 
-這是自動對齊失敗時的主要手動工具。落差超過 60 秒（超出自動對齊的搜尋範圍）時，它也是最快的方法：放一個對齊點就把整段拉回來了。直接輸入位移或拖曳同樣可以，只是要自己算差多少。
+This is the main manual tool when auto-align fails. When the gap is over 60 seconds (beyond auto-align's search range), it's also the fastest method: one anchor pulls the whole segment back. Typing the offset directly or dragging works too, but you have to work out the difference yourself.
 
-### 分段
+### Segments
 
-剪輯版本不同的字幕，前後需要不同的位移。
+Subtitles for a different cut need different offsets in different parts.
 
-- 「從選取的句子分段」：從那一句開始另成一段，先沿用原本那段的位移和速率。選的是第 1 句或已經是段落開頭時，說明並不動作。
-- 「併回前一段」：只在有兩段以上、而且選取的句子不在第一段時出現。併回後沿用前一段的位移和速率。
-- 有兩段以上時，工具區列出每一段的範圍和位移。
-- 段數沒有上限。
+- "Start a segment at the selected line": starts a new segment from that line, initially keeping the original segment's offset and rate. If line 1 or a line that already starts a segment is selected, explain and do nothing.
+- "Merge into the previous segment": shown only when there are two or more segments and the selected line isn't in the first. After merging, the previous segment's offset and rate are used.
+- When there are two or more segments, the tool area lists each segment's range and offset.
+- There is no limit on the number of segments.
 
-### 檢查點
+### Checkpoints
 
-系統挑出幾句分散在全片、而且前面有明顯停頓的台詞（`pickCheckpoints`），請使用者聽。數量是 `Me.limits.checkpointCount`，預設 8（D36）。字幕加入時就挑好，存在同步文件裡。
+The system picks a few lines spread across the film, each preceded by a clear pause (`pickCheckpoints`), and asks the user to listen to them. The count is `Me.limits.checkpointCount`, default 8 (D36). They're picked when the subtitles are added and stored in the sync doc.
 
-- 「聽下一個」（快捷鍵 N）：跳到下一個還沒通過的檢查點，從那句前 1.5 秒播到後 0.5 秒就停。訊息列：「檢查點 2/8：第 14 句。聽它是不是在開口的瞬間出現。」
-- 「這句準」：標成通過，自動跳到下一個。全部通過時說「檢查點都確認過了，可以按「確認同步」。」
-- 「這句不準」：標成不準，提示用位移、吸附或「對到現在」調整後再聽一次。
-- 還沒有正在聽的檢查點就按這兩個按鈕：「先按「聽下一個」，聽完再標記。」
-- 一排編號的圓點顯示每個檢查點的狀態，點一下直接跳去聽。時間軸上也畫出來。
-- **任何改變時間的動作，會把受影響範圍內的檢查點退回「還沒聽」**：改某一段的位移或速率影響那一段；自動對齊和併段影響全部；改單一句影響那一句。聽過的東西變了就要重聽。
+- "Listen to next" (shortcut N): jumps to the next checkpoint that hasn't passed, plays from 1.5 seconds before the line to 0.5 seconds after, then stops. Message bar: "Checkpoint 2/8: line 14. Listen for whether it appears the moment someone speaks."
+- "This one is right": marks it passed and jumps to the next automatically. When all have passed, say "All checkpoints are confirmed. You can press "Confirm sync"."
+- "This one is off": marks it off and suggests adjusting with offset, snap or "Anchor to now", then listening again.
+- Pressing either button with no checkpoint being listened to: "Press "Listen to next" first, then mark it."
+- A row of numbered dots shows each checkpoint's state; clicking one jumps straight to listening to it. They're drawn on the timeline too.
+- **Any action that changes timing sends checkpoints within the affected range back to "not heard yet"**: changing a segment's offset or rate affects that segment; auto-align and merging affect all; changing a single line affects that line. If something you've heard changes, it has to be heard again.
 
-### 比較與復原
+### Compare and undo
 
-- 「按住看原始時間」（按住 O）：按住期間，畫面、清單、時間軸都顯示字幕原本的時間，影片上出現「原始時間」的標籤；放開就回來。用來確認「我到底改善了多少」。
-- 復原 / 重做（Z / Shift+Z）：保留最近 100 步。每一步是整份文件的快照。連續打字算一步（從開始打到離開輸入框）；一次拖曳算一步。
-- 「全部重設」：回到原始字幕、重新挑檢查點。它本身可以復原。
+- "Hold to see original timing" (hold O): while held, the screen, list and timeline all show the subtitles' original timing, and an "Original timing" tag appears on the video; release to return. Used to check "how much have I actually improved it".
+- Undo / Redo (Z / Shift+Z): keeps the last 100 steps. Each step is a snapshot of the whole doc. Continuous typing counts as one step (from starting to type until leaving the input); one drag counts as one step.
+- "Reset all": goes back to the original subtitles and picks checkpoints again. It can itself be undone.
 
-復原紀錄只在瀏覽器裡，離開頁面就沒有了。
+Undo history lives only in the browser and is gone when you leave the page.
 
-### 確認
+### Confirm
 
-「確認同步」：
+"Confirm sync":
 
-1. 還有檢查點沒通過時先問：「還有 n 個檢查點沒有確認。」給「仍要確認」（焦點在這裡）、「聽下一個檢查點」和「先不要」（Esc 也可以）。這個問題**出現在按鈕正下方**，不是訊息列：訊息列在時間軸下面，從按鈕那裡看不到，按了會像沒反應（Brian 回報，2026-10-06）。確認失敗也在按鈕下方說。
-2. 先確定最新的文件已經存好，再呼叫 `POST /api/subtitles/:id/confirm`。
-3. 狀態從「草稿」變成「已確認」。下方出現摘要：對齊分數、通過的檢查點數、修改和刪除了幾句、每一段的句數範圍、速率、位移；以及「下載字幕檔」和「前往匯出」。
-4. 這部片的其他持有人收到通知：「Brian 把 Charade 的繁體中文字幕對好了」。
+1. If some checkpoints haven't passed, ask first: "n checkpoints haven't been confirmed yet.", offering "Confirm anyway" (focused), "Listen to next checkpoint" and "Not now" (Esc works too). This question **appears right below the button**, not in the message bar: the message bar is below the timeline, out of sight from the button, so pressing it would seem to do nothing (reported by Brian, 2026-10-06). A failed confirm is also reported below the button.
+2. Make sure the latest doc is saved first, then call `POST /api/subtitles/:id/confirm`.
+3. Status changes from "Draft" to "Confirmed". A summary appears below: sync score, number of checkpoints passed, how many lines were edited and deleted, each segment's line range, rate and offset; plus "Download subtitle file" and "Go to Export".
+4. This film's other holders get a notification: "Brian synced the Traditional Chinese subtitles for Charade".
 
-確認之後再改動時間或文字（分段、位移、速率、逐句修改、刪除句子），狀態立刻回到「草稿」，摘要收起來，要重新確認才能匯出。只是把某個檢查點重新標記，不會：那沒有改變字幕本身。這個判斷在伺服器做（`PUT /api/subtitles/:id/doc` 比較 `segments` 和 `edits`），前端照回應裡的 `status` 顯示。
+After confirming, any change to timing or text (segments, offset, rate, per-line edits, deleting lines) immediately sets the status back to "Draft", collapses the summary, and requires confirming again before exporting. Merely re-marking a checkpoint doesn't: that doesn't change the subtitles themselves. This is decided on the server (`PUT /api/subtitles/:id/doc` compares `segments` and `edits`), and the frontend shows the `status` from the response.
 
-### 對照另一條字幕
+### Showing other subtitles alongside
 
-勾選「同時顯示」並選這部片的另一條字幕（例如對中文字幕時把英文字幕放在下面）。原型這裡是一個「中英雙語」的勾選；「同時顯示」和旁邊的選單是新的。個人設定頁對應的那一項，原型寫「同步頁預設顯示中英雙語」，正式版寫「同步頁預設顯示第二語言」。第二條用它自己的同步文件算時間，用較小的字顯示在主字幕下方，清單裡也多一行。它只是對照用，不能在這裡編輯。使用者偏好裡的「同步頁預設顯示第二語言」決定預設要不要開（有英文字幕時選英文）。
+Check "Also show" and pick another subtitle track for this film (e.g. English subtitles underneath while syncing Chinese ones). In the prototype this is a "Chinese-English bilingual" checkbox; "Also show" and the menu next to it are new. For the matching item on the Profile page, the prototype says "Show Chinese-English bilingual on the Sync page by default" and the real version says "Show a second language on the Sync tab by default". The second track uses its own sync doc for timing, is shown in smaller text below the main subtitles, and adds a line in the list too. It's for reference only and can't be edited here. The user preference "Show a second language on the Sync tab by default" decides whether it's on by default (choosing English when there are English subtitles).
 
-原型裡每一句自帶中英兩行，那只是示範資料的形式（D35）。
+In the prototype every line carries both a Chinese and an English line; that's just the form of the demo data (D35).
 
-### 快捷鍵
+### Keyboard shortcuts
 
-| 按鍵 | 動作 |
+| Key | Action |
 | --- | --- |
-| 空白鍵 | 播放或暫停 |
-| ← → | 前後 1 秒；加 Shift 為 5 秒 |
-| `,` `.` | 字幕提前或延後 50 毫秒；加 Shift 為 500 |
-| ↑ ↓ | 選上一句或下一句 |
-| Enter | 把選取的句子對到現在 |
-| A | 自動對齊 |
-| N | 聽下一個檢查點 |
-| O（按住） | 看原始時間 |
-| Z | 復原；加 Shift 為重做 |
+| Space | Play or pause |
+| ← → | Back or forward 1 second; with Shift, 5 seconds |
+| `,` `.` | Subtitles 50 ms earlier or later; with Shift, 500 |
+| ↑ ↓ | Select the previous or next line |
+| Enter | Anchor the selected line to now |
+| A | Auto-align |
+| N | Listen to the next checkpoint |
+| O (hold) | See original timing |
+| Z | Undo; with Shift, redo |
 
-焦點在輸入框、下拉選單、文字區時，快捷鍵不作用。焦點在按鈕上時，空白鍵和 Enter 留給按鈕。按著 Ctrl、Cmd、Alt 時不作用。
+Shortcuts don't work while focus is in an input, drop-down or text area. When focus is on a button, Space and Enter go to the button. They don't work while Ctrl, Cmd or Alt is held.
 
-### 訊息列
+### Message bar
 
-播放列下面、工具上方有一行文字，每個動作之後更新，說明剛剛發生了什麼、數字變成多少、下一步建議做什麼。它是 `aria-live="polite"`，所以螢幕閱讀器也讀得到。有些訊息帶按鈕（例如確認前的詢問）。
+Below the play bar and above the tools is a line of text, updated after every action, saying what just happened, what the numbers became, and what to do next. It's `aria-live="polite"`, so screen readers read it too. Some messages carry buttons (e.g. the question before confirming).
 
-這一行是工作台「教使用者怎麼用」的主要方式，不要省略成 toast。
+This line is the workbench's main way of "teaching people how to use it"; don't reduce it to a toast.
 
-## 儲存
+## Saving
 
-原型沒有儲存的概念，這一節和下一小節的句子都是新的。
+The prototype has no concept of saving; all wording in this section and the next subsection is new.
 
-- 文件一有變化，1.5 秒後自動存（`PUT /api/subtitles/:id/doc`，帶目前的 `rev`）。連續操作時重新計時。
-- 這次儲存包含「套用自動對齊的結果」或「全部重設」時，帶上 `reason`（`auto-align` 或 `reset`），伺服器會多存一份歷史。其他的儲存不帶。
-- 狀態標籤旁顯示「已儲存」「儲存中…」「還沒儲存」。
-- 離開頁面或切換字幕前，有未儲存的變更就先存。瀏覽器關閉時用 `beforeunload` 提醒。
-- 存檔失敗（網路問題）時保留變更、顯示「儲存失敗，會自動再試」，每 5 秒重試。
+- As soon as the doc changes, it saves automatically 1.5 seconds later (`PUT /api/subtitles/:id/doc`, with the current `rev`). Continued actions restart the timer.
+- When this save includes "applying the auto-align result" or "Reset all", it carries `reason` (`auto-align` or `reset`), and the server keeps an extra history copy. Other saves don't carry it.
+- Next to the status tag, show "Saved", "Saving…" or "Not saved".
+- Before leaving the page or switching subtitles, save any unsaved changes first. When the browser is closing, warn with `beforeunload`.
+- When saving fails (network problem), keep the changes, show "Save failed. Retrying automatically", and retry every 5 seconds.
 
-### 兩個人同時改
+### Two people editing at once
 
-字幕是這部片所有持有人共用的，所以可能有人同時在改。
+Subtitles are shared by all of this film's holders, so someone else may be editing at the same time.
 
-- 存檔時伺服器回 `REVISION_CONFLICT`，表示別人先存了。停止自動儲存，顯示：「美玲剛剛也改了這條字幕。」（名字來自 `details.updatedBy`）兩個選擇：
-  - 「用他的版本」：載入伺服器上的文件，自己的變更放進復原紀錄（所以還能按復原拿回來）。
-  - 「用我的版本覆蓋」：帶上新的 `rev` 再存一次。
-- 沒有未儲存的變更時收到別人儲存的事件（`subtitle`，裡面的 `by` 是存的人）：重新抓一次，直接換成新的文件，訊息列說明是誰改的。
+- When the server answers a save with `REVISION_CONFLICT`, someone else saved first. Stop autosaving and show: "Meiling just changed these subtitles too." (the name comes from `details.updatedBy`). Two choices:
+  - "Use their version": loads the doc from the server and puts your own changes into the undo history (so Undo can still bring them back).
+  - "Overwrite with mine": saves again with the new `rev`.
+- When an event that someone else saved (`subtitle`, whose `by` is the person who saved) arrives while there are no unsaved changes: fetch again, swap in the new doc directly, and say in the message bar who changed it.
 
-不做即時協作（看到對方的游標之類）。
+No real-time collaboration (seeing the other person's cursor and so on).
 
-## ASS 字幕
+## ASS subtitles
 
-第一版把 ASS 當成純文字的句子清單處理（D34）：樣式、位置、特效在匯入時就拿掉，同步和匯出都和 SRT 一樣。字幕清單上標示「原本是 ASS，樣式已移除」（新）。
+The first version treats ASS as a plain-text list of lines (D34): styles, positioning and effects are stripped on import, and syncing and exporting work the same as SRT. The subtitle lines show "Originally ASS; styling removed" (new).
 
-後續功能「保留 ASS 樣式」的做法（現在不做，但資料模型已經留好）：同步文件只依賴句子的索引和編號，所以可以把同一份文件套到原始 ASS 的 `Dialogue` 行上，改寫開始和結束時間後原樣輸出；預覽用 JASSUB（libass 的 WebAssembly 版）疊在影片上；封裝時字幕軌用 ASS。原始的 `.ass` 檔已經保留在 `/data/subtitles/<id>/original.ass`。
+How a later "keep ASS styling" feature would work (not done now, but the data model already allows for it): the sync doc depends only on line indexes and ids, so the same doc can be applied to the original ASS `Dialogue` lines, rewriting start and end times and outputting the rest unchanged; preview overlays it on the video with JASSUB (the WebAssembly build of libass); packing uses ASS for the subtitle track. The original `.ass` file is already kept at `/data/subtitles/<id>/original.ass`.
 
-## 無障礙
+## Accessibility
 
-- 所有功能都能只用鍵盤完成。時間軸的拖曳有等價的鍵盤操作（位移的按鈕和快捷鍵、↑ ↓ 選句）。
-- canvas 有 `role="img"` 和說明文字；它傳達的資訊在清單和訊息列裡都有文字版本。
-- 顏色不是唯一的訊號：色點有 `title`（「與人聲重疊 62%」），檢查點的圓點有 `aria-label`。
-- 尊重 `prefers-reduced-motion`：捲動不做動畫。
+- Every feature can be done with the keyboard alone. Dragging on the timeline has keyboard equivalents (offset buttons and shortcuts, ↑ ↓ to select lines).
+- The canvas has `role="img"` and a description; the information it conveys is available as text in the list and message bar.
+- Color is never the only signal: the colored dots have a `title` ("62% overlap with speech"), and the checkpoint dots have an `aria-label`.
+- Respect `prefers-reduced-motion`: scrolling isn't animated.
 
-## 和原型不同的地方
+## Differences from the prototype
 
-| 原型 | 正式版 |
+| Prototype | Real version |
 | --- | --- |
-| 頁首有「這份字幕的問題」下拉選單，切換三種示範情境；左邊寫的是示範片段的資訊 | 沒有那個選單。頁首左邊是這部片真正的資訊；要同步哪一條字幕在工作台上方的卡片選 |
-| 自動對齊的搜尋範圍是前後 30 秒 | 60 秒（[08-media-pipeline.md](08-media-pipeline.md) 說明為什麼） |
-| 確認之後重新標記一個檢查點、復原、重做，都會回到草稿 | 只有時間或文字真的變了才回到草稿（復原或重做如果改回了不同的分段或逐句修改，當然也算） |
-| 自動對齊在瀏覽器裡算 | 伺服器算（兩種方法），瀏覽器只做吸附和對齊點 |
-| 5 個檢查點；文案寫死了數字（步驟提示「用檢查點聽五句」、訊息「五個檢查點都確認過了…」） | 預設 8 個，數量來自 `Me.limits.checkpointCount`；文案不寫數字：「用檢查點聽幾句」「檢查點都確認過了，可以按「確認同步」。」 |
-| 每句自帶中英文 | 對照另一條字幕 |
-| 字幕清單直接畫出全部 | 虛擬化 |
-| 確認後的摘要裡顯示整份 SRT 和「複製字幕內容」 | 改成「下載字幕檔」。SRT 全文太長，不顯示 |
-| 影片載入失敗時用無聲計時器 | 退到下一個來源，都失敗就顯示錯誤 |
-| 沒有儲存的概念 | 自動儲存、版本衝突處理 |
-| 沒有只有聲音的模式 | 有 |
-| 平台原型裡，確認之後再修改，標籤仍然顯示「已確認」（原型的簡化）；獨立的工作台原型會回到草稿 | 改動時間或文字就回到草稿 |
-| `core.js` 的 `toSrt` 不排序，也不保證每句的最短長度；`pickCheckpoints` 在句數比檢查點少時會重複挑同一句 | 以 `packages/shared/src/sync-core/core.ts` 為準：`toSrt` 依開始時間排序、每句至少 0.2 秒；`pickCheckpoints` 最多挑到句數為止、不重複。這些差異是有意的 |
+| The header has a "What's wrong with these subtitles" drop-down that switches between three demo scenarios; the left side shows the demo clip's info | No such menu. The left of the header shows this film's real info; which subtitles to sync is chosen in the card above the workbench |
+| Auto-align searches ±30 seconds | 60 seconds ([08-media-pipeline.md](08-media-pipeline.md) explains why) |
+| After confirming, re-marking a checkpoint, undo and redo all go back to draft | Only real changes to timing or text go back to draft (undo or redo that restores different segments or per-line edits counts, of course) |
+| Auto-align is computed in the browser | Computed on the server (two methods); the browser only does snapping and anchors |
+| 5 checkpoints; the copy hard-codes the number (step guide "Listen to five lines with checkpoints", message "All five checkpoints are confirmed…") | 8 by default, count from `Me.limits.checkpointCount`; the copy has no number: "Listen to a few lines with checkpoints", "All checkpoints are confirmed. You can press "Confirm sync"." |
+| Every line carries Chinese and English | Showing other subtitles alongside |
+| The subtitle list renders everything | Virtualized |
+| The summary after confirming shows the full SRT and "Copy subtitle text" | Changed to "Download subtitle file". The full SRT is too long and isn't shown |
+| Uses a silent timer when the video fails to load | Falls back to the next source; if all fail, shows an error |
+| No concept of saving | Autosave, revision conflict handling |
+| No audio-only mode | Has one |
+| In the platform prototype, editing after confirming still shows the "Confirmed" tag (a prototype simplification); the standalone workbench prototype goes back to draft | Changing timing or text goes back to draft |
+| `core.js`'s `toSrt` doesn't sort or guarantee a minimum length per line; `pickCheckpoints` picks the same line repeatedly when there are fewer lines than checkpoints | `packages/shared/src/sync-core/core.ts` wins: `toSrt` sorts by start time with each line at least 0.2 seconds; `pickCheckpoints` picks at most as many as there are lines, without repeats. These differences are intentional |
 
-## 驗收
+## Acceptance
 
-`prototype/workbench/e2e.cjs` 是原型的自動化檢查（40 項全過）。把它改寫成專案的 Playwright 測試，用 `fixtures/` 的片段和三份弄錯的字幕。其中有幾項綁著原型才有的東西，要換個方式做，不是照搬：
+`prototype/workbench/e2e.cjs` is the prototype's automated check (all 40 items pass). Rewrite it as the project's Playwright tests, using the clip in `fixtures/` and the three mistimed subtitle files. A few items are tied to things only the prototype has and must be done differently, not copied over:
 
-| 原型的檢查 | 正式版 |
+| Prototype check | Real version |
 | --- | --- |
-| 用上方的選單切換示範情境（`scenario switch resets status`） | 沒有這個選單。改成載入另一條字幕 |
-| 從畫面上的 SRT 全文讀結果（`srt output is retimed`、刪除一句之後的編號） | 改成下載 `GET /api/subtitles/:id/file?synced=true` 來比對 |
-| 「5 個檢查點」「全部 5 個都標成準」 | 數量是 8（或測試設定的值） |
-| 每句自帶的英文那一行（`bilingual overlay`） | 改成對照另一條字幕 |
-| 逐句編輯之後讀 `edits` 裡的 `zh`（原型的欄位名稱） | 欄位是 `text` |
-| 直接呼叫 `Core.toSrt`、透過 `window.__bench` 跳到某個時間和讀內部狀態 | 測試用的掛鉤自己設計（只在測試建置裡存在）；能從畫面上讀的就從畫面上讀 |
+| Switching demo scenarios with the menu at the top (`scenario switch resets status`) | No such menu. Load different subtitles instead |
+| Reading results from the full SRT on screen (`srt output is retimed`, numbering after deleting a line) | Download `GET /api/subtitles/:id/file?synced=true` and compare instead |
+| "5 checkpoints", "all 5 marked right" | The count is 8 (or the value set for the test) |
+| The English line each cue carries (`bilingual overlay`) | Showing other subtitles alongside instead |
+| Reading `zh` in `edits` after line editing (the prototype's field name) | The field is `text` |
+| Calling `Core.toSrt` directly, jumping to a time and reading internal state via `window.__bench` | Design your own test hooks (existing only in the test build); read from the screen whatever can be read from the screen |
 
-其餘的行為正式版都要通過：
+The real version must pass all the remaining behavior:
 
-- 「晚 2.4 秒」的字幕一開始分數 51%；自動對齊後位移約 −2.36、分數 80%；第 2 句在 6.0 秒時顯示。
-- 還有檢查點沒聽就按確認會被問；全部標成準之後確認成功，狀態變成已確認，摘要有位移。
-- 「影格率不同」的字幕一開始分數 66%；自動對齊後速率是 ×1.0427，分數 80%。
-- 手動在第 2 句和第 25 句各放一個對齊點，得到和自動對齊同樣的速率(×1.0427)；位移是 −0.834（自動對齊的是 −0.79，兩者相差在容許範圍內）。
-- 「剪輯不同」的字幕自動對齊後是兩段、分數 80%；不允許分段時只有 62%；復原後回到兩段。
-- 四次 −500 毫秒是 −2.00；鍵盤再 −500 是 −2.50；吸附後回到 −2.36 附近。
-- 在位移欄位直接輸入 −2.4：分數 80%。
-- 在時間軸上拖 60 像素，位移變化等於 60 像素對應的秒數。
-- 手動分段、併回。
-- 按住看原始時間時標籤出現，放開消失。
-- 搜尋「電梯」剩一列；搜尋不存在的字顯示空狀態。
-- 逐句編輯：改文字後畫面上跟著變；開始時間 +50 毫秒；刪除一句後匯出少一句而且編號連續。
-- 放大兩次，視野是全長的四分之一。
-- 400 px 寬沒有橫向捲軸；深色模式正常。
+- The "2.4 seconds late" subtitles start at a 51% score; after auto-align the offset is about −2.36 and the score 80%; line 2 is shown at 6.0 seconds.
+- Pressing confirm with checkpoints not yet heard asks the question; after marking all as right, confirming succeeds, the status becomes confirmed and the summary has the offset.
+- The "different frame rate" subtitles start at 66%; after auto-align the rate is ×1.0427 and the score 80%.
+- Placing one anchor each on lines 2 and 25 by hand gives the same rate as auto-align (×1.0427); the offset is −0.834 (auto-align's is −0.79; the difference is within tolerance).
+- The "different cut" subtitles are two segments at 80% after auto-align; only 62% without segments allowed; after undo, back to two segments.
+- Four −500 ms presses give −2.00; another −500 from the keyboard gives −2.50; after snapping, back to about −2.36.
+- Typing −2.4 directly in the offset field: score 80%.
+- Dragging 60 pixels on the timeline changes the offset by the seconds 60 pixels correspond to.
+- Splitting and merging segments by hand.
+- While holding to see original timing the tag appears, and disappears on release.
+- Searching "電梯" ("elevator") leaves one row; searching for a word that doesn't exist shows the empty state.
+- Edit lines: after changing text the screen updates; start time +50 ms; after deleting a line the export has one line fewer with continuous numbering.
+- After zooming in twice, the view is a quarter of the total length.
+- No horizontal scrollbar at 400 px wide; dark mode works.
 
-再加上原型沒有的：自動儲存、重新整理後狀態還在、版本衝突的兩種選擇、只有聲音的模式、一千句以上的清單捲動順暢。
+Plus what the prototype doesn't have: autosave, state surviving a reload, both choices for a revision conflict, audio-only mode, smooth scrolling of a list with over a thousand lines.
 
-不依賴測試用的 Chromium 能不能解 H.264（見 15-testing.md），所以測試時用 `fixtures/clip.webm`（同一段內容的 VP9 版本）。WebM 重新編碼過聲音，人聲偵測的結果和 `clip.mp4` 有極小的差異（9,242 個影格裡有 28 個不同），所以分數可能差 1 個百分點（例如 79% 而不是 80%）；位移和速率不受影響。用 WebM 跑的測試，比對分數時容許正負 1 個百分點。
+Don't rely on whether the test Chromium can decode H.264 (see 15-testing.md), so tests use `fixtures/clip.webm` (a VP9 version of the same clip). The WebM's audio was re-encoded, so speech detection differs very slightly from `clip.mp4` (28 of 9,242 frames differ), and the score may be off by 1 percentage point (e.g. 79% instead of 80%); offset and rate are unaffected. Tests run on the WebM allow ±1 percentage point when comparing scores.

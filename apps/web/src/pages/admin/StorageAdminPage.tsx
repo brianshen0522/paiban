@@ -12,7 +12,7 @@ import { UsageNotice } from '../StoragePage';
 
 const GB = 1024 ** 3;
 
-/** docs/10-storage.md, "上限的驗證", every item with force deletion, the recalculation and what it found. */
+/** docs/10-storage.md, "Validating the limit", every item with force deletion, the recalculation and what it found. */
 export function StorageAdminPage() {
   const s = useAdminStorage();
   const qc = useQueryClient();
@@ -164,7 +164,7 @@ export function StorageAdminPage() {
   );
 }
 
-/** One item with the administrator's force delete (docs/10-storage.md, "確認的文字"). */
+/** One item with the administrator's force delete (docs/10-storage.md, "Confirmation wording"). */
 function AdminItemRow({ item, hasPreview }: { item: StorageItem; hasPreview: boolean }) {
   const qc = useQueryClient();
   const toast = useToast();
@@ -256,7 +256,7 @@ function AdminItemRow({ item, hasPreview }: { item: StorageItem; hasPreview: boo
 
 const busyTask = (x: Task | null) => !!x && (x.state === 'queued' || x.state === 'running');
 
-/** "重新計算用量": a background task; the page updates itself when it is done (docs/10, "重新計算用量"). */
+/** "Recounting usage": a background task; the page updates itself when it is done (docs/10, "Recounting usage"). */
 function Rescan({ rescan }: { rescan: Task | null }) {
   const qc = useQueryClient();
   const toast = useToast();

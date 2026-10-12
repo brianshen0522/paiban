@@ -60,7 +60,7 @@ function initial(p: LlmProfile | null): Form {
 }
 
 /**
- * What the form sends (docs/18-llm.md, "設定檔"): the key is left out when nothing was typed and
+ * What the form sends (docs/18-llm.md, "Profiles"): the key is left out when nothing was typed and
  * "clear" was not pressed (the stored one stays), null when it is to be cleared, the text otherwise.
  */
 export function profileBody(form: Form, keyText: string, clearKey: boolean): LlmProfileInput {

@@ -15,7 +15,7 @@ import { keys, useMovie } from '../lib/queries';
 import { SearchError } from './SearchPage';
 import { NotFoundPage } from './StatusPages';
 
-/** docs/11-pages.md, "電影頁". */
+/** docs/11-pages.md, "Film page (03, 04)". */
 export function MoviePage() {
   const me = useOutletContext<Me>();
   const id = Number(useParams().ytsId);

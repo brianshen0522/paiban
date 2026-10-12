@@ -10,7 +10,7 @@ import { one } from '../db/pool.js';
 import { ApiError } from '../http/errors.js';
 import type { DiskProbe } from './disk.js';
 
-/** The five categories and the limit (docs/10-storage.md, "用量怎麼算"; the view is in the schema). */
+/** The five categories and the limit (docs/10-storage.md, "How usage is counted"; the view is in the schema). */
 export async function readUsage(q: Queryable): Promise<Usage> {
   const r = await one<{
     movies_bytes: number;
@@ -42,7 +42,7 @@ export async function readUsage(q: Queryable): Promise<Usage> {
 }
 
 /**
- * Bytes already promised but not yet on disk (docs/10-storage.md, "磁碟本身的空間"): unfinished
+ * Bytes already promised but not yet on disk (docs/10-storage.md, "Space on the disk itself"): unfinished
  * downloads' missing pieces, preview reservations, and exports being written.
  */
 export async function pendingWrites(q: Queryable): Promise<number> {
@@ -67,7 +67,7 @@ export async function diskInfo(q: Queryable, disk: DiskProbe, reserveBytes: numb
 }
 
 /**
- * Admission, inside the caller's transaction (docs/10-storage.md, "接受與拒絕"). First the logical
+ * Admission, inside the caller's transaction (docs/10-storage.md, "Admission and refusal (admission)"). First the logical
  * limit through storage_admit (which takes the advisory lock, so concurrent callers take turns),
  * then the physical disk. Throws STORAGE_LIMIT or DISK_FULL with the numbers the page needs.
  */

@@ -36,7 +36,7 @@ const toForm = (s: Settings): Form => ({
 
 const num = (v: string) => (/^\s*\d+\s*$/.test(v) ? Number(v) : Number.NaN);
 
-/** docs/11-pages.md, "下載設定": one form with an unsaved-changes bar; ports are read-only (D31). */
+/** docs/11-pages.md, "Download settings (19)": one form with an unsaved-changes bar; ports are read-only (D31). */
 export function DownloadSettingsPage() {
   const s = useAdminSettings();
   const qc = useQueryClient();

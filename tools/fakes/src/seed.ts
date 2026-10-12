@@ -4,7 +4,7 @@ import WebTorrent from 'webtorrent';
 
 /**
  * Seeds local files with every discovery mechanism off, so the torrent service can download them
- * by hash over 127.0.0.1 (docs/15-testing.md, "本機做種"; reference/torrent/local-swarm-test.mjs).
+ * by hash over 127.0.0.1 (docs/15-testing.md, "local seeding"; reference/torrent/local-swarm-test.mjs).
  * The hash depends on the content and piece size, so it is computed here and reported back.
  */
 export type Seeded = { file: string; name: string; hash: string; length: number; torrentFile: Buffer };

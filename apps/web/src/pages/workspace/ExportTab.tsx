@@ -10,7 +10,7 @@ import { bytes, percent, relative } from '../../lib/format';
 import { keys } from '../../lib/queries';
 import { langName, providerName } from './SubtitlesTab';
 
-/** The MKV language tag shown next to a track (docs/11-pages.md, "匯出"): zh counts as zh-TW. */
+/** The MKV language tag shown next to a track (docs/11-pages.md, "Export (10, 11)"): zh counts as zh-TW. */
 export function trackTag(lang: string): string {
   if (lang === 'zh-Hant' || lang === 'zh') return 'zh-TW';
   if (lang === 'zh-Hans') return 'zh-CN';
@@ -25,7 +25,7 @@ export function defaultFileName(title: string, year: number, quality: string): s
 
 export type FileNameProblem = 'EXTENSION' | 'CHARACTERS' | 'TOO_LONG' | null;
 
-/** The same checks as the server (docs/11-pages.md, "檔名"). */
+/** The same checks as the server (docs/11-pages.md, "file name"). */
 export function checkFileName(name: string): FileNameProblem {
   // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what is refused
   if (/[/\\:*?"<>|\u0000-\u001f\u007f]/.test(name) || name.startsWith('.') || name !== name.trim()) return 'CHARACTERS';
@@ -34,7 +34,7 @@ export function checkFileName(name: string): FileNameProblem {
   return null;
 }
 
-/** docs/11-pages.md, "匯出": choose tracks, name the file, check the space, start; the film's exports below. */
+/** docs/11-pages.md, "Export (10, 11)": choose tracks, name the file, check the space, start; the film's exports below. */
 export function ExportTab({ ws }: { ws: Workspace }) {
   const qc = useQueryClient();
   const toast = useToast();
@@ -51,7 +51,7 @@ export function ExportTab({ ws }: { ws: Workspace }) {
   const nameRef = useRef<HTMLInputElement>(null);
 
   const on = confirmed.filter((s) => !off.has(s.id));
-  // "預設顯示" stays on a ticked track: when it is unticked it moves to the first ticked one.
+  // "Shown" (the default track) stays on a ticked track: when it is unticked it moves to the first ticked one.
   const defId = on.some((s) => s.id === def) ? def : (on[0]?.id ?? null);
   useEffect(() => {
     if (defId !== def) setDef(defId);
@@ -297,7 +297,7 @@ export function exportState(e: Export) {
 
 /** One export with download and delete; shared by the export tab and the storage page. */
 export function ExportRow({ e, showFilm = false }: { e: Export; showFilm?: boolean }) {
-  // The storage page words it shorter (docs/10-storage.md, "確認的文字").
+  // The storage page words it shorter (docs/10-storage.md, "Confirmation wording").
   const qc = useQueryClient();
   const toast = useToast();
   const [confirm, setConfirm] = useState(false);

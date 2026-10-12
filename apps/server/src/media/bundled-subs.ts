@@ -13,7 +13,7 @@ import type { JobDeps, MediaRow } from './jobs.js';
 import { run } from './proc.js';
 
 /**
- * Subtitles a download carries (Brian, 2026-10-09; docs/08-media-pipeline.md, "種子內附的字幕"):
+ * Subtitles a download carries (Brian, 2026-10-09; docs/08-media-pipeline.md, "Subtitles from the torrent"):
  * text subtitle files beside the film (.srt, .ass, .ssa, .vtt) and the text subtitle tracks inside
  * the video. Each one becomes a subtitle of the film, provider 'bundled', not confirmed yet, added
  * by nobody in particular. Runs once the probe has read the file; a duplicate (same cues) is

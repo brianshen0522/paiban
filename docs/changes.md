@@ -1,346 +1,354 @@
-# 規格變更紀錄
+# Spec change log
 
-實作和原本的規格不一樣的地方。每改一處就記一則，並且把受影響的文件一起改掉：這裡是「改了什麼、為什麼」的紀錄，文件本身永遠要是最新的。最新的寫在最上面。
+Places where the implementation differs from the original spec. Record one entry for every change, and update the affected documents along with it: this is the record of "what changed and why"; the documents themselves must always be current. Newest entries go at the top.
 
-每一則的格式：
+Format of each entry:
 
 ```text
-## 2026-10-12 射手網回應的語言欄位
+## 2026-10-12 The language field in Assrt responses
 
-- 原本：docs/07-subtitle-providers.md 寫 lang.langlist 的鍵是 langcht、langchs……
-- 改成：……
-- 原因：階段 0 錄到的真實回應是……
-- 改了哪些檔案：docs/07-subtitle-providers.md、reference/providers/assrt.search.sample.json
-- Brian 是否已確認：是 / 否 / 不需要
+- Before: docs/07-subtitle-providers.md says the keys of lang.langlist are langcht, langchs…
+- Now: …
+- Why: the real response recorded in phase 0 is…
+- Files changed: docs/07-subtitle-providers.md, reference/providers/assrt.search.sample.json
+- Confirmed by Brian: yes / no / not needed
 ```
 
 ---
 
-## 2026-10-10 每個人選海報的國家
-
-- 原本：海報一律向 TMDB 用 zh-TW 查（有台灣版就是台灣版），下載過的片存一份。
-- 改成：個人設定多「電影海報」：跟隨介面語言（預設；中文用台灣、英文用美國），或台灣、香港、中國、美國、日本、韓國。海報端點多 `region` 參數；伺服器用 TMDB `language=` 取那一國的海報，片庫裡的片每一國各存一份，刪片時一起刪。`UserPrefs.posterRegion`、`PosterRegion`、`POSTER_REGIONS`。
-- 原因：Brian 要海報的國家可以在設定裡改；他同意做成每個人自己選。
-- 改了哪些檔案：docs/04-api.md、docs/05-yts.md、docs/11-pages.md、docs/13-settings.md、packages/shared/src/contracts/api.ts
-- Brian 是否已確認：是
+## 2026-10-12 The documents are in English
+
+- Before: everything under `docs/`, `AGENTS.md`, `README.md` and the other READMEs was in Traditional Chinese; code comments cited doc sections by their Chinese headings.
+- Now: all of them are in English. Chinese stays only where the Chinese itself is the subject (the style rules for the zh-TW copy in 17-ui.md, language labels, Chinese example titles and subtitle lines, the site name 拍板). Code comments cite the English headings. Plan steps (階段) are called "phases" throughout, matching `docs/reports/phase-N.md`. D13 now records the bilingual interface and the English docs; reports go into `docs/reports/` in English. AGENTS.md: docs in English; conversation and reports to Brian stay in Traditional Chinese. Interface text quoted in the docs is the English interface copy (`apps/web/src/copy/en.ts`) where it exists.
+- Why: Brian is publishing the repository on GitHub.
+- Files changed: every Markdown file in the repository, code comments that cite doc sections
+- Confirmed by Brian: yes
 
-## 2026-10-09 種子內附的字幕
-
-- 原本：種子裡的字幕檔沒有用處（手動加入的甚至不下載），影片裡內嵌的字幕軌也不理。
-- 改成：影片探測完，種子資料夾裡的 `.srt`、`.ass`、`.ssa`、`.vtt` 和影片裡的文字字幕軌（用 ffmpeg 取出）自動加成這部片的字幕：來源「種子內附」（`provider = 'bundled'`），還沒確認，簡體照下載發起人的偏好轉繁體，重複的跳過。YTS 和手動加入的下載都一樣；手動加入的種子把字幕檔也選進來下載，預留空間一起算。`TorrentInspection` 多 `subtitleFiles`；`ProviderId` 多 `bundled`；遷移 `0008_bundled_subtitles.sql`；新的事件 `{type: 'subtitle', id}` 由 `media` 送、`api` 轉推。
-- 原因：Brian 要種子裡附的字幕一起加進來；他選了外掛檔和內嵌字幕軌都要、直接加成字幕、YTS 的也一起。
-- 改了哪些檔案：docs/03-data-model.md、docs/06-torrent-worker.md、docs/08-media-pipeline.md、docs/11-pages.md、db/schema.sql、packages/shared/src/contracts/api.ts
-- Brian 是否已確認：是
+## 2026-10-10 Each person picks the country for posters
+
+- Before: posters were always fetched from TMDB with zh-TW (the Taiwanese poster if there is one), and one copy was stored for each downloaded film.
+- Now: Profile has a new "Film posters" setting: follow the interface language (default; Chinese uses Taiwan, English uses the US), or Taiwan, Hong Kong, China, the US, Japan, Korea. The poster endpoint takes a new `region` parameter; the server uses TMDB `language=` to get that country's poster, stores one copy per country for each film in the library, and deletes them when the film is deleted. `UserPrefs.posterRegion`, `PosterRegion`, `POSTER_REGIONS`.
+- Why: Brian wants the poster country to be changeable in settings; he agreed to make it each person's own choice.
+- Files changed: docs/04-api.md, docs/05-yts.md, docs/11-pages.md, docs/13-settings.md, packages/shared/src/contracts/api.ts
+- Confirmed by Brian: yes
 
-## 2026-10-09 手動加入種子（磁力連結、.torrent 檔）
-
-- 原本：AGENTS.md 絕對規則第 4 條和 D26：只接受 YTS 搜尋結果裡的 info hash，產品不做貼磁力連結、上傳 .torrent 的入口。
-- 改成：所有登入的人都能在「手動加入種子」視窗貼磁力連結或上傳 .torrent 檔，選 TMDB 上的一部電影後下載；只下載最大的影片檔。磁力連結的種子資訊由 `torrent` 服務在記憶體裡取得。tracker 過濾、網頁種子丟掉、每人每小時讀 30 次。新資料表 `torrent_inspections`，`movies.yts_id` 可以是空的，`torrents` 多 `origin`、`metainfo`、`trackers`（遷移 `0007_manual_torrents.sql`）。新端點 `POST /api/torrents/inspect`、`GET /api/torrents/inspect/:id`、`POST /api/torrents/manual`、`GET /api/movies/:id/poster`；錯誤碼 `TORRENT_INVALID`、`TMDB_NOT_CONFIGURED`、`TMDB_UNREACHABLE`；`Torrent.movie.ytsId` 可以是 null，`Torrent.origin`；操作紀錄 `torrent.manual`。
-- 原因：Brian 要在 YTS 找不到片時能手動加入。他確認取消原本的規則、所有人都能用、用 TMDB 選片、只下載最大的影片檔。
-- 改了哪些檔案：AGENTS.md、docs/00-decisions.md（D26）、docs/03-data-model.md、docs/04-api.md、docs/06-torrent-worker.md、docs/10-storage.md、docs/11-pages.md、docs/12-auth.md、db/schema.sql、packages/shared/src/contracts/api.ts
-- Brian 是否已確認：是
+## 2026-10-09 Subtitles from the torrent
+
+- Before: subtitle files in a torrent were of no use (torrents added by hand didn't even download them), and subtitle tracks embedded in the video were ignored too.
+- Now: after the video is probed, the `.srt`, `.ass`, `.ssa`, `.vtt` files in the torrent folder and the text subtitle tracks in the video (extracted with ffmpeg) are automatically added as this film's subtitles: source "From the torrent" (`provider = 'bundled'`), not yet confirmed, Simplified converted to Traditional according to the preference of whoever started the download, duplicates skipped. YTS downloads and downloads added by hand work the same way; for a torrent added by hand, the subtitle files are also selected for download, and they count toward the reserved space. `TorrentInspection` gets `subtitleFiles`; `ProviderId` gets `bundled`; migration `0008_bundled_subtitles.sql`; a new event `{type: 'subtitle', id}` is sent by `media` and relayed by `api`.
+- Why: Brian wants the subtitles that come with a torrent added too; he chose to take both external files and embedded subtitle tracks, add them directly as subtitles, and include YTS downloads as well.
+- Files changed: docs/03-data-model.md, docs/06-torrent-worker.md, docs/08-media-pipeline.md, docs/11-pages.md, db/schema.sql, packages/shared/src/contracts/api.ts
+- Confirmed by Brian: yes
 
-## 2026-10-09 全站片庫
-
-- 原本：每個人只看得到自己持有的片。要用別人下載過的片，得先在搜尋裡找到同一部片、同一個版本，再按「加入片庫」。系統裡有哪些片，只有管理員看得到。
-- 改成：片庫頁多一個「全站片庫」分頁，列出所有下載完成的片、誰持有、已確認字幕的語言；沒持有的可以一鍵「加入我的片庫」（新端點 `POST /api/torrents/:id/hold`，不再問 YTS、不佔空間）。`GET /api/library` 多 `scope=all`，`LibraryItem` 多 `confirmedLanguages`。持有人制度和刪除規則（D21、最後一位持有人刪除整部片）不變。
-- 原因：Brian 要所有人都能看到所有的影片；範圍（全站列表加一鍵加入）和刪除規則（維持現況）由 Brian 選定。
-- 改了哪些檔案：docs/04-api.md、docs/11-pages.md、packages/shared/src/contracts/api.ts
-- Brian 是否已確認：是
+## 2026-10-09 Adding a torrent by hand (magnet link, .torrent file)
+
+- Before: AGENTS.md absolute rule 4 and D26: only info hashes from YTS search results are accepted; the product has no way to paste a magnet link or upload a .torrent file.
+- Now: everyone who is signed in can paste a magnet link or upload a .torrent file in the "Add a torrent by hand" window, pick a film on TMDB, and download it; only the largest video file is downloaded. For magnet links, the `torrent` service fetches the torrent info in memory. Trackers are filtered, web seeds are dropped, and each person can inspect 30 times per hour. New table `torrent_inspections`; `movies.yts_id` can be empty; `torrents` gets `origin`, `metainfo`, `trackers` (migration `0007_manual_torrents.sql`). New endpoints `POST /api/torrents/inspect`, `GET /api/torrents/inspect/:id`, `POST /api/torrents/manual`, `GET /api/movies/:id/poster`; error codes `TORRENT_INVALID`, `TMDB_NOT_CONFIGURED`, `TMDB_UNREACHABLE`; `Torrent.movie.ytsId` can be null, `Torrent.origin`; activity log action `torrent.manual`.
+- Why: Brian wants to be able to add a film by hand when YTS doesn't have it. He confirmed dropping the original rule, letting everyone use it, picking the film from TMDB, and downloading only the largest video file.
+- Files changed: AGENTS.md, docs/00-decisions.md (D26), docs/03-data-model.md, docs/04-api.md, docs/06-torrent-worker.md, docs/10-storage.md, docs/11-pages.md, docs/12-auth.md, db/schema.sql, packages/shared/src/contracts/api.ts
+- Confirmed by Brian: yes
 
-## 2026-10-08 介面雙語（繁體中文、English）
-
-- 原本：介面只有繁體中文，文案檔 `zh-TW.ts` 直接匯出 `t`。
-- 改成：多一份英文文案 `en.ts`，鍵和中文版完全一樣（型別檢查）。每個人在頂端列、登入頁或個人設定選語言，存在 `users.prefs.locale`（`'zh-TW'`、`'en'`，`null` 跟隨瀏覽器）。通知和操作紀錄的句子跟著看的人的語言；AI 翻譯字幕的名稱和匯出 MKV 的字幕軌標題用做的那個人的語言。片名和電影簡介依介面語言選用中文或原文。合約 `UserPrefs` 多 `locale`，`UiLocale` 型別，`MovieDetail` 多 `summaryEn`。沒有遷移（`prefs` 是 jsonb）。
-- 原因：Brian 要求系統做成雙語；語言、預設、範圍由 Brian 選定。
-- 改了哪些檔案：docs/17-ui.md、docs/11-pages.md、docs/04-api.md、docs/13-settings.md、docs/08-media-pipeline.md、docs/18-llm.md、AGENTS.md（語言表）、packages/shared/src/contracts/api.ts
-- Brian 是否已確認：是
+## 2026-10-09 All films library
+
+- Before: each person could only see the films they hold. To use a film someone else downloaded, you had to find the same film and the same version in Search, then press "Add to Library". Only administrators could see which films were in the system.
+- Now: the Library page has a new "All films" tab listing every finished download, who holds it, and the languages of its confirmed subtitles; films you don't hold can be added with one click on "Add to my library" (new endpoint `POST /api/torrents/:id/hold`; no YTS request, no extra space used). `GET /api/library` gets `scope=all`, and `LibraryItem` gets `confirmedLanguages`. The holder model and the deletion rules (D21, the last holder deletes the whole film) are unchanged.
+- Why: Brian wants everyone to be able to see every film; Brian chose the scope (a site-wide list plus one-click adding) and the deletion rules (keep as is).
+- Files changed: docs/04-api.md, docs/11-pages.md, packages/shared/src/contracts/api.ts
+- Confirmed by Brian: yes
 
-## 2026-10-07 Ollama 從「自架」分出來
-
-- 原本：「自架」一種涵蓋 Ollama 和其他 OpenAI 相容的服務，都走 `/v1/chat/completions`。
-- 改成：多一種供應商「Ollama」，走 Ollama 自己的 `/api/chat`，可以設長度上限（`num_ctx`，預設 16384）、用 `think: false` 關閉推理、用 JSON schema 限制回答；模型清單從 `/api/tags` 取。「自架」改名為「OpenAI 相容的自架服務（vLLM、LM Studio 等）」。合約 `LlmProvider` 多 `ollama`、`LlmParams` 多 `contextLength`；遷移 `0006_llm_ollama.sql`。已經存的「自架」設定檔不受影響。
-- 原因：Brian 問為什麼兩個是同一個選項；Ollama 預設的上下文很小，透過相容介面調不了，翻譯會悄悄少句。Brian 同意拆開。
-- 改了哪些檔案：docs/18-llm.md、docs/08-media-pipeline.md、db/schema.sql、packages/shared/src/contracts/api.ts
-- Brian 是否已確認：是
+## 2026-10-08 Bilingual interface (Traditional Chinese, English)
+
+- Before: the interface was Traditional Chinese only, and the copy file `zh-TW.ts` exported `t` directly.
+- Now: there is an English copy file `en.ts` with exactly the same keys as the Chinese one (enforced by type checking). Each person picks a language in the top bar, on the sign-in page, or in Profile; it is stored in `users.prefs.locale` (`'zh-TW'`, `'en'`, `null` follows the browser). Notification and activity log sentences follow the viewer's language; the names of AI-translated subtitles and the subtitle track titles in exported MKVs use the language of the person who made them. Film titles and summaries use Chinese or the original according to the interface language. The contract's `UserPrefs` gets `locale`, a `UiLocale` type, and `MovieDetail` gets `summaryEn`. No migration (`prefs` is jsonb).
+- Why: Brian asked for the system to be bilingual; Brian chose the languages, the default, and the scope.
+- Files changed: docs/17-ui.md, docs/11-pages.md, docs/04-api.md, docs/13-settings.md, docs/08-media-pipeline.md, docs/18-llm.md, AGENTS.md (language table), packages/shared/src/contracts/api.ts
+- Confirmed by Brian: yes
 
-## 2026-10-07 LLM 設定頁與字幕翻譯
-
-- 原本：語言模型只用在自動對齊，設定在「來源設定 → 自動對齊」，只有一個（Claude 或 OpenAI 相容），金鑰是 `llmKey`。沒有字幕翻譯。
-- 改成：管理頁新增「LLM 設定」（`/admin/llm`），可以建立多個設定檔（OpenAI、Anthropic、Azure OpenAI、Azure AI Foundry、OpenRouter、自架），依優先順序和權重做負載平衡與備援；翻譯和自動對齊共用。工作區的字幕可以翻成任何語言（純譯文或雙語），結果是一條沿用原字幕同步結果的新字幕。舊設定在升級時搬成第一個設定檔。新資料表（遷移 `0005_llm.sql`）、新端點、`SubtitleLang`、`ProviderId` 多 `translated`、錯誤碼 `LLM_NOT_CONFIGURED`、`TRANSLATION_RUNNING`；`Settings.align.llm`、`llmKey`、`POST /api/admin/align/test` 移除。
-- 原因：Brian 在對話裡要求（翻譯常常只有英文的字幕；設定檔要能負載平衡和備援；浮動視窗、取得模型清單、測試按鈕；翻譯帶 TMDB 簡介、分段並帶重疊的參考句）。範圍是他在選項裡選的。
-- 改了哪些檔案：docs/18-llm.md（新）、docs/03-data-model.md、docs/04-api.md、docs/08-media-pipeline.md、docs/11-pages.md、docs/13-settings.md、db/schema.sql、packages/shared/src/contracts/api.ts
-- Brian 是否已確認：是（他提出的）
+## 2026-10-07 Ollama split out from "self-hosted"
+
+- Before: a single "self-hosted" option covered Ollama and other OpenAI-compatible services, all via `/v1/chat/completions`.
+- Now: a new provider, "Ollama", uses Ollama's own `/api/chat`, can set a length limit (`num_ctx`, default 16384), turns off reasoning with `think: false`, and constrains answers with a JSON schema; the model list comes from `/api/tags`. "Self-hosted" is renamed "Self-hosted, OpenAI-compatible (vLLM, LM Studio…)". The contract's `LlmProvider` gets `ollama` and `LlmParams` gets `contextLength`; migration `0006_llm_ollama.sql`. Existing "self-hosted" profiles are not affected.
+- Why: Brian asked why the two were the same option; Ollama's default context is small and can't be adjusted through the compatible interface, so translations silently lose lines. Brian agreed to split them.
+- Files changed: docs/18-llm.md, docs/08-media-pipeline.md, db/schema.sql, packages/shared/src/contracts/api.ts
+- Confirmed by Brian: yes
 
-## 2026-10-06 下載頁整理
-
-- 原本：每列只有百分比，沒有大小；沒有總覽；細節頁只能點片名進去（看不出來）；手機上縮圖自己佔一列；有圖片的縮圖多一圈色框。
-- 改成：標題旁的總覽（各狀態幾部、合計速度、還要下載多少、全部完成的時間）；說明文字加「已下載 / 總大小」；「細節 ›」按鈕；收到資料時進度條有一道跑動的光；手機縮圖在左；修掉色框；細節頁的「剩下」寫「約 12 分鐘」不重複「剩」，進度條也有跑動的光。見 docs/11-pages.md 的「下載」。
-- 原因：Brian 在對話裡要求優化下載頁面。
-- 改了哪些檔案：docs/11-pages.md
-- Brian 是否已確認：是（他提出的）
+## 2026-10-07 LLM settings page and subtitle translation
+
+- Before: the language model was used only for auto-align, configured under "Sources → Auto-align", and there was only one (Claude or OpenAI-compatible) with the key `llmKey`. There was no subtitle translation.
+- Now: a new admin page, "LLM settings" (`/admin/llm`), where you can create multiple profiles (OpenAI, Anthropic, Azure OpenAI, Azure AI Foundry, OpenRouter, self-hosted), with load balancing and fallback by priority and weight; translation and auto-align share them. Subtitles in the workspace can be translated into any language (translation only or bilingual); the result is a new subtitle track that reuses the original subtitles' sync result. The old setting is moved into the first profile on upgrade. New tables (migration `0005_llm.sql`), new endpoints, `SubtitleLang`, `ProviderId` gets `translated`, error codes `LLM_NOT_CONFIGURED`, `TRANSLATION_RUNNING`; `Settings.align.llm`, `llmKey`, and `POST /api/admin/align/test` are removed.
+- Why: Brian asked for it in the conversation (subtitles are often available only in English; profiles need load balancing and fallback; a floating window, fetching the model list, a test button; translation includes the TMDB summary and is split into chunks with overlapping context lines). He chose the scope from the options.
+- Files changed: docs/18-llm.md (new), docs/03-data-model.md, docs/04-api.md, docs/08-media-pipeline.md, docs/11-pages.md, docs/13-settings.md, db/schema.sql, packages/shared/src/contracts/api.ts
+- Confirmed by Brian: yes (he proposed it)
 
-## 2026-10-06 搜尋框用 TMDB 建議電影（中文片名也找得到）
-
-- 原本：搜尋只問 YTS，YTS 只認得英文片名，用中文譯名找不到片。
-- 改成：打字時列出 TMDB 的電影建議；點了用 IMDb 編號找 YTS 上的同一部片並打開。新端點 `GET /api/tmdb/suggest`、`GET /api/tmdb/:tmdbId/yts`、`GET /api/tmdb/poster/:file`，合約多 `TmdbSuggestion`。
-- 原因：Brian 在對話裡要求。
-- 改了哪些檔案：packages/shared/src/contracts/api.ts、docs/04-api.md、docs/05-yts.md、docs/11-pages.md
-- Brian 是否已確認：是（他提出的）
+## 2026-10-06 Downloads page tidy-up
+
+- Before: each row showed only a percentage, no size; there was no summary; the details page could only be reached by clicking the title (not discoverable); on phones the thumbnail took a row of its own; thumbnails with images had an extra colored border.
+- Now: a summary next to the heading (how many in each status, total speed, how much is left to download, when everything will finish); the description adds "downloaded / total size"; a "Details ›" button; the progress bar has a moving shine while data is arriving; on phones the thumbnail is on the left; the colored border is fixed; on the details page "Left" reads "about 12 minutes" without repeating "left" (剩), and the progress bar has the moving shine too. See "Downloads (05, 34)" in docs/11-pages.md.
+- Why: Brian asked in the conversation for the Downloads page to be improved.
+- Files changed: docs/11-pages.md
+- Confirmed by Brian: yes (he proposed it)
 
-## 2026-10-06 節點地圖：自動偵測伺服器所在國家並置中
-
-- 原本：伺服器的位置由 `TZ` 推得（不認得的當作台灣），地圖固定以本初子午線為中心。
-- 改成：依節點在 extended handshake 回報的公開位址（BEP 10 `yourip`）投票決定國家，沒有回報時才用 `TZ`；地圖左右轉到那個國家在正中間。合約 `TorrentLive` 多 `homeFrom`。不向任何外部服務查詢自己的 IP。
-- 原因：Brian 在對話裡要求系統自動偵測伺服器所在的國家，並把它移到地圖中間。
-- 改了哪些檔案：packages/shared/src/contracts/api.ts、docs/06-torrent-worker.md、docs/11-pages.md
-- Brian 是否已確認：是（他提出的）
-
-## 2026-10-06 同步工作台的工具移到影片下面
-
-- 原本：影片和字幕清單在上，時間軸在中，訊息列和五組工具在最下面；聽檢查點要上下來回捲。工作區頁首有大海報、選字幕的卡片三行。
-- 改成：影片下面依序是播放列、訊息列、工具分頁（一次一組，聽檢查點時自動換到「檢查點」）；字幕清單在右邊、和左欄等高；時間軸在下面整個寬度。影片高度隨視窗限制。頁首的海報變縮圖，選字幕的卡片變一列，步驟提示和「確認同步」在同一列。見 docs/09-sync-workbench.md 的「版面」。
-- 原因：Brian 在對話裡說選檢查點要往下滑、再往上滑看影片，並要求多找可以優化的地方。
-- 改了哪些檔案：docs/09-sync-workbench.md
-- Brian 是否已確認：是（他提出的）
-
-## 2026-10-06 來源設定改成分頁
-
-- 原本：來源設定是一長頁，九張卡片由上往下排。
-- 改成：「電影資料」「字幕來源」「自動對齊」三個橫向分頁，標籤下面一行小字說那一頁的狀況；寬螢幕卡片兩欄。見 docs/11-pages.md 的「來源設定」。
-- 原因：Brian 在對話裡說整頁太長，想做成橫向分頁。
-- 改了哪些檔案：docs/11-pages.md
-- Brian 是否已確認：是（他提出的）
-
-## 2026-10-06 確認框改成對話框
-
-- 原本：破壞性的動作按下去後，在同一個位置展開紅色的確認區塊（規格明說不用 modal）。
-- 改成：畫面中央的小對話框（`<dialog>`），背景變暗；焦點從「先不要」開始，Esc 或點外面取消，關掉後焦點回到原本的按鈕。七個頁面共用同一個元件，一起換。
-- 原因：Brian 在對話裡說「刪除整部片」按下去後，紅色區塊讓那張電影卡片變長，「是個很糟糕的設計」。
-- 改了哪些檔案：docs/11-pages.md、docs/17-ui.md
-- Brian 是否已確認：是（他提出的）
-
-## 2026-10-06 介面的元件與配色整理
-
-- 原本：中文標題在沒有 PingFang、JhengHei 的系統上沒有粗體；狀態標籤和流程標籤只有框線；按鈕、輸入框高度不一；說明框整圈粗框；下載頁兩張卡片黏在一起；手機的頂端列佔三列；工作台字幕清單的文字被置中。
-- 改成：打包 Noto Sans TC 當中文的後備字型（按字元範圍切片）；標籤改成淡色底；按鈕和輸入框統一 34 px，強調按鈕改成淡琥珀底；說明框淡框加左側色條；卡片加極淡陰影；表格列懸停；返回連結改成灰色小字；手機頂端列兩列；淺色主題的 `--ink-3` 調深到在頁面底色上也有 4.5:1。見 docs/17-ui.md。
-- 原因：Brian 在對話裡要求（「把整個平台的物件設計與配色弄好……很多地方很醜」）。
-- 改了哪些檔案：docs/17-ui.md
-- Brian 是否已確認：是（他提出的）
-
-## 2026-10-06 刪除整部片連匯出檔一起刪；匯出中停用匯出按鈕
-
-- 原本：最後一位持有人從片庫移除電影時，影片、預覽檔、字幕刪除，匯出的 MKV 保留（它們比電影活得久）；管理員強制刪除影片也一樣。同一部片可以連續按「開始匯出」。
-- 改成：自己是最後一位持有人時，片庫的按鈕是「刪除整部片」，連同這部片的所有匯出檔一起刪（排隊、完成、失敗的直接刪，封裝中的取消後刪）；別人建立的匯出檔，建立者收到 `item.deleted`。還有別人持有時仍然只是退出。管理員強制刪除影片也連匯出檔一起刪。確認文字列出會刪的匯出檔和合計釋放的空間：合約的 `LibraryItem` 和 `StorageItem` 多 `filmExports {count, bytes}`。這部片有排隊或封裝中的匯出時，「開始匯出」停用。
-- 原因：Brian 在對話裡要求（「要有機制可以從片庫那邊刪除整個影片，刪除的時候要把種子、片庫所有字幕和匯出檔一起刪除」「匯出進行中要把匯出按鈕 disable」）。範圍（只有自己持有才刪、管理員可以強制；取代原本的移除）是他在選項裡選的。
-- 改了哪些檔案：packages/shared/src/contracts/api.ts、db/schema.sql（註解）、docs/03-data-model.md、docs/04-api.md、docs/10-storage.md、docs/11-pages.md、docs/17-ui.md
-- Brian 是否已確認：是
-
-## 2026-10-06 依另一條字幕對齊
-
-- 原本：自動對齊只依片子的聲音（人聲偵測、語音辨識）。
-- 改成：可以選同一部片的另一條字幕當參考來對齊。`POST /api/subtitles/:id/auto-align` 多一個選填的 `referenceId`；`AlignResult` 多 `reference`（含參考字幕本身離片中人聲多遠的 `offBy`）、`extraLines`，`method` 多 `reference`、`reference-text`、`reference-llm`（最後一個目前不會出現，保留給以後）。開頭結尾的製作資訊不參與計算，對齊後列出來讓使用者決定要不要刪；拆句、併句不影響。
-- 原因：Brian 在對話裡要求（對好一條字幕之後，可以幫其他字幕對齊；要考慮開頭與電影無關的資訊、一句對兩句）。
-- 改了哪些檔案：packages/shared/src/contracts/api.ts、docs/04-api.md、docs/08-media-pipeline.md、docs/09-sync-workbench.md
-- Brian 是否已確認：是（他提出的）
-
-## 2026-10-06 版面改成視窗不捲動，列表在自己的框裡捲動
-
-- 原本：整頁一起捲動。
-- 改成：頂端列和選單固定，視窗不捲動；列表頁的列表、其他頁的每個表格在自己的框裡捲動；手機的選單變成一列左右滑。下載細節頁的地圖、每一塊、速度改成分頁；節點加上國旗。見 docs/17-ui.md 的「版面」。
-- 原因：Brian 在對話裡要求（有列表的地方用容器包起來，不要讓整個頁面滑；細節頁用分頁；加國旗）。他也回報「所有頁面都可以滑到很下面、下面是空白」，在這台機器的 Chrome 重現不出來；改成視窗不捲動後，這種情況不會再發生。
-- 改了哪些檔案：docs/11-pages.md、docs/17-ui.md
-- Brian 是否已確認：是（他提出的）
-
-## 2026-10-06 下載頁加海報和下載細節頁
-
-- 原本：下載頁每一列左邊是一塊顏色，沒有細節頁。
-- 改成：每一列有海報，片名連到新的「下載細節」頁：節點世界地圖（連線像網路攻擊即時地圖那樣畫成弧線）、每一塊的狀態格子、速度曲線、節點表。新端點 `GET /api/torrents/:id/live`、合約 `TorrentLive`、資料表 `torrent_live`（遷移 `0004`）、映像檔裡的 DB-IP 國家對照表。
-- 原因：Brian 在對話裡要求（海報、可以點開看下載細節、地圖顯示節點並連線、用格子顯示每一塊）。
-- 改了哪些檔案：docs/03-data-model.md、docs/06-torrent-worker.md、docs/11-pages.md、db/schema.sql、packages/shared/src/contracts/api.ts
-- Brian 是否已確認：是（他提出的）；伺服器位置用時區推、IP 遮一半、DB-IP 的資料是我決定的
-
-## 2026-10-06 電影資料改用 TMDB，取代 IMDb
-
-- 原本：搜尋和電影頁的片名、簡介、海報、評分都是 YTS 給的（評分是 IMDb 的）；TMDB 只用來換編號和查中文片名。
-- 改成：有 TMDB 金鑰時，中文片名（放在前面）、中文簡介、海報、評分都來自 TMDB，評分標明來源，電影頁有「在 TMDB 查看」。沒有金鑰時退回 YTS。合約多了 `MovieSummary.tmdbId`、`ratingSource`，`MovieDetail.tmdbUrl`。篩選和排序的評分仍是 YTS 的 IMDb 評分（只有它能篩整個片庫）。
-- 原因：Brian 在對話裡要求「use TMDB API, replace imdb」，範圍選了全部（評分、電影資料、TMDB 連結、字幕查詢用 TMDB 編號）。
-- 改了哪些檔案：docs/05-yts.md、docs/11-pages.md、docs/12-auth.md、docs/13-settings.md、packages/shared/src/contracts/api.ts
-- Brian 是否已確認：是（他提出的）
-
-## 2026-10-06 外觀改成角落的一個按鈕
-
-- 原本：外觀是一組三選一的按鈕（淺色／深色／跟隨系統），放在帳號選單、個人設定、登入頁底部。
-- 改成：一個圖示按鈕，放在頂端列右側和登入類頁面的右上角，每按一次換下一種，圖示轉一圈。個人設定拿掉「外觀」區塊。
-- 原因：Brian 在對話裡說不喜歡三個按鈕佔位置，要放在角落、一個按鈕輪流切換。
-- 改了哪些檔案：docs/11-pages.md、docs/17-ui.md
-- Brian 是否已確認：是（他提出的）
-
-## 2026-10-06 假的字幕來源也替本機做種的那部片回答
-
-- 原本：docs/15-testing.md 寫假的字幕來源只有 *Inception*（`tt1375666`）有結果。但假 YTS 上由本機做種的是 *Charade*（`tt9000002`），所以「離線的完整流程」走到找字幕時每個來源都是 0 筆，`pnpm dev` 也一樣，只能自己上傳。
-- 改成：`startFakeSources({ answerAsInception: [...] })` 把列出的 IMDb 編號當成 *Inception* 回答（TMDB、SubDL、YIFY 依 IMDb 查；JustSubtitles 依 TMDB 查到的 27205）。`pnpm dev` 的假來源和端對端測試都替 `tt9000002` 回答。錄下來的回應不變。
-- 原因：階段 9 的完整流程測試要能從真的搜尋結果加入字幕。
-- 改了哪些檔案：docs/15-testing.md、tools/fakes/src/subtitles.ts、tools/fakes/src/subtitles-cli.ts、scripts/dev.mjs
-- Brian 是否已確認：不需要
-
-## 2026-10-06 自動對齊加上語音辨識和語言模型
-
-- 原本：自動對齊只看人聲偵測（ffsubsync 兩種、對齊核心），在配樂多的真實影片上會選錯（階段 0 的 Tears of Steel 五種情境全錯）。
-- 改成（Brian 在對話裡指定的做法：Whisper 或通義千問的 ASR，分批、不跑整部片，再用語言模型對齊不同語言的字幕）：
-  - 分析之後多一步語音辨識（faster-whisper `base`，平均分布的 30 秒窗，最多 6 分鐘），`media_files.asr_state`、`asr_language`，結果 `asr.json`。遷移 `0002_asr.sql`。
-  - 辨識結果和字幕配對：同語言用文字比對；不同語言用語言模型（Claude 或 OpenAI 相容的服務，如通義千問），在 `api` 裡呼叫。配對擬合成一個新候選 `asr` / `asr-llm`，並且當裁判：反駁配對的候選出局。
-  - 新設定 `align.asr`、`align.llm.{provider, model, baseUrl}`，新金鑰 `llmKey`。`MediaStatus.asr`、`MediaErrorCode` 的 `ASR_FAILED`、`AlignResult` 的 `heard` 和兩個新方法名稱。
-  - 映像檔多了 `/opt/asr`（約 300 MB）。
-- 原因：Brian 的要求；實測 Tears of Steel 五種情境從最多錯 79 秒變成全部 0.03 秒以內。
-- 改了哪些檔案：docs/03-data-model.md、docs/04-api.md、docs/08-media-pipeline.md、docs/12-auth.md、docs/13-settings.md、db/schema.sql、packages/shared/src/contracts/api.ts
-- Brian 是否已確認：做法是他指定的；細節（窗的數量、`base` 模型、排名不用語言模型、語言模型在 api 裡呼叫）還沒確認
-
-## 2026-10-06 防跨站檢查也接受「送到哪個主機就從哪個主機來」的請求
-
-- 原本：`docs/12-auth.md`、`docs/04-api.md` 要求寫入請求的 `Origin` 和 `PUBLIC_URL` 同源。
-- 改成：`Origin` 等於 `PUBLIC_URL`，或者 `Origin` 的主機就是這個請求的 `Host`，都接受。邀請和重設連結的開頭仍然用 `PUBLIC_URL`；但 `PUBLIC_URL` 還是 `localhost` 時，改用管理員當下打開網站的位址。
-- 原因：`PUBLIC_URL` 沒改到實際網址時，從別台電腦用 IP 打開網站連登入都會被拒（Brian 要在早上從別的裝置測試）。跨站請求帶的是攻擊者網站自己的 Origin，和 Host 不同，所以防護不變；`X-Requested-With` 的檢查也照舊。
-- 改了哪些檔案：docs/12-auth.md、docs/04-api.md
-- Brian 是否已確認：否
-
-## 2026-10-06 匯出：驗證的細節、移除電影時的 tracks/、取消到一半被重啟
-
-- 原本：
-  - docs/04-api.md 只寫了 `NO_CONFIRMED_SUBTITLE`、`INVALID_FILENAME` 兩種錯誤，沒說「預設軌不是恰好一條」、「同一條選兩次」、「選了別部片的字幕」、「下載還沒完成」怎麼回，也沒說檔名錯誤要怎麼區分兩句說明。
-  - docs/03-data-model.md 寫「排隊中的匯出的 `tracks/` 由 `torrent` 刪；進行中的由封裝工作自己收」。
-  - 「做完之後檢查一次」沒說檢查的是 `.part` 還是改名之後的檔案。
-  - 沒寫 `media` 在取消到一半被重啟時怎麼辦。
-- 改成：
-  - 預設軌不是恰好一條、同一條選兩次：`VALIDATION`（`details.fields.tracks` 是 `ONE_DEFAULT`、`DUPLICATE`）。別部片的字幕：`NO_CONFIRMED_SUBTITLE`。下載沒完成：`MEDIA_NOT_READY`。檔名：`INVALID_FILENAME`，`details.fields.fileName` 是 `EXTENSION`、`CHARACTERS`、`TOO_LONG`，對應頁面上的兩句說明；另外拒絕控制字元、開頭是點、頭尾空白（檔名會進 HTTP 標頭和別人的磁碟）。
-  - `torrent` 移除電影時，替**所有**它標成失敗的匯出刪 `tracks/`（排隊中和進行中都刪）；進行中的封裝工作之後再刪一次也不算錯。這樣 `media` 剛好沒在跑時也不會留下沒有人收的資料夾。
-  - 檢查的是 `.part`，通過才改名，維持「看得到正式檔名的檔案一定是完整的」。
-  - `media` 啟動時，`cancel_requested` 已經是 true 的匯出直接收掉（刪 `tracks/`、刪那一列、`tasks` 標 `cancelled`）；對帳第 4 項也收掉對象已經不在 `queued`/`running` 的 `export` 工作。
-  - 已經要求取消、正在等 `media` 停下來的匯出，清單不列出，再刪一次回 `NOT_FOUND`。
-  - 管理員強制刪除排隊中的匯出時，它的 `tasks` 也標成 `cancelled`，並發 `export.removed`。
-  - 匯出需要的空間只寫在 `packages/shared` 的 `exportNeedBytes()`，`Workspace.exportNeedBytes` 和 admission 用同一個。
-- 原因：實作階段 7 時發現的缺漏；行為依 docs/08 的共通規矩推出來，沒有改變任何既定的決定。
-- 改了哪些檔案：docs/03-data-model.md、docs/04-api.md、docs/08-media-pipeline.md、docs/10-storage.md、docs/11-pages.md、AGENTS.md（指令）
-
-## 2026-10-06 字幕來源：沒有佇列、下載移到 api、三種壓縮檔都用 bsdtar
-
-- 原本：
-  - `docs/07-subtitle-providers.md`、`docs/02-architecture.md` 用佇列把工作交給別人：`subtitle.resolve` 把臨時的下載網址放進 `subtitle.fetch` 的工作內容，由 `media` 下載並處理。
-  - zip 用 Node 的函式庫，7z 和 rar 用映像檔裡的工具。SRT、VTT 用解析函式庫。
-  - 同一個來源重新搜尋時，所有還沒抓的候選都被取代（`docs/agent-notes.md` 記下的問題：只查英文會清掉中文的候選）。
-  - 確認時 `doc_rev` 要不要加 1 沒寫。
-- 改成：
-  - 和 `media` 服務一樣沒有佇列，資料表就是待辦：`running` 的 `subtitle_searches` 是待做的查詢，`fetching` 而還沒有暫存資料夾的候選是待下載的。`api` 每個來源一條線，重啟時從資料表接著做。
-  - **下載由 `api` 做**：問到網址就下載，放進和上傳相同的 `/data/tmp/uploads/<候選 id>/`（加 `manifest.json`），`media` 只負責處理（解壓縮、轉碼、解析、判斷語言）。上傳和下載走同一個處理工作。`media` 不再需要連外。
-  - zip、7z、RAR5 都用 `bsdtar`：先列出項目檢查規則，再只把字幕檔一個一個讀到程式裡、邊讀邊算大小，由程式自己寫檔。`bsdtar` 不寫磁碟。
-  - SRT、VTT 用自己寫的小解析器（規則簡單，有測試），不加相依套件。
-  - 重新搜尋只取代這次搜尋涵蓋的語言裡、還沒抓過或抓失敗的候選；來源失敗時什麼都不取代。
-  - 確認不加 `doc_rev`（文件沒變）。
-  - 自動對齊在這個階段就用了兩種方法（ffsubsync 加對齊核心），排名也是；計算放在 `computeAlignment(speech, cues, opts, extraCandidates)`，之後別的方法（例如語音辨識）只要多給候選。
-- 原因：射手網的下載網址是臨時的，不能存進資料表，而沒有佇列就沒有地方暫放；由拿得到金鑰的 `api` 直接下載最單純。`bsdtar` 階段 0 已經驗證過三種格式，一套做法、一套檢查比兩套好；讓它只輸出到 stdout，路徑和符號連結就沒有落地的機會。語言的取代範圍是交叉比對時發現的缺陷。
-- 改了哪些檔案：docs/02-architecture.md、docs/03-data-model.md、docs/07-subtitle-providers.md、docs/10-storage.md、docs/15-testing.md
-- Brian 是否已確認：否（交接層級）
-
-## 2026-10-06 media 服務：不用 pg-boss，錯誤每種資產一格，測試在映像檔裡跑
-
-- 原本：`docs/02-architecture.md` 用 pg-boss 當工作佇列；`media_files.error` 和 `MediaStatus.error` 只有一格。
-- 改成：
-  - `media` 直接從資料表認領工作：等待中的列就是待辦，帶條件的更新認領，所以重複排入只會做一次；重啟時把「進行中」改回「等待中」再對帳。三種工作（分析、預覽資產、重新計算用量）各自同時只跑一個。
-  - `media_files.error` 存 `{analysis?, audio?, proxy?}`，合約改成 `MediaStatus.errors`。之後預覽檔失敗不會蓋掉「為什麼沒有波形」。
-  - 需要 ffmpeg 和 ffsubsync 的測試（`apps/server/test/media.test.ts`）在主機上沒有這些工具時明確略過，`pnpm test:image` 在映像檔裡實際跑。
-- 原因：規格本來就以資料表為準，佇列只是「叫人去做事」；少一套東西，去重和重啟的行為也更容易驗證。錯誤一格是交叉比對時發現的規格缺陷。
-- 改了哪些檔案：docs/02-architecture.md、docs/03-data-model.md、docs/04-api.md、docs/08-media-pipeline.md、docs/09-sync-workbench.md、docs/11-pages.md、packages/shared/src/contracts/api.ts、db/schema.sql（註解）
-- Brian 是否已確認：否（交接層級）
-
-## 2026-10-06 總覽的 DISK_LOW 門檻、media 服務的心跳
-
-- 原本：`docs/11-pages.md` 有 `DISK_LOW` 這個問題，但 10 和 13 都沒有定門檻；`media` 服務在它的階段之前不寫心跳。
-- 改成：磁碟本身的可用空間少於系統保留的兩倍（預設 4 GB）就列為問題。`media` 服務現在就寫心跳（它還沒有工作可做），否則總覽會一直說它沒有回應。系統狀態頁還沒做，所以總覽裡指向它的問題（`SERVICE_DOWN`、`FAILED_TASK`）先不顯示按鈕。
-- 原因：做總覽時需要；門檻選系統保留的兩倍，是因為少於一倍時 admission 已經會拒絕，兩倍時還來得及處理。
-- 改了哪些檔案：docs/11-pages.md、docs/13-settings.md
-- Brian 是否已確認：否（交接層級的細節）
-
-## 2026-10-06 階段的順序：先做登入、搜尋與下載
-
-- 原本：`docs/14-plan.md` 依序做階段 1（帳號與外框）→ 2（搜尋與電影頁）→ 3（下載與容量上限）。
-- 改成：Brian 在 2026-10-06 說先做 YTS 搜尋和種子下載，並且要有登入。所以這一輪做了階段 1 的登入、外框和共用程式碼，階段 2 的全部，階段 3 的大部分。還沒做的列在 `docs/reports/phase-1-3.md`（邀請、註冊、重設密碼、個人設定、使用者管理、操作紀錄頁、強制刪除、`media` 程式等）。
-- 原因：Brian 的指示（AGENTS.md 依據的優先順序第 1 項）。
-- 改了哪些檔案：沒有改計畫本身；這一則是紀錄
-- Brian 是否已確認：是（他提出的）
-
-## 2026-10-06 外觀可以選淺色、深色、跟隨系統
-
-- 原本：`docs/17-ui.md` 只跟隨系統，`data-theme` 只給測試用。
-- 改成：帳號選單、個人設定和登入頁有三選一，選擇存在裝置的 localStorage；`public/theme-init.js` 在第一次繪製前套用。
-- 原因：Brian 的 UI 原則（2026-10-06）：一定要 RWD，一定要能選 Light、Dark、System。
-- 改了哪些檔案：docs/17-ui.md、docs/11-pages.md（外框、登入、個人設定）
-- Brian 是否已確認：是（他提出的）
-
-## 2026-10-06 資料庫：純 SQL 遷移，不用 Drizzle
-
-- 原本：`docs/02-architecture.md` 選 Drizzle ORM，`docs/14-plan.md` 階段 1 要用 Drizzle 定義 schema 並產生遷移，再寫測試確認和 `db/schema.sql` 等價。
-- 改成：遷移是純 SQL 檔，第一個（`apps/server/migrations/0001_init.sql`）就是交接的 `db/schema.sql`。查詢用 `pg` 加手寫 SQL，包在每個領域自己的函式裡。等價測試照做（`apps/server/test/schema-equivalence.test.ts`：兩邊各建一個資料庫，比對欄位、約束、索引、函式和 view）。
-- 原因：schema 已經有一份寫好、測過的 SQL；再用 Drizzle 重寫一份，要維持兩份一致，而用量計算、admission、排隊這些本來就要直接寫 SQL。02 的技術選型不在 00 的決定裡。
-- 改了哪些檔案：docs/02-architecture.md
-- Brian 是否已確認：否（交接層級的技術選擇，報告裡說明）
-
-## 2026-10-06 連入狀況只看 TCP 的連入
-
-- 原本：`docs/06-torrent-worker.md` 把 `tcpIncoming` 和 `utpIncoming` 都當成「埠是通的」。
-- 改成：只看 `tcpIncoming`。
-- 原因：階段 0 在沒有確認路由器轉發的情況下也看到了 `utpIncoming`（UDP 經由 NAT 回連），會讓管理員誤以為埠開好了。D32 是「交接」層級。
-- 改了哪些檔案：docs/06-torrent-worker.md
-- Brian 是否已確認：不需要
-
-## 2026-10-06 合約和對齊核心搬進 packages/shared
-
-- 原本：`contracts/api.ts`、`reference/sync-core/core.ts` 和它的測試在交接包的位置。
-- 改成：`packages/shared/src/contracts/api.ts`、`packages/shared/src/sync-core/`（`git mv`，只留一份）。測試從 `node:test` 改成 Vitest：只換了 `test` 的來源和 fixtures 的相對路徑，案例和預期值不動（`node:assert` 照用）。
-- 原因：`docs/14-plan.md` 階段 1 的第一步。Brian 在 2026-10-06 要求先做登入、YTS 搜尋和下載，這些都要用到合約的型別，所以提前做。
-- 改了哪些檔案：全 repo 提到舊路徑的地方（AGENTS.md、README.md、docs/、fixtures/README.md、prototype/README.md、reference/、db/schema.sql 的註解、scripts/phase0/）。`docs/14-plan.md` 描述這次搬移的段落和 `docs/reports/phase-0.md` 是紀錄，保留原本的路徑
-- Brian 是否已確認：不需要
-
-## 2026-10-05 Playwright 的 Chromium 能不能解 H.264
-
-- 原本：docs/15-testing.md、08、09、fixtures/README.md、prototype/README.md 寫「Playwright 內建的 Chromium 不能解碼 H.264」。
-- 改成：交接時的版本不能；Playwright 1.63（Chromium 153）實測可以。測試仍然用 WebM，理由改成「不依賴這件事」。
-- 原因：階段 0 第 7 項實測：H.264 High + AAC 的 MP4（立體聲與 5.1、`moov` 在檔尾）能播、能拖動，畫面確實有解碼。
-- 改了哪些檔案：docs/08-media-pipeline.md、docs/09-sync-workbench.md、docs/15-testing.md、fixtures/README.md、prototype/README.md
-- Brian 是否已確認：不需要
-
-## 2026-10-05 預設的 tracker 清單
-
-- 原本：docs/05-yts.md 列了四個憑記憶寫的 tracker。
-- 改成：只留 `tracker.opentrackr.org:1337` 和 `open.demonii.com:1337`。
-- 原因：階段 0 第 5 項實測：`tracker.openbittorrent.com` 查不到網域，`p4p.arenabg.com:1337` 逾時。拿到 YTS 網址後再和 YTS API 文件列的清單對一次。
-- 改了哪些檔案：docs/05-yts.md
-- Brian 是否已確認：不需要
-
-## 2026-10-05 JustSubtitles：不存在的編號回 200、片名搜尋的形狀
-
-- 原本：docs/07-subtitle-providers.md 寫不存在的編號回 HTTP 500；片名搜尋的外層欄位「沒有記下來」。
-- 改成：不存在的編號回 200 或 500 都一樣處理（看內容的 `status: false`，不看狀態碼）；片名搜尋是 `{results: [...]}`，每一筆是 TMDB 搜尋電影的形狀，只有電影。
-- 原因：階段 0 第 4 項從伺服器端實際呼叫的結果。另外確認 `ZH`、`ZH_BG` 的每一筆 `url` 都帶別人的 `api_key`，去掉之後下載照樣成功。
-- 改了哪些檔案：docs/07-subtitle-providers.md、reference/providers/（換成錄下來的真實回應）
-- Brian 是否已確認：不需要
-
-## 2026-10-05 壓縮檔的測試素材
-
-- 原本：fixtures/README.md 寫「`.rar`、`.7z` 和惡意的壓縮檔還沒有，階段 0 自己準備」。
-- 改成：`fixtures/archives/` 有 RAR5、7z，以及七種該被拒絕的壓縮檔（路徑跳出、絕對路徑、符號連結、炸彈、超過 200 項、沒有字幕、壞掉的檔案），由 `scripts/phase0/make-archives.sh` 產生。
-- 原因：階段 0 第 3 項。RAR4 沒有樣本：目前的 `rar` 7 已經不能寫 RAR4。
-- 改了哪些檔案：fixtures/README.md、fixtures/archives/
-- Brian 是否已確認：不需要
-
-## 2026-10-05 deploy 的範例檔變成正式檔案
-
-- 原本：`deploy/Dockerfile.example`、`docker-compose.example.yml`、`Caddyfile.example`，沒有建置過。
-- 改成：`deploy/Dockerfile`、`docker-compose.yml`、`Caddyfile`。實際建置後改的地方：
-  - 三個伺服器服務共用一個映像檔標籤 `paiban-server`，compose 只建一次（原本會建三個內容相同、ID 不同的映像檔）。
-  - `pnpm deploy` 要加 `--legacy`（pnpm 12 在沒有開 inject-workspace-packages 時的要求）；建置階段多複製 `tsconfig.base.json`。
-  - `apps/server` 只把 `dist/` 放進映像檔。
-  - `.env.example` 註明要先建立 `DATA_PATH`：不存在時 Docker 會用 root 建立，而三個服務以 `PUID` 執行，寫不進去（實際遇到）。
-  - 頁面的 `<title>` 在建置時從 `SITE_NAME` 帶入（D9）。
-- 原因：階段 0 第 1 項。
-- 改了哪些檔案：deploy/、docs/12-auth.md（檔名）、docs/02-architecture.md（ffmpeg 版本）
-- Brian 是否已確認：不需要
+## 2026-10-06 Search box suggests films from TMDB (Chinese titles work too)
+
+- Before: search only asked YTS, which only knows English titles, so searching by a Chinese title found nothing.
+- Now: TMDB film suggestions are listed while typing; clicking one uses the IMDb ID to find the same film on YTS and opens it. New endpoints `GET /api/tmdb/suggest`, `GET /api/tmdb/:tmdbId/yts`, `GET /api/tmdb/poster/:file`; the contract gets `TmdbSuggestion`.
+- Why: Brian asked for it in the conversation.
+- Files changed: packages/shared/src/contracts/api.ts, docs/04-api.md, docs/05-yts.md, docs/11-pages.md
+- Confirmed by Brian: yes (he proposed it)
+
+## 2026-10-06 Peer map: detect the server's country automatically and center on it
+
+- Before: the server's location was inferred from `TZ` (unrecognized values were treated as Taiwan), and the map was always centered on the prime meridian.
+- Now: the country is decided by a vote over the public addresses peers report in the extended handshake (BEP 10 `yourip`), falling back to `TZ` only when none are reported; the map rotates horizontally so that country is in the center. The contract's `TorrentLive` gets `homeFrom`. No external service is asked for the server's own IP.
+- Why: Brian asked in the conversation for the system to detect the server's country automatically and move it to the center of the map.
+- Files changed: packages/shared/src/contracts/api.ts, docs/06-torrent-worker.md, docs/11-pages.md
+- Confirmed by Brian: yes (he proposed it)
+
+## 2026-10-06 Sync workbench tools moved below the video
+
+- Before: the video and the subtitle lines were at the top, the timeline in the middle, and the message bar and five tool groups at the bottom; listening to checkpoints meant scrolling up and down. The workspace header had a large poster and a three-line card for choosing subtitles.
+- Now: below the video come, in order, the playback bar, the message bar, and the tool tabs (one group at a time, switching to "Checkpoints" automatically when listening to checkpoints); the subtitle lines are on the right, as tall as the left column; the timeline spans the full width below. The video height is limited by the window. The header poster became a thumbnail, the subtitle chooser card became one row, and the step hint and "Confirm sync" share a row. See "Layout" in docs/09-sync-workbench.md.
+- Why: Brian said in the conversation that choosing a checkpoint meant scrolling down, then back up to see the video, and asked for more things that could be improved.
+- Files changed: docs/09-sync-workbench.md
+- Confirmed by Brian: yes (he proposed it)
+
+## 2026-10-06 Sources settings split into tabs
+
+- Before: Sources was one long page with nine cards stacked top to bottom.
+- Now: three horizontal tabs, "Film data", "Subtitle sources", "Auto-align", with a line of small text under each label describing that tab's status; cards in two columns on wide screens. See "Sources (17)" in docs/11-pages.md.
+- Why: Brian said in the conversation that the page was too long and he wanted horizontal tabs.
+- Files changed: docs/11-pages.md
+- Confirmed by Brian: yes (he proposed it)
+
+## 2026-10-06 Confirmation boxes became dialogs
+
+- Before: pressing a destructive action expanded a red confirmation block in the same place (the spec explicitly said not to use a modal).
+- Now: a small dialog in the center of the screen (`<dialog>`) with the background dimmed; focus starts on "Not now", Esc or clicking outside cancels, and after closing, focus returns to the original button. Seven pages share the same component and changed together.
+- Why: Brian said in the conversation that after pressing "Delete whole film", the red block made that film card taller, and that it was "a really bad design".
+- Files changed: docs/11-pages.md, docs/17-ui.md
+- Confirmed by Brian: yes (he proposed it)
+
+## 2026-10-06 Interface components and colors tidied up
+
+- Before: Chinese headings had no bold on systems without PingFang or JhengHei; status tags and flow tags were outline only; buttons and inputs had different heights; callouts had a thick border all around; the two cards on the Downloads page stuck together; the top bar took three rows on phones; text in the workbench's subtitle lines was centered.
+- Now: Noto Sans TC is bundled as the Chinese fallback font (sliced by character range); tags have a light background; buttons and inputs are all 34 px, and the primary button has a light amber background; callouts have a light border plus a colored bar on the left; cards have a very faint shadow; table rows highlight on hover; back links are small gray text; the top bar on phones takes two rows; in the light theme, `--ink-3` is darkened to reach 4.5:1 on the page background too. See docs/17-ui.md.
+- Why: Brian asked for it in the conversation ("get the component design and colors right across the whole platform… a lot of places are ugly").
+- Files changed: docs/17-ui.md
+- Confirmed by Brian: yes (he proposed it)
+
+## 2026-10-06 Deleting a whole film also deletes its exports; Export button disabled while exporting
+
+- Before: when the last holder removed a film from their library, the video, preview file and subtitles were deleted but exported MKVs were kept (they outlive the film); the same applied when an administrator force-deleted a video. "Start export" could be pressed repeatedly for the same film.
+- Now: when you are the last holder, the Library button is "Delete whole film", and it also deletes all of this film's exports (queued, done and failed ones are deleted directly; ones being packed are cancelled, then deleted); for exports created by someone else, the creator receives `item.deleted`. When someone else still holds the film, it still only leaves. An administrator force-deleting a video also deletes its exports. The confirmation wording lists the exports that will be deleted and the total space freed: the contract's `LibraryItem` and `StorageItem` get `filmExports {count, bytes}`. While this film has a queued or packing export, "Start export" is disabled.
+- Why: Brian asked for it in the conversation ("there needs to be a way to delete a whole film from the library, and deleting it should delete the torrent, all the library's subtitles and exports together"; "disable the export button while an export is in progress"). He chose the scope from the options (delete only when you're the only holder, administrators can force it; it replaces the original remove).
+- Files changed: packages/shared/src/contracts/api.ts, db/schema.sql (comments), docs/03-data-model.md, docs/04-api.md, docs/10-storage.md, docs/11-pages.md, docs/17-ui.md
+- Confirmed by Brian: yes
+
+## 2026-10-06 Align by other subtitles
+
+- Before: auto-align used only the film's audio (speech detection, speech recognition).
+- Now: another subtitle track of the same film can be chosen as the reference for alignment. `POST /api/subtitles/:id/auto-align` gets an optional `referenceId`; `AlignResult` gets `reference` (including `offBy`, how far the reference subtitles themselves are from the speech in the film) and `extraLines`, and `method` gets `reference`, `reference-text`, `reference-llm` (the last one doesn't currently occur; it's reserved for later). Credits at the beginning and end are left out of the calculation and listed after alignment so the user can decide whether to delete them; split and merged lines don't affect it.
+- Why: Brian asked for it in the conversation (once one subtitle track is synced, it can help sync the others; account for information at the start that isn't part of the film, and one line matching two).
+- Files changed: packages/shared/src/contracts/api.ts, docs/04-api.md, docs/08-media-pipeline.md, docs/09-sync-workbench.md
+- Confirmed by Brian: yes (he proposed it)
+
+## 2026-10-06 Layout: the window doesn't scroll, lists scroll in their own boxes
+
+- Before: the whole page scrolled together.
+- Now: the top bar and menu are fixed and the window doesn't scroll; the list on list pages and each table on other pages scroll in their own boxes; on phones the menu becomes a single horizontally swipeable row. The Download details page's map, pieces and speed became tabs; peers get country flags. See "Layout" in docs/17-ui.md.
+- Why: Brian asked for it in the conversation (wrap places with lists in containers instead of letting the whole page scroll; use tabs on the details page; add flags). He also reported that "every page can scroll way down, and below is blank", which couldn't be reproduced in Chrome on this machine; with the window no longer scrolling, this can't happen anymore.
+- Files changed: docs/11-pages.md, docs/17-ui.md
+- Confirmed by Brian: yes (he proposed it)
+
+## 2026-10-06 Posters on the Downloads page, and a download details page
+
+- Before: each row on the Downloads page had a block of color on the left, and there was no details page.
+- Now: each row has a poster, and the title links to a new "Download details" page: a world map of peers (connections drawn as arcs, like a live cyberattack map), a grid showing the state of each piece, a speed graph, and a peer table. New endpoint `GET /api/torrents/:id/live`, contract `TorrentLive`, table `torrent_live` (migration `0004`), and a DB-IP country lookup table in the image.
+- Why: Brian asked for it in the conversation (posters, clicking to see download details, a map showing peers and connections, a grid showing each piece).
+- Files changed: docs/03-data-model.md, docs/06-torrent-worker.md, docs/11-pages.md, db/schema.sql, packages/shared/src/contracts/api.ts
+- Confirmed by Brian: yes (he proposed it); inferring the server location from the time zone, masking half of each IP, and the DB-IP data were my decisions
+
+## 2026-10-06 Film data now comes from TMDB instead of IMDb
+
+- Before: titles, summaries, posters and ratings on Search and the film page all came from YTS (the ratings were IMDb's); TMDB was only used to map IDs and look up Chinese titles.
+- Now: with a TMDB key, the Chinese title (shown first), Chinese summary, poster and rating all come from TMDB, the rating states its source, and the film page has "View on TMDB". Without a key it falls back to YTS. The contract gets `MovieSummary.tmdbId`, `ratingSource`, and `MovieDetail.tmdbUrl`. The rating used for filtering and sorting is still YTS's IMDb rating (only it can filter the whole catalog).
+- Why: Brian asked for it in the conversation ("use TMDB API, replace imdb") and chose the full scope (ratings, film data, TMDB link, subtitle lookups by TMDB ID).
+- Files changed: docs/05-yts.md, docs/11-pages.md, docs/12-auth.md, docs/13-settings.md, packages/shared/src/contracts/api.ts
+- Confirmed by Brian: yes (he proposed it)
+
+## 2026-10-06 Appearance became a single corner button
+
+- Before: appearance was a set of three buttons (Light / Dark / System), placed in the account menu, in Profile, and at the bottom of the sign-in page.
+- Now: a single icon button on the right side of the top bar and in the top right corner of sign-in-type pages; each press switches to the next option and the icon spins once. The "Appearance" section was removed from Profile.
+- Why: Brian said in the conversation he didn't like three buttons taking up space and wanted one button in the corner that cycles through them.
+- Files changed: docs/11-pages.md, docs/17-ui.md
+- Confirmed by Brian: yes (he proposed it)
+
+## 2026-10-06 The fake subtitle source also answers for the locally seeded film
+
+- Before: docs/15-testing.md said the fake subtitle source only returns results for *Inception* (`tt1375666`). But the film seeded locally on the fake YTS is *Charade* (`tt9000002`), so when the "Offline end-to-end flow" got to finding subtitles, every source returned 0 results, and the same happened in `pnpm dev`; the only option was uploading your own.
+- Now: `startFakeSources({ answerAsInception: [...] })` answers for the listed IMDb IDs as if they were *Inception* (TMDB, SubDL, YIFY look up by IMDb; JustSubtitles by the TMDB ID 27205 it looks up). The fake sources in `pnpm dev` and the end-to-end tests both answer for `tt9000002`. The recorded responses are unchanged.
+- Why: the phase 9 end-to-end test needs to be able to add subtitles from real search results.
+- Files changed: docs/15-testing.md, tools/fakes/src/subtitles.ts, tools/fakes/src/subtitles-cli.ts, scripts/dev.mjs
+- Confirmed by Brian: not needed
+
+## 2026-10-06 Auto-align adds speech recognition and a language model
+
+- Before: auto-align looked only at speech detection (two ffsubsync variants, the sync core), and picked wrong on real films with a lot of music (in phase 0, all five Tears of Steel scenarios were wrong).
+- Now (the approach Brian specified in the conversation: ASR with Whisper or Qwen, in batches rather than over the whole film, then a language model to align subtitles in a different language):
+  - After analysis there is a speech recognition step (faster-whisper `base`, evenly distributed 30-second windows, at most 6 minutes), `media_files.asr_state`, `asr_language`, result `asr.json`. Migration `0002_asr.sql`.
+  - Recognized speech is matched with the subtitles: by text comparison for the same language; for different languages by a language model (Claude or an OpenAI-compatible service such as Qwen), called in `api`. The matches are fitted into a new candidate `asr` / `asr-llm`, which also acts as a judge: candidates that contradict the matches are eliminated.
+  - New settings `align.asr`, `align.llm.{provider, model, baseUrl}`, new key `llmKey`. `MediaStatus.asr`, `ASR_FAILED` in `MediaErrorCode`, `heard` in `AlignResult`, and two new method names.
+  - The image gets `/opt/asr` (about 300 MB).
+- Why: Brian's request; measured on Tears of Steel, the five scenarios went from being off by up to 79 seconds to all within 0.03 seconds.
+- Files changed: docs/03-data-model.md, docs/04-api.md, docs/08-media-pipeline.md, docs/12-auth.md, docs/13-settings.md, db/schema.sql, packages/shared/src/contracts/api.ts
+- Confirmed by Brian: he specified the approach; the details (number of windows, the `base` model, no language model for ranking, calling the language model in api) are not yet confirmed
+
+## 2026-10-06 Cross-site check also accepts requests whose origin matches the host they're sent to
+
+- Before: `docs/12-auth.md` and `docs/04-api.md` required the `Origin` of write requests to be same-origin with `PUBLIC_URL`.
+- Now: accepted if `Origin` equals `PUBLIC_URL`, or if the host of `Origin` is this request's `Host`. Invite and reset links still start with `PUBLIC_URL`; but while `PUBLIC_URL` is still `localhost`, the address the administrator currently has the site open at is used instead.
+- Why: if `PUBLIC_URL` hasn't been changed to the real address, opening the site by IP from another computer gets even sign-in rejected (Brian wants to test from another device in the morning). A cross-site request carries the attacker site's own Origin, which differs from Host, so the protection is unchanged; the `X-Requested-With` check also stays as is.
+- Files changed: docs/12-auth.md, docs/04-api.md
+- Confirmed by Brian: no
+
+## 2026-10-06 Export: validation details, `tracks/` when a film is removed, cancellation interrupted by a restart
+
+- Before:
+  - docs/04-api.md only listed two errors, `NO_CONFIRMED_SUBTITLE` and `INVALID_FILENAME`, and didn't say what to return for "not exactly one default track", "the same track chosen twice", "subtitles from another film chosen" or "download not finished yet", nor how to distinguish the two explanations for file name errors.
+  - docs/03-data-model.md said "`tracks/` of queued exports is deleted by `torrent`; running ones are cleaned up by the packing job itself".
+  - "Check once when done" didn't say whether it checks the `.part` file or the renamed file.
+  - Nothing said what `media` does when restarted partway through a cancellation.
+- Now:
+  - Not exactly one default track, same track chosen twice: `VALIDATION` (`details.fields.tracks` is `ONE_DEFAULT`, `DUPLICATE`). Subtitles from another film: `NO_CONFIRMED_SUBTITLE`. Download not finished: `MEDIA_NOT_READY`. File name: `INVALID_FILENAME`, with `details.fields.fileName` being `EXTENSION`, `CHARACTERS`, `TOO_LONG`, matching the two explanations on the page; control characters, a leading dot, and leading or trailing spaces are also rejected (the file name goes into HTTP headers and onto other people's disks).
+  - When `torrent` removes a film, it deletes `tracks/` for **every** export it marks as failed (both queued and running); the running packing job deleting it again afterwards isn't an error. That way no orphaned folder is left behind even if `media` happens not to be running.
+  - The `.part` file is checked, and renamed only if it passes, keeping "a file visible under its final name is always complete".
+  - When `media` starts, exports whose `cancel_requested` is already true are cleaned up directly (delete `tracks/`, delete the row, mark `tasks` as `cancelled`); reconciliation item 4 also cleans up `export` jobs whose target is no longer `queued`/`running`.
+  - Exports that have been asked to cancel and are waiting for `media` to stop are not listed, and deleting one again returns `NOT_FOUND`.
+  - When an administrator force-deletes a queued export, its `tasks` are also marked `cancelled` and `export.removed` is sent.
+  - The space an export needs is defined only in `exportNeedBytes()` in `packages/shared`; `Workspace.exportNeedBytes` and admission use the same one.
+- Why: gaps found while implementing phase 7; the behavior follows from the common rules in docs/08 and doesn't change any settled decision.
+- Files changed: docs/03-data-model.md, docs/04-api.md, docs/08-media-pipeline.md, docs/10-storage.md, docs/11-pages.md, AGENTS.md (commands)
+
+## 2026-10-06 Subtitle sources: no queue, download moved to api, bsdtar for all three archive types
+
+- Before:
+  - `docs/07-subtitle-providers.md` and `docs/02-architecture.md` handed work off through a queue: `subtitle.resolve` put the temporary download URL into the payload of a `subtitle.fetch` job, and `media` downloaded and processed it.
+  - zip used a Node library; 7z and rar used tools in the image. SRT and VTT used parsing libraries.
+  - When the same source was searched again, all candidates not yet fetched were replaced (a problem recorded in `docs/agent-notes.md`: searching only English would wipe out the Chinese candidates).
+  - Nothing said whether `doc_rev` is incremented on confirmation.
+- Now:
+  - Like the `media` service, there is no queue; the table is the to-do list: `running` rows in `subtitle_searches` are pending searches, and candidates that are `fetching` and don't yet have a temporary folder are pending downloads. `api` has one lane per source and picks up from the table after a restart.
+  - **`api` does the downloading**: as soon as it gets the URL it downloads into `/data/tmp/uploads/<candidate id>/`, the same place as uploads (plus a `manifest.json`), and `media` only does the processing (extracting, transcoding, parsing, detecting the language). Uploads and downloads go through the same processing job. `media` no longer needs outbound access.
+  - zip, 7z and RAR5 all use `bsdtar`: first list the entries and check the rules, then read only the subtitle files into the program one at a time, counting size while reading, and the program writes the files itself. `bsdtar` doesn't write to disk.
+  - SRT and VTT use small parsers written in-house (the rules are simple, and they have tests), with no added dependencies.
+  - Searching again only replaces candidates, within the languages this search covers, that haven't been fetched yet or failed to fetch; when the source fails, nothing is replaced.
+  - Confirmation doesn't increment `doc_rev` (the document hasn't changed).
+  - Auto-align already uses two methods at this phase (ffsubsync plus the sync core), and so does ranking; the calculation lives in `computeAlignment(speech, cues, opts, extraCandidates)`, so later methods (such as speech recognition) only need to supply more candidates.
+- Why: Assrt's download URLs are temporary and can't be stored in the table, and without a queue there is nowhere to hold them; having `api`, which has access to the key, download directly is simplest. `bsdtar` was already verified on all three formats in phase 0, and one approach with one set of checks is better than two; having it output only to stdout means paths and symlinks never get a chance to land on disk. The language scope of replacement was a defect found during cross-checking.
+- Files changed: docs/02-architecture.md, docs/03-data-model.md, docs/07-subtitle-providers.md, docs/10-storage.md, docs/15-testing.md
+- Confirmed by Brian: no (Handover level)
+
+## 2026-10-06 media service: no pg-boss, one error slot per asset, tests run in the image
+
+- Before: `docs/02-architecture.md` used pg-boss as the job queue; `media_files.error` and `MediaStatus.error` had only one slot.
+- Now:
+  - `media` claims jobs directly from the tables: waiting rows are the to-do list, and a conditional update claims them, so a job queued twice runs only once; on restart, "running" is changed back to "waiting" and then reconciled. Each of the three kinds of job (analysis, preview assets, recalculating usage) runs only one at a time.
+  - `media_files.error` stores `{analysis?, audio?, proxy?}`, and the contract changes to `MediaStatus.errors`. A later preview file failure no longer overwrites "why there is no waveform".
+  - Tests that need ffmpeg and ffsubsync (`apps/server/test/media.test.ts`) are explicitly skipped when the host doesn't have those tools; `pnpm test:image` actually runs them in the image.
+- Why: the spec already treated the tables as the source of truth, and the queue was only "telling someone to do something"; with one less system, deduplication and restart behavior are also easier to verify. The single error slot was a spec defect found during cross-checking.
+- Files changed: docs/02-architecture.md, docs/03-data-model.md, docs/04-api.md, docs/08-media-pipeline.md, docs/09-sync-workbench.md, docs/11-pages.md, packages/shared/src/contracts/api.ts, db/schema.sql (comments)
+- Confirmed by Brian: no (Handover level)
+
+## 2026-10-06 The Overview's DISK_LOW threshold, media service heartbeat
+
+- Before: `docs/11-pages.md` had a `DISK_LOW` issue, but neither 10 nor 13 set a threshold; the `media` service didn't write a heartbeat before its own phase.
+- Now: it's listed as an issue when the disk's own free space is less than twice the system reserve (default 4 GB). The `media` service writes a heartbeat now (even though it has no work yet); otherwise the Overview would keep saying it isn't responding. The System status page isn't built yet, so issues in the Overview that point to it (`SERVICE_DOWN`, `FAILED_TASK`) don't show a button yet.
+- Why: needed when building the Overview; the threshold is twice the system reserve because below one times, admission already rejects, and at two times there's still time to deal with it.
+- Files changed: docs/11-pages.md, docs/13-settings.md
+- Confirmed by Brian: no (a Handover-level detail)
+
+## 2026-10-06 Phase order: sign-in, search and downloads first
+
+- Before: `docs/14-plan.md` went in order through phase 1 (accounts and shell) → 2 (search and film page) → 3 (downloads and storage limit).
+- Now: on 2026-10-06 Brian said to do YTS search and torrent downloading first, with sign-in. So this round did phase 1's sign-in, shell and shared code, all of phase 2, and most of phase 3. What's not done yet is listed in `docs/reports/phase-1-3.md` (invites, registration, password reset, Profile, user management, the Activity log page, force delete, the `media` code, etc.).
+- Why: Brian's instruction (item 1 of "Order of authority" in AGENTS.md).
+- Files changed: the plan itself wasn't changed; this entry is a record
+- Confirmed by Brian: yes (he proposed it)
+
+## 2026-10-06 Appearance can be light, dark or system
+
+- Before: `docs/17-ui.md` only followed the system, and `data-theme` was only for tests.
+- Now: the account menu, Profile and the sign-in page have a three-way choice, stored in the device's localStorage; `public/theme-init.js` applies it before the first paint.
+- Why: Brian's UI principles (2026-10-06): it must be responsive, and Light, Dark and System must be selectable.
+- Files changed: docs/17-ui.md, docs/11-pages.md (shell, sign-in, Profile)
+- Confirmed by Brian: yes (he proposed it)
+
+## 2026-10-06 Database: plain SQL migrations, no Drizzle
+
+- Before: `docs/02-architecture.md` chose Drizzle ORM, and phase 1 in `docs/14-plan.md` called for defining the schema in Drizzle, generating migrations, and writing a test confirming it is equivalent to `db/schema.sql`.
+- Now: migrations are plain SQL files, and the first one (`apps/server/migrations/0001_init.sql`) is the handed-over `db/schema.sql`. Queries use `pg` with hand-written SQL, wrapped in each domain's own functions. The equivalence test is still done (`apps/server/test/schema-equivalence.test.ts`: build a database from each side and compare columns, constraints, indexes, functions and views).
+- Why: there is already a written and tested SQL schema; rewriting it in Drizzle would mean keeping two copies consistent, and usage calculation, admission and queuing need direct SQL anyway. The technology choices in 02 aren't among the decisions in 00.
+- Files changed: docs/02-architecture.md
+- Confirmed by Brian: no (a Handover-level technology choice, explained in the report)
+
+## 2026-10-06 Incoming connections only look at TCP
+
+- Before: `docs/06-torrent-worker.md` treated both `tcpIncoming` and `utpIncoming` as "the port is open".
+- Now: only `tcpIncoming` counts.
+- Why: in phase 0, `utpIncoming` showed up even without confirmed router forwarding (UDP connecting back through NAT), which would mislead an administrator into thinking the port was open. D32 is at the "Handover" level.
+- Files changed: docs/06-torrent-worker.md
+- Confirmed by Brian: not needed
+
+## 2026-10-06 Contracts and the sync core moved into packages/shared
+
+- Before: `contracts/api.ts`, `reference/sync-core/core.ts` and its tests were where the handover pack put them.
+- Now: `packages/shared/src/contracts/api.ts`, `packages/shared/src/sync-core/` (`git mv`, only one copy kept). The tests changed from `node:test` to Vitest: only the source of `test` and the relative paths to fixtures changed; the cases and expected values are untouched (`node:assert` is still used).
+- Why: the first step of phase 1 in `docs/14-plan.md`. On 2026-10-06 Brian asked for sign-in, YTS search and downloading first, which all need the contract types, so it was done early.
+- Files changed: every place in the repo that mentioned the old paths (AGENTS.md, README.md, docs/, fixtures/README.md, prototype/README.md, reference/, comments in db/schema.sql, scripts/phase0/). The paragraph in `docs/14-plan.md` describing this move and `docs/reports/phase-0.md` are records and keep the original paths
+- Confirmed by Brian: not needed
+
+## 2026-10-05 Can Playwright's Chromium decode H.264?
+
+- Before: docs/15-testing.md, 08, 09, fixtures/README.md and prototype/README.md said "Playwright's built-in Chromium can't decode H.264".
+- Now: the version at handover couldn't; Playwright 1.63 (Chromium 153) was tested and can. Tests still use WebM, with the reason changed to "not depending on this".
+- Why: tested in phase 0 item 7: an H.264 High + AAC MP4 (stereo and 5.1, `moov` at the end of the file) plays and seeks, and the frames are actually decoded.
+- Files changed: docs/08-media-pipeline.md, docs/09-sync-workbench.md, docs/15-testing.md, fixtures/README.md, prototype/README.md
+- Confirmed by Brian: not needed
+
+## 2026-10-05 Default tracker list
+
+- Before: docs/05-yts.md listed four trackers written from memory.
+- Now: only `tracker.opentrackr.org:1337` and `open.demonii.com:1337` are kept.
+- Why: tested in phase 0 item 5: `tracker.openbittorrent.com` has no DNS record, and `p4p.arenabg.com:1337` times out. Check again against the list in the YTS API docs once the YTS URL is available.
+- Files changed: docs/05-yts.md
+- Confirmed by Brian: not needed
+
+## 2026-10-05 JustSubtitles: missing IDs return 200, shape of title search
+
+- Before: docs/07-subtitle-providers.md said a nonexistent ID returns HTTP 500, and the outer fields of title search were "not recorded".
+- Now: a nonexistent ID is handled the same whether it returns 200 or 500 (look at `status: false` in the body, not the status code); title search returns `{results: [...]}`, each item in the shape of a TMDB movie search result, films only.
+- Why: results of actual server-side calls in phase 0 item 4. It was also confirmed that every `url` in `ZH` and `ZH_BG` carries someone else's `api_key`, and downloads still succeed with it removed.
+- Files changed: docs/07-subtitle-providers.md, reference/providers/ (replaced with recorded real responses)
+- Confirmed by Brian: not needed
+
+## 2026-10-05 Archive test fixtures
+
+- Before: fixtures/README.md said "there are no `.rar`, `.7z` or malicious archives yet; prepare them in phase 0".
+- Now: `fixtures/archives/` has RAR5 and 7z, plus seven archives that should be rejected (path escape, absolute path, symlink, bomb, more than 200 entries, no subtitles, corrupted file), generated by `scripts/phase0/make-archives.sh`.
+- Why: phase 0 item 3. There is no RAR4 sample: the current `rar` 7 can no longer write RAR4.
+- Files changed: fixtures/README.md, fixtures/archives/
+- Confirmed by Brian: not needed
+
+## 2026-10-05 Example files in deploy became real files
+
+- Before: `deploy/Dockerfile.example`, `docker-compose.example.yml`, `Caddyfile.example`, never built.
+- Now: `deploy/Dockerfile`, `docker-compose.yml`, `Caddyfile`. Changes after actually building them:
+  - The three server services share one image tag, `paiban-server`, and compose builds it only once (before, it built three images with the same content and different IDs).
+  - `pnpm deploy` needs `--legacy` (required by pnpm 12 when inject-workspace-packages isn't enabled); the build phase also copies `tsconfig.base.json`.
+  - `apps/server` puts only `dist/` into the image.
+  - `.env.example` notes that `DATA_PATH` must be created first: if it doesn't exist, Docker creates it as root, and the three services, which run as `PUID`, can't write to it (this actually happened).
+  - The page's `<title>` is filled in from `SITE_NAME` at build time (D9).
+- Why: phase 0 item 1.
+- Files changed: deploy/, docs/12-auth.md (file names), docs/02-architecture.md (ffmpeg version)
+- Confirmed by Brian: not needed

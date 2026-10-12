@@ -21,7 +21,7 @@ const TONE: Record<Torrent['status'], Tone> = {
   failed: 'bad',
 };
 
-/** docs/11-pages.md, "下載". */
+/** docs/11-pages.md, "Downloads (05, 34)". */
 export function DownloadsPage() {
   const me = useOutletContext<Me>();
   const isAdmin = me.user.role === 'admin';
@@ -119,7 +119,7 @@ export function DownloadsPage() {
 const sizeOf = (x: Torrent) => t.downloads.sizeOf(bytes(x.downloadedBytes), bytes(x.sizeBytes));
 
 /**
- * One line over the list (Brian, 2026-10-06, "優化下載頁面"): how many are downloading, waiting
+ * One line over the list (Brian, 2026-10-06, "polish the downloads page"): how many are downloading, waiting
  * and paused, the speed of all of them together and when the last one should be done.
  */
 function Summary({ active }: { active: Torrent[] }) {
@@ -172,7 +172,7 @@ function meta(x: Torrent, me: Me): string {
   }
 }
 
-/** docs/11-pages.md, "下載": the preview's state on a finished row; nothing for a film that plays directly. */
+/** docs/11-pages.md, "Downloads (05, 34)": the preview's state on a finished row; nothing for a film that plays directly. */
 function previewMeta(x: Torrent): string {
   const m = x.media;
   if (!m || m.directPlay) return '';

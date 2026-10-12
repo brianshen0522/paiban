@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { keys, type StorageView } from './queries';
 
 /**
- * Live updates (docs/04-api.md, "即時更新"): events patch the caches; ones carrying only an id
+ * Live updates (docs/04-api.md, "Live updates"): events patch the caches; ones carrying only an id
  * invalidate. After a reconnect everything the page shows is refetched, nothing is replayed.
  */
 export function useServerEvents(enabled: boolean, onNotification: (n: Notification) => void): void {

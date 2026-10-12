@@ -11,7 +11,7 @@ import { DEFAULT_PARAMS, LlmPool, sealKey } from '../src/llm/pool.js';
 import { testConfig, testDb } from './helpers.js';
 
 /**
- * The api's half of alignment by recognised speech (docs/08, "語言模型"): when the subtitle is in
+ * The api's half of alignment by recognised speech (docs/08, "Language model"): when the subtitle is in
  * another language than the one heard, it asks the configured model before queueing the work.
  * The model here is a local stand-in; no request leaves the machine.
  */

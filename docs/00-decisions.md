@@ -1,95 +1,95 @@
-# 00 已定案的決定
+# 00 Settled decisions
 
-這份文件的地位最高。其他文件、原型或參考程式和這裡衝突時，以這裡為準，並把衝突記到 `docs/agent-notes.md`。
+This document has the highest authority. When other documents, the prototypes or the reference code conflict with it, this one wins, and the conflict is recorded in `docs/agent-notes.md`.
 
-每一條都標了來源，因為來源決定它能不能動：
+Every entry is marked with its source, because the source decides whether it can be changed:
 
-| 來源 | 意思 | 能不能改 |
+| Source | Meaning | Can it change? |
 | --- | --- | --- |
-| **指定** | Brian 明確說的 | 不能。有疑慮就問他 |
-| **代決** | Brian 說「你決定」之後定的 | 不能自行改；可以提出理由請他重新決定 |
-| **假設** | 規劃時提出、Brian 看過沒有反對 | 發現行不通時提出替代方案，等他確認 |
-| **交接** | 打包這份交接包時才補上的，Brian 還沒看過 | 可以直接採用更好的做法，但要在報告裡講清楚改了什麼、為什麼 |
+| **Specified** | Brian said it explicitly | No. If in doubt, ask him |
+| **Decided for Brian** | Decided after Brian said "you decide" | Not on your own; you can give reasons and ask him to decide again |
+| **Assumption** | Proposed during planning; Brian saw it and didn't object | If it turns out not to work, propose an alternative and wait for his confirmation |
+| **Handover** | Added only when packing this handover pack; Brian hasn't seen it | You may adopt a better approach directly, but say clearly in the report what changed and why |
 
-## 功能與範圍
+## Features and scope
 
-| # | 決定 | 來源 |
+| # | Decision | Source |
 | --- | --- | --- |
-| D1 | 主流程：搜尋 YTS → 列出這部片的所有版本 → 用內建的 torrent 下載 → 從字幕網站找字幕 → 在網頁上同步字幕 → 確認 → 後端把影片和字幕封裝成 MKV → 下載 | 指定 |
-| D2 | 使用對象是 Brian 自己和家人朋友。不對外開放註冊 | 指定 |
-| D3 | 技術：Docker、Node.js、React、PostgreSQL | 指定 |
-| D4 | Torrent 引擎：Node 內嵌 WebTorrent，不另外跑 qBittorrent 之類的程式 | 指定 |
-| D5 | 字幕來源：JustSubtitles、YIFY Subtitles、中文字幕站。**全部在同一個階段一起做，其中 JustSubtitles 最重要**，不能排到後面 | 指定 |
-| D6 | 字幕同步採「自動對齊 + 手動微調」。**所有同步操作都在網頁裡完成**，功能要完整，不能要使用者另外開別的軟體 | 指定 |
-| D7 | **不做定期刪除，也不做任何自動刪除。** 管理員設定一個容量上限；達到上限就不能載入新影片；要手動刪除才能再下載 | 指定 |
-| D8 | 匯出的 MKV 也算進容量上限；空間不夠就不能匯出 | 代決 |
-| D9 | 平台名稱是「拍板」（Paiban）。使用者看得到的站名只能出現在一個設定常數裡，方便日後改名。技術上的識別字（cookie 名稱、請求標頭、資料庫的通知頻道、套件名稱）可以直接寫 `paiban` | 代決 |
-| D10 | 中文字幕站的做法：射手網（偽）走它的官方 API；字幕庫有驗證碼，只做「協助式」：系統開啟它的搜尋頁，使用者自己下載後把檔案拖進來 | 假設 |
-| D11 | 字幕以軟字幕（MKV 裡的字幕軌）封裝。影像和聲音直接複製，不重新編碼，也不把字幕燒進畫面 | 假設 |
-| D12 | 影片下載完成後才能開始同步。邊下載邊播放留到以後 | 假設 |
-| D13 | 介面是繁體中文（台灣用語）。程式碼、識別字、commit 訊息用英文 | 假設 |
-| D14 | 部署在家裡的主機或 NAS，單機 Docker Compose | 假設 |
+| D1 | Main flow: search YTS → list every version of the film → download with the built-in torrent client → find subtitles on subtitle sites → sync the subtitles in the browser → confirm → the back end packs the video and subtitles into an MKV → download | Specified |
+| D2 | The users are Brian himself, family and friends. Registration is not open to the public | Specified |
+| D3 | Technology: Docker, Node.js, React, PostgreSQL | Specified |
+| D4 | Torrent engine: WebTorrent embedded in Node; no separate program such as qBittorrent | Specified |
+| D5 | Subtitle sources: JustSubtitles, YIFY Subtitles, Chinese subtitle sites. **All done together in the same phase, with JustSubtitles the most important**; it can't be pushed to later | Specified |
+| D6 | Subtitle sync is "auto-align + manual fine-tuning". **All sync operations happen in the browser**, the features are complete, and users never have to open other software | Specified |
+| D7 | **No periodic deletion, and no automatic deletion of any kind.** An administrator sets a storage limit; once it's reached, no new films can be loaded; files have to be deleted by hand before downloading again | Specified |
+| D8 | Exported MKVs also count toward the storage limit; without enough space, you can't export | Decided for Brian |
+| D9 | The platform is named "拍板" (Paiban). The site name users see may appear only in one configuration constant, so it's easy to rename later. Technical identifiers (cookie names, request headers, database notification channels, package names) may use `paiban` directly | Decided for Brian |
+| D10 | Approach for the Chinese subtitle sites: Assrt (Shooter) goes through its official API; Zimuku has a CAPTCHA, so it's only "assisted": the system opens its search page, and the user downloads the file and drags it in | Assumption |
+| D11 | Subtitles are packed as soft subtitles (subtitle tracks in the MKV). Video and audio are copied directly, not re-encoded, and subtitles are not burned into the picture | Assumption |
+| D12 | Syncing can start only after a film has finished downloading. Playing while downloading is left for later | Assumption |
+| D13 | The interface is in Traditional Chinese (Taiwan usage) and English, each person's choice (since 2026-10-08, Brian). Code, identifiers, commit messages and, since 2026-10-12, the documents are in English | Specified (Brian, 2026-10-08 and 2026-10-12) |
+| D14 | Deployed on a home server or NAS, single-machine Docker Compose | Assumption |
 
-## 帳號與權限
+## Accounts and permissions
 
-| # | 決定 | 來源 |
+| # | Decision | Source |
 | --- | --- | --- |
-| D15 | 邀請制：管理員產生一次性的邀請連結，拿到的人才能註冊 | 假設 |
-| D16 | 兩種角色：管理員、成員。管理頁只有管理員能進 | 假設 |
-| D17 | 忘記密碼由管理員產生一次性的重設連結，不寄信 | 假設 |
-| D18 | 第一個管理員由環境變數建立（資料庫裡沒有任何使用者時才生效），不做公開的初始設定頁 | 交接 |
+| D15 | Invite-only: an administrator generates a one-time invite link, and only whoever gets it can register | Assumption |
+| D16 | Two roles: administrator, member. Only administrators can enter the admin pages | Assumption |
+| D17 | For a forgotten password, an administrator generates a one-time reset link; no email is sent | Assumption |
+| D18 | The first administrator is created from environment variables (only takes effect when the database has no users at all); there is no public setup page | Handover |
 
-## 儲存空間
+## Storage
 
-完整規則在 [10-storage.md](10-storage.md)。
+The full rules are in [10-storage.md](10-storage.md).
 
-| # | 決定 | 來源 |
+| # | Decision | Source |
 | --- | --- | --- |
-| D19 | 全站只有一個容量上限，沒有每人配額 | 假設 |
-| D20 | 下載一被接受，就以完整大小佔位。不會下載到一半才發現放不下 | 假設 |
-| D21 | 同一個 torrent（同一個 info hash）全站只存一份。第二個人要同一個版本時是「加入片庫」，不佔額外空間；要所有持有人都移除，檔案才會刪除 | 假設 |
-| D22 | 把上限調到低於目前用量是允許的：不會刪任何檔案，只是在用量降到上限以下之前，所有人都不能下載或匯出 | 假設 |
-| D23 | 管理員可以強制刪除任何人的任何檔案 | 假設 |
-| D24 | 瀏覽器不能直接播的版本（x265、10-bit）需要預覽檔。預覽檔的空間在接受下載時就一併預留，避免下載完才把用量推過上限 | 假設（做原型時發現的缺口） |
-| D25 | 預留的大小用轉檔的碼率上限估算，完成後改記實際大小，多留的自動釋出。預覽資產包含一份聲音檔 `audio.m4a`，讓使用者在影像還在轉檔時就能先用聲音對字幕 | 交接 |
+| D19 | There is only one site-wide storage limit, no per-person quotas | Assumption |
+| D20 | As soon as a download is admitted, it takes up its full size. You never find out halfway through a download that it won't fit | Assumption |
+| D21 | The same torrent (same info hash) is stored only once site-wide. When a second person wants the same version, it's "Add to my library" and takes no extra space; files are deleted only when every holder has removed it | Assumption |
+| D22 | Lowering the limit below current usage is allowed: no files are deleted, but until usage drops below the limit, nobody can download or export | Assumption |
+| D23 | Administrators can force delete any file of anyone's | Assumption |
+| D24 | Versions browsers can't play directly (x265, 10-bit) need a preview file. Space for the preview file is reserved together with the download when it's admitted, so usage isn't pushed over the limit only after the download finishes | Assumption (a gap found while building the prototype) |
+| D25 | The reserved size is estimated from the transcoding bitrate cap; once done, the actual size is recorded instead, and the excess is freed automatically. The preview assets include an audio file `audio.m4a`, so users can start syncing subtitles by sound while the picture is still being transcoded | Handover |
 
-## 安全與界線
+## Safety and boundaries
 
-| # | 決定 | 來源 |
+| # | Decision | Source |
 | --- | --- | --- |
-| D26 | 種子來自 YTS 的搜尋結果，或由登入的人在「手動加入種子」視窗貼磁力連結、上傳 .torrent 檔（2026-10-09 起；原本只接受 YTS）。手動加入的要先選 TMDB 上的一部電影，只下載最大的影片檔 | 指定（Brian，2026-10-09） |
-| D27 | **不設計、不實作任何繞過驗證碼或反爬蟲機制的做法。** 某個來源擋自動存取時，就改成協助式或停用 | 假設 |
-| D28 | **不使用、不儲存、不記錄任何不屬於使用者自己的 API 金鑰。** 例如 JustSubtitles 的回應有時會在網址裡夾帶 `api_key`，一律在解析時去掉，不得存進資料庫或寫進 log | 假設 |
-| D29 | 開發與測試不下載有版權的影片。自動化測試只用 `fixtures/` 裡的合成素材、模擬的 YTS、本機的 torrent 測試（`reference/torrent/`），不使用從真實來源下載的字幕。唯一的例外是兩次**手動**的來源確認（階段 0 第 4 項、階段 5 的手動驗收）：每個來源可以下載最少數量的字幕壓縮檔，只用來確認格式，不提交、不當成測試素材 | 假設 |
-| D30 | 網頁本身不向 YTS 或字幕網站發出任何請求。海報、搜尋、字幕全部由伺服器代為取得。使用者自己點的外部連結（字幕的來源頁、字幕庫的搜尋頁）不在此限，一律在新分頁開啟 | 交接 |
+| D26 | Torrents come from YTS search results, or from a signed-in person pasting a magnet link or uploading a .torrent file in the "Add a torrent by hand" window (since 2026-10-09; originally only YTS was accepted). For one added by hand, a film on TMDB must be picked first, and only the largest video file is downloaded | Specified (Brian, 2026-10-09) |
+| D27 | **Design and implement no way of bypassing CAPTCHAs or anti-scraping mechanisms.** When a source blocks automated access, it becomes assisted or is disabled | Assumption |
+| D28 | **Do not use, store or log any API key that doesn't belong to the user.** For example, JustSubtitles responses sometimes carry an `api_key` in URLs; it is always removed while parsing and must never be stored in the database or written to logs | Assumption |
+| D29 | Development and testing download no copyrighted videos. Automated tests use only the synthetic material in `fixtures/`, the simulated YTS, and the local torrent tests (`reference/torrent/`), and don't use subtitles downloaded from real sources. The only exceptions are the two **manual** source checks (phase 0 item 4, and the manual acceptance in phase 5): for each source, the minimum number of subtitle archives may be downloaded, only to confirm the format; they aren't committed and aren't used as test fixtures | Assumption |
+| D30 | The web page itself sends no requests to YTS or subtitle sites. Posters, search and subtitles are all fetched by the server on its behalf. External links the user clicks (a subtitle's source page, Zimuku's search page) are exempt, and always open in a new tab | Handover |
 
-## 交接時補上的設計
+## Designs added at handover
 
-這些是把規劃寫成可實作的規格時才定下來的，原型裡沒有或做法不同。細節在各自的文件裡。
+These were settled only when the plan was written up as an implementable spec; the prototypes don't have them or do them differently. Details are in the respective documents.
 
-| # | 決定 | 和原型的差別 |
+| # | Decision | Difference from the prototype |
 | --- | --- | --- |
-| D31 | BitTorrent 的連入埠由環境變數決定，介面上只顯示、不能改 | 原型的「下載設定」可以改。Docker 對外開的埠寫在 compose 裡，網頁上改了不會生效 |
-| D32 | 連入狀況用被動觀察顯示（最近有沒有外部連進來） | 原型有「測試外部能不能連入」按鈕，那需要第三方服務配合 |
-| D33 | 自動對齊同時用兩種方法（ffsubsync 與本專案的對齊核心），取分數高的，並告訴使用者兩者是否一致 | 原型只用對齊核心。見 [08-media-pipeline.md](08-media-pipeline.md) |
-| D34 | 字幕一律轉成純文字的句子清單來同步與匯出。ASS 的樣式和特效在第一版會被拿掉；「保留 ASS 樣式」列為後續功能 | 原型只示範 SRT |
-| D35 | 「雙語」是同時顯示這部片的另一條字幕當對照，不是每句自帶兩種語言 | 原型的示範資料每句都有中英兩行 |
-| D36 | 檢查點預設 8 個 | 原型是 5 個，因為示範片段只有 92 秒 |
-| D37 | 新增兩個設定：tracker 清單、下載停滯多久算失敗 | 原型沒有 |
-| D38 | 沒有設定 TMDB 金鑰時，JustSubtitles 改用它自己的片名搜尋來對出編號（片名和年份都相符才採用） | 原型假設金鑰一定有 |
-| D39 | 預覽檔的預留量比原型顯示的大（原型用典型大小，正式版用上限） | 見 D25 |
-| D40 | 預覽檔要不要轉、轉成什麼解析度，在接受下載的那一刻就定下來並跟著那個下載走。之後改設定只影響之後接受的下載 | 原型沒有這個問題（它的預覽檔是假的）。這樣預留的空間和實際要做的事才對得起來，見 [10-storage.md](10-storage.md) |
-| D41 | 射手網、JustSubtitles 這些來源的請求，不論是哪個程式發的，都排同一個隊（資料庫裡的一張表），保證間隔 | 原型沒有對外請求 |
+| D31 | The BitTorrent incoming port is set by an environment variable; the interface only shows it and can't change it | The prototype's "Download settings" can change it. The port Docker exposes is written in compose, so changing it in the web page wouldn't take effect |
+| D32 | Incoming connections are shown by passive observation (whether anything outside has connected in recently) | The prototype has a "Test whether outside peers can connect" button, which would need a third-party service |
+| D33 | Auto-align uses two methods at once (ffsubsync and this project's sync core), takes the one with the higher score, and tells the user whether the two agree | The prototype uses only the sync core. See [08-media-pipeline.md](08-media-pipeline.md) |
+| D34 | Subtitles are always converted to a plain-text list of lines for syncing and export. ASS styles and effects are dropped in the first version; "Keep ASS styles" is listed as a later feature | The prototype only demonstrates SRT |
+| D35 | "Bilingual" means showing another subtitle track of the same film alongside for reference, not each line carrying two languages | The prototype's demo data has two lines, Chinese and English, for every cue |
+| D36 | 8 checkpoints by default | The prototype uses 5, because the demo clip is only 92 seconds |
+| D37 | Two new settings: the tracker list, and how long a download can stall before it counts as failed | The prototype doesn't have them |
+| D38 | When no TMDB key is set, JustSubtitles uses its own title search to find the ID instead (adopted only when both title and year match) | The prototype assumes the key always exists |
+| D39 | The preview file reservation is larger than the prototype shows (the prototype uses a typical size, production uses the cap) | See D25 |
+| D40 | Whether to make a preview file, and at what resolution, is decided the moment a download is admitted and travels with that download. Changing the settings later affects only downloads admitted afterwards | The prototype doesn't have this problem (its preview files are fake). This way the reserved space and the actual work match up; see [10-storage.md](10-storage.md) |
+| D41 | Requests to sources such as Assrt (Shooter) and JustSubtitles, no matter which program sends them, all go through the same queue (one table in the database), which guarantees the spacing | The prototype makes no outbound requests |
 
-## 不做的事
+## What we won't do
 
-第一版明確不做，除非 Brian 另外提出：
+Explicitly not in the first version, unless Brian raises it:
 
-- 影集（YTS 只有電影）
-- 把字幕燒進畫面、轉檔成其他格式或解析度供下載
-- 邊下載邊播放
-- 公開註冊、電子郵件通知、第三方登入
-- 多台主機、叢集
-- 手機 App（網頁要能在手機上用）
-- 自動下載、訂閱、RSS
-- 任何形式的排程清理
+- TV series (YTS only has films)
+- Burning subtitles into the picture; transcoding to other formats or resolutions for download
+- Playing while downloading
+- Public registration, email notifications, third-party sign-in
+- Multiple hosts, clusters
+- A mobile app (the web page has to work on phones)
+- Automatic downloads, subscriptions, RSS
+- Scheduled clean-up of any kind

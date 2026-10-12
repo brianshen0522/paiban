@@ -14,7 +14,7 @@ import { titleGuess } from '../src/torrents/manual-routes.js';
 import { call, createUser, GB, login, PUBLIC_URL, setLimit, type TestApp, testApp, testDb } from './helpers.js';
 
 /**
- * Torrents added by hand (Brian, 2026-10-09; D26 changed; docs/06-torrent-worker.md, "手動加入"):
+ * Torrents added by hand (Brian, 2026-10-09; D26 changed; docs/06-torrent-worker.md, "Adding by hand"):
  * a .torrent file or a magnet link against a WebTorrent seeder on 127.0.0.1, the film from the
  * local fake TMDB. No network beyond loopback.
  */

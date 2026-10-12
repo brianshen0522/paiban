@@ -14,7 +14,7 @@ export function attachment(fileName: string): string {
 }
 
 /**
- * Streams a file with Range support (docs/04-api.md, "影片": Range, If-Range, HEAD, Accept-Ranges,
+ * Streams a file with Range support (docs/04-api.md, "Videos": Range, If-Range, HEAD, Accept-Ranges,
  * no caching). The path always comes from the database, never from the request. With
  * `downloadName` the browser saves it instead of showing it.
  */

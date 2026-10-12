@@ -5,8 +5,8 @@ type Cue = SyncCore.Cue;
 type Segment = SyncCore.Segment;
 
 /**
- * Aligning a subtitle to another one already aligned (Brian, 2026-10-06; docs/08, "依另一條字幕
- * 對齊"). The reference stands in for the film: its lines, as they play now, are where people
+ * Aligning a subtitle to another one already aligned (Brian, 2026-10-06; docs/08, "Align by other
+ * subtitles"). The reference stands in for the film: its lines, as they play now, are where people
  * speak, far more precisely than speech detection can tell, and its words can be paired with the
  * other subtitle's by text (same language) or by the language model (another language).
  */

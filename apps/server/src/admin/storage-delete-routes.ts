@@ -12,7 +12,7 @@ import { removeExportFiles, removeOrphanFolder, removePreviewFiles } from '../st
 import { versionLabel } from '../torrents/view.js';
 
 /**
- * DELETE /api/admin/storage/items/:kind/:id (D23; docs/10-storage.md, "刪除"). An administrator
+ * DELETE /api/admin/storage/items/:kind/:id (D23; docs/10-storage.md, "Deletion"). An administrator
  * removes anything, whoever holds it. The people affected are told (item.deleted), not the
  * administrator who pressed it. Film files themselves are deleted by the torrent service, which
  * picks up `want = 'remove'`; preview, export and orphan files go through storage/remove.ts here.

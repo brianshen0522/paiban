@@ -31,7 +31,7 @@ export type CueListProps = {
 };
 
 /**
- * The line list (docs/09-sync-workbench.md, "字幕清單"), virtualised: a film has over a thousand
+ * The line list (docs/09-sync-workbench.md, "Subtitle lines"), virtualised: a film has over a thousand
  * lines. The playing line follows playback unless the person is working inside the list.
  */
 export function CueList(p: CueListProps) {

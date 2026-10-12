@@ -14,7 +14,7 @@ import {
 } from './text.js';
 
 // Ported from reference/subtitles/text.test.mjs (same cases and expected values), plus the cue
-// readers and the normalization rules of docs/07-subtitle-providers.md, "下載與處理".
+// readers and the normalization rules of docs/07-subtitle-providers.md, "Download and processing (`subtitle.resolve` downloads; `subtitle.fetch` / `subtitle.ingest` process)".
 const FIX = (p: string) => fileURLToPath(new URL(`../../../../fixtures/${p}`, import.meta.url));
 const bytes = (p: string) => readFileSync(FIX(p));
 const utf8 = (p: string) => readFileSync(FIX(p), 'utf8');

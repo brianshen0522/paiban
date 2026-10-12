@@ -1,4 +1,4 @@
--- Speech recognition for subtitle alignment (docs/08-media-pipeline.md, "語音辨識"), and the
+-- Speech recognition for subtitle alignment (docs/08-media-pipeline.md, "Speech recognition"), and the
 -- language model key used to pair recognised speech with a subtitle in another language.
 
 alter table media_files

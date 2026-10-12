@@ -12,7 +12,7 @@ import { keys } from '../../lib/queries';
 export const mediaError = (code: string | undefined): string =>
   code ? (t.media.errors[code] ?? t.media.otherError(code)) : t.common.unknownError;
 
-/** docs/11-pages.md, "同步": which file the workbench plays, in one sentence. */
+/** docs/11-pages.md, "Sync (09)": which file the workbench plays, in one sentence. */
 export function previewSentence(x: Torrent): string {
   const m = x.media;
   const codec = x.version.videoCodec || x.version.quality;
@@ -24,12 +24,12 @@ export function previewSentence(x: Torrent): string {
   return t.media.preview.none(codec);
 }
 
-/** Whether there is a preview asset to ask for (docs/09, "播哪個檔"). */
+/** Whether there is a preview asset to ask for (docs/09, "Which file to play"). */
 export const canRequestPreview = (m: MediaStatus): boolean =>
   !m.directPlay && (m.previewNeedBytes > 0 || m.proxy.state === 'none' || m.proxy.state === 'failed');
 
 /**
- * Analysis, speech recognition and preview state for one film, with "重新分析" and "轉預覽檔".
+ * Analysis, speech recognition and preview state for one film, with "Analyze again" and "Make preview file".
  * Progress arrives inside torrent events, so this re-renders by itself.
  */
 export function MediaPanel({ torrent }: { torrent: Torrent }) {

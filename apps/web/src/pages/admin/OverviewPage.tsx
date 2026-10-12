@@ -79,7 +79,7 @@ function actionLabel(p: Problem): string {
   return o.actions.view;
 }
 
-/** docs/11-pages.md, "總覽". */
+/** docs/11-pages.md, "Overview (14)". */
 export function OverviewPage() {
   const q = useQuery({
     queryKey: ['admin', 'overview'],

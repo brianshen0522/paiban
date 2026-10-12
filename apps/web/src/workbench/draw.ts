@@ -1,5 +1,5 @@
 /**
- * Canvas drawing for the workbench timeline and overview (docs/09-sync-workbench.md, "時間軸").
+ * Canvas drawing for the workbench timeline and overview (docs/09-sync-workbench.md, "Timeline").
  * Colours come from the theme tokens and are re-read when the theme changes. For long films only
  * what is in view is drawn, and the waveform takes the min and max of the peaks under each pixel.
  */

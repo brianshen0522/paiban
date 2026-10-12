@@ -18,8 +18,8 @@ import { type ParsedSubtitle, parseSubtitleFile } from '../subtitles/text.js';
 import type { JobDeps } from './jobs.js';
 
 /**
- * The media service's subtitle work (docs/07-subtitle-providers.md, "下載與處理"; docs/08,
- * "自動對齊"): turning a staged upload or download into cues (`ingest`), aligning a candidate for
+ * The media service's subtitle work (docs/07-subtitle-providers.md, "Download and processing (`subtitle.resolve` downloads; `subtitle.fetch` / `subtitle.ingest` process)"; docs/08,
+ * "Auto-align"): turning a staged upload or download into cues (`ingest`), aligning a candidate for
  * a ranking (`rank`), and the workbench's own alignment (`align`). Same rules as every media job:
  * a conditional claim, work in /data/tmp/work, a check right before files move into place, and a
  * conditional final update that removes what it just placed when the update finds nothing.
@@ -245,7 +245,7 @@ export async function ingestJob(d: JobDeps, candidateId: string): Promise<void> 
 /* ================================================================ alignment */
 
 /**
- * ffsubsync's candidates, the core's, and recognised speech's (docs/08, "步驟", "語音辨識"), for
+ * ffsubsync's candidates, the core's, and recognised speech's (docs/08, "Steps", "Speech recognition"), for
  * one cue list. `given` are pairs the api already made with the language model; otherwise a
  * subtitle in the spoken language is paired by text here. Ranking never asks a language model:
  * thirty candidates would cost thirty requests.
@@ -274,7 +274,7 @@ async function align(
   return computeAlignment(speech, cues, { ...opts, heard: withError }, extra);
 }
 
-/** Polls `check` every two seconds while `fn` runs; the flag tells the job to stop (docs/08, "執行中每 2 秒確認一次"). */
+/** Polls `check` every two seconds while `fn` runs; the flag tells the job to stop (docs/08, "check every 2 seconds while running"). */
 async function whileWanted<T>(
   check: () => Promise<boolean>,
   fn: (isCancelled: () => boolean) => Promise<T>,
@@ -351,7 +351,7 @@ export async function rankJob(d: JobDeps, candidateId: string): Promise<void> {
 }
 
 /**
- * The workbench's "自動對齊" (`subtitle.align`): the answer goes into tasks.result for the api that
+ * The workbench's "Auto-align" (`subtitle.align`): the answer goes into tasks.result for the api that
  * is waiting. Not retried; an alignment the api stopped waiting for finds its task no longer running.
  */
 export async function alignJob(d: JobDeps, taskId: string): Promise<void> {
@@ -380,7 +380,7 @@ export async function alignJob(d: JobDeps, taskId: string): Promise<void> {
     }
     const sp = await speechFor(pool, config.dataDir, s.torrent_id);
     if (t.input.referenceId) {
-      // Aligning to another subtitle of the same film (docs/08, "依另一條字幕對齊"): no sound needed.
+      // Aligning to another subtitle of the same film (docs/08, "Align by other subtitles"): no sound needed.
       const ref = await one<{ rel_dir: string; doc: SyncDoc; language: string }>(
         pool,
         'select rel_dir, doc, language from subtitles where id = $1 and torrent_id = $2',
@@ -446,7 +446,7 @@ export async function alignJob(d: JobDeps, taskId: string): Promise<void> {
 /* ================================================================ reconciliation */
 
 /**
- * Progress of every unfinished ranking (docs/08, "對帳" item 2): of its candidates that still
+ * Progress of every unfinished ranking (docs/08, "Reconciliation" item 2): of its candidates that still
  * exist, how many have a result. When all of them do, the run is done. Candidates removed or
  * replaced meanwhile do not count.
  */
@@ -481,7 +481,7 @@ export async function settleRanks(pool: Pool): Promise<void> {
 }
 
 /**
- * Candidates stuck in 'fetching' for 10 minutes (docs/08, "對帳" item 3): the program handling them
+ * Candidates stuck in 'fetching' for 10 minutes (docs/08, "Reconciliation" item 3): the program handling them
  * was restarted. A state change only; their staged files, if any, are removed at the next start.
  */
 export async function failStuckFetches(pool: Pool): Promise<void> {

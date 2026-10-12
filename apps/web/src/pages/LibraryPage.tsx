@@ -15,7 +15,7 @@ import { langName } from './workspace/SubtitlesTab';
 type Filter = keyof typeof t.library.filters;
 const FILTERS: Filter[] = ['all', 'nosub', 'draft', 'export', 'exported'];
 
-/** docs/11-pages.md, "片庫": the filters are done here, from the counts the list carries. */
+/** docs/11-pages.md, "Library (06, 25, 30)": the filters are done here, from the counts the list carries. */
 export function matches(f: Filter, i: LibraryItem): boolean {
   switch (f) {
     case 'nosub':
@@ -42,7 +42,7 @@ type Scope = 'mine' | 'all';
 const SCOPES: Scope[] = ['mine', 'all'];
 
 /**
- * docs/11-pages.md, "片庫": the own library, and beside it every finished film on the site
+ * docs/11-pages.md, "Library (06, 25, 30)": the own library, and beside it every finished film on the site
  * (Brian, 2026-10-09), which anyone can add to their own with one press.
  */
 export function LibraryPage() {

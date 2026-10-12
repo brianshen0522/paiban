@@ -88,7 +88,7 @@ export function parseJustSubtitlesAnswer(status: number, body: unknown): FoundSu
   return parseJustSubtitlesEntries(a.data.subtitles ?? []);
 }
 
-/** Which `lang` values to ask for: Traditional asks both Chinese categories (docs/07, "語言對照"). */
+/** Which `lang` values to ask for: Traditional asks both Chinese categories (docs/07, "language mapping"). */
 export function justSubtitlesLangs(languages: readonly Lang[]): string[] {
   const out = new Set<string>();
   if (languages.includes('en')) out.add('EN');
@@ -156,7 +156,7 @@ async function tmdbFind(env: ProviderEnv, imdb: string, key: string): Promise<un
 const TMDB_CACHE_DAYS = 30;
 
 /**
- * IMDb id → TMDB id (docs/07, "把 IMDb 編號換成 TMDB 編號"): the film row, then TMDB with a key
+ * IMDb id → TMDB id (docs/07, "Turning IMDb IDs into TMDB IDs"): the film row, then TMDB with a key
  * (also keeping the zh-TW title), then JustSubtitles' own title search. NOT_CONFIGURED when none
  * of them gives an answer.
  */

@@ -10,7 +10,7 @@ export const METADATA_TIMEOUT_MS = 120_000;
 const PARALLEL = 3;
 
 /**
- * Magnet links someone is adding by hand (docs/06-torrent-worker.md, "手動加入"): the api writes a
+ * Magnet links someone is adding by hand (docs/06-torrent-worker.md, "Adding by hand"): the api writes a
  * `torrent_inspections` row, this fetches the metadata into memory (nothing on disk) and writes it
  * back. The api's page polls the row. A fetch interrupted by a restart is failed, not resumed.
  */

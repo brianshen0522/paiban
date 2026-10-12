@@ -1,250 +1,250 @@
-# 12 帳號、權限與安全
+# 12 Accounts, permissions and security
 
-這個網站是給熟人用的，但它會放在網路上、會下載檔案、會連外部網站、會執行 ffmpeg。這份文件列出必須做到的事。
+This site is for people who know each other, but it sits on the internet, downloads files, connects to outside sites and runs ffmpeg. This document lists what must be done.
 
-## 帳號
+## Accounts
 
-- 帳號（`username`）：英文小寫、數字、底線，3 到 32 個字。輸入時不分大小寫，存小寫。
-- 顯示名稱：1 到 20 個字，可以是中文。其他人在共用的影片、通知、紀錄上看到的是這個。
-- 兩種角色：`admin`、`member`。
-- 沒有電子郵件。系統不寄信。
+- Username (`username`): lowercase English letters, digits and underscores, 3 to 32 characters. Case-insensitive on input, stored in lowercase.
+- Display name: 1 to 20 characters, may be Chinese. This is what others see on shared videos, notifications and logs.
+- Two roles: `admin` and `member`.
+- No email. The system sends no mail.
 
-### 第一個管理員（D18）
+### The first administrator (D18)
 
-`api` 啟動時，如果 `users` 資料表是空的，而且環境變數 `BOOTSTRAP_ADMIN_USERNAME` 和 `BOOTSTRAP_ADMIN_PASSWORD` 都有值，就建立這個管理員。資料表不是空的就完全忽略這兩個變數。
+When `api` starts, if the `users` table is empty and the environment variables `BOOTSTRAP_ADMIN_USERNAME` and `BOOTSTRAP_ADMIN_PASSWORD` both have values, it creates this administrator. If the table is not empty, these two variables are ignored completely.
 
-細節：
+Details:
 
-| 情況 | 行為 |
+| Case | Behavior |
 | --- | --- |
-| 資料表是空的，兩個變數都有值而且合乎規則 | 建立管理員。顯示名稱先用帳號（超過 20 個字就取前 20 個），登入後可以在個人設定改 |
-| 資料表是空的，值不合規則（帳號不是 3 到 32 個英文小寫、數字、底線；密碼不到 8 個字），或只設了其中一個 | `api` 報錯結束，訊息說明是哪個變數、哪條規則。不要默默略過，否則會得到一個沒有人能登入的網站 |
-| 資料表是空的，兩個變數都沒設 | 照常啟動，log 裡寫一行警告。這時沒有人能登入；設好變數、重啟就會建立 |
-| 資料表不是空的 | 完全不看這兩個變數。它們留在 `.env` 裡沒有影響，但建議第一次登入後改掉密碼並把這兩行刪掉 |
+| The table is empty, both variables have values, and they follow the rules | Create the administrator. The display name starts as the username (the first 20 characters if longer than 20) and can be changed in Profile after signing in |
+| The table is empty and a value breaks the rules (username not 3 to 32 lowercase English letters, digits and underscores; password shorter than 8 characters), or only one of them is set | `api` exits with an error whose message says which variable and which rule. Don't silently skip it, or you get a site no one can sign in to |
+| The table is empty and neither variable is set | Start normally and write one warning line to the log. No one can sign in at this point; set the variables and restart, and the administrator is created |
+| The table is not empty | Don't look at these two variables at all. Leaving them in `.env` has no effect, but we recommend changing the password after the first sign-in and deleting these two lines |
 
-密碼的值不寫進 log。
+The password value is never written to the log.
 
-不做「第一個打開網站的人成為管理員」的設定頁：網站一上線就可能被別人搶先。
+There is no setup page where "the first person to open the site becomes administrator": someone else could get there first as soon as the site goes online.
 
-### 密碼
+### Passwords
 
-- 至少 8 個字，最多 200 個字。不要求大小寫或符號的組合。
-- 用 argon2id 雜湊（`@node-rs/argon2` 的預設參數即可），存 PHC 格式的字串。
-- 登入時帳號不存在也要跑一次雜湊比對（對一個固定的假雜湊），讓回應時間不透露帳號存不存在。
-- 改密碼要輸入目前的密碼；成功後這個帳號的其他 session 全部刪除。
-- 任何地方都不記錄、不回傳密碼或雜湊。
+- At least 8 characters, at most 200. No required mix of cases or symbols.
+- Hashed with argon2id (the default parameters of `@node-rs/argon2` are fine), stored as a PHC-format string.
+- When signing in with a username that doesn't exist, still run one hash comparison (against a fixed fake hash), so response time doesn't reveal whether the account exists.
+- Changing the password requires the current password; on success, all other sessions of this account are deleted.
+- Passwords and hashes are never logged or returned anywhere.
 
-### 登入狀態
+### Sign-in state
 
-- Cookie 名稱 `paiban_session`，值是 32 個隨機位元組的 base64url。
-- 屬性：`HttpOnly`、`SameSite=Lax`、`Path=/`，`PUBLIC_URL` 是 https 時加 `Secure`。
-- 資料庫只存它的 SHA-256（`sessions.token_hash`）。資料庫外洩不等於 session 外洩。
-- 有效 30 天。剩不到 15 天時，下次請求順便延長。`last_seen_at` 最多每 5 分鐘更新一次。
-- 過期的列在查詢時被忽略，不需要程式去清。
-- 「登入中的裝置」頁列出自己的 session，可以登出其他裝置。API 回的是從登入時的 User-Agent 推出來的作業系統和瀏覽器名稱（`os`、`browser`，推不出來是 null）；「Windows · Edge」和「未知的裝置」這些字是前端寫的。
-- 帳號被停用、被移除、被重設密碼時，它的 session 全部刪除。
+- Cookie name `paiban_session`; the value is 32 random bytes in base64url.
+- Attributes: `HttpOnly`, `SameSite=Lax`, `Path=/`, plus `Secure` when `PUBLIC_URL` is https.
+- The database stores only its SHA-256 (`sessions.token_hash`). A database leak is not a session leak.
+- Valid for 30 days. When fewer than 15 days remain, the next request extends it as well. `last_seen_at` is updated at most once every 5 minutes.
+- Expired rows are ignored in queries; no code needs to clean them up.
+- The "Signed-in devices" page lists your own sessions and can sign out other devices. The API returns the operating system and browser names derived from the User-Agent at sign-in (`os`, `browser`, null when they can't be derived); text like "Windows · Edge" and "Unknown device" is written by the front end.
+- When an account is disabled, removed or has its password reset, all of its sessions are deleted.
 
-### 嘗試次數限制
+### Attempt limits
 
-| 對象 | 限制 |
+| Target | Limit |
 | --- | --- |
-| 登入，同一個帳號 | 15 分鐘內失敗 5 次就鎖 15 分鐘 |
-| 登入，同一個 IP | 15 分鐘內 20 次 |
-| 查邀請碼、註冊，同一個 IP | 每分鐘 10 次 |
-| 查重設連結、重設，同一個 IP | 每分鐘 10 次 |
+| Sign-in, same account | 5 failures within 15 minutes locks it for 15 minutes |
+| Sign-in, same IP | 20 within 15 minutes |
+| Checking invite codes and registering, same IP | 10 per minute |
+| Checking reset links and resetting, same IP | 10 per minute |
 
-`api` 只有一個實例，計數放在記憶體裡就可以。回 `RATE_LIMITED`，帶還要等幾秒。
+`api` has only one instance, so keeping the counts in memory is fine. Return `RATE_LIMITED` with how many seconds remain to wait.
 
-`api` 在 Caddy 後面，用戶端的 IP 要從 `X-Forwarded-For` 取，而且只信任來自 Docker 內部網路的這個標頭。
+`api` sits behind Caddy; the client IP must be taken from `X-Forwarded-For`, and this header is trusted only when it comes from the internal Docker network.
 
-## 邀請
+## Invites
 
-- 管理員選角色（成員或管理員）和有效期限（1、3、7 天）。
-- 邀請碼的樣式是 `XXXX-XXXX`，字母表是 `ABCDEFGHJKLMNPQRSTUVWXYZ23456789`（沒有容易看錯的 I、O、0、1），用密碼學等級的亂數產生。
-- 連結是 `<PUBLIC_URL>/invite/<邀請碼>`。
-- 一個邀請碼只能用一次。註冊時在同一個交易裡檢查「沒過期、沒用過」並標成已使用，避免兩個人同時用。
-- 還沒用的可以「撤銷」，用過或過期的可以「清除」。兩者都是把那一列刪掉。
+- The administrator chooses the role (member or administrator) and the validity period (1, 3 or 7 days).
+- Invite codes look like `XXXX-XXXX`, with the alphabet `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (no easily confused I, O, 0, 1), generated with cryptographic-grade randomness.
+- The link is `<PUBLIC_URL>/invite/<invite code>`.
+- An invite code can be used only once. On registration, check "not expired, not used" and mark it used in the same transaction, so two people can't use it at the same time.
+- Unused ones can be "Revoke"d; used or expired ones can be "Clear"ed. Both delete that row.
 
-## 重設密碼（D17）
+## Reset password (D17)
 
-- 管理員在使用者頁按「重設密碼」，產生一個連結：`<PUBLIC_URL>/reset/<token>`。token 是 32 個隨機位元組的 base64url，資料庫只存雜湊。
-- 30 分鐘有效，只能用一次。同一個帳號再產生新的時，舊的作廢。
-- **連結只在產生的那次回應裡出現**，之後查不到。管理員自己私下傳給對方。
-- 對方設定新密碼後，連結失效，所有 session 刪除。
+- The administrator presses "Reset password" on the users page, which generates a link: `<PUBLIC_URL>/reset/<token>`. The token is 32 random bytes in base64url; the database stores only the hash.
+- Valid for 30 minutes, usable only once. Generating a new one for the same account voids the old one.
+- **The link appears only in the response that generated it** and can't be looked up afterward. The administrator passes it to the person privately.
+- After the person sets a new password, the link stops working and all sessions are deleted.
 
-## 誰能做什麼
+## Who can do what
 
-| 資源 | 成員 | 管理員 |
+| Resource | Member | Administrator |
 | --- | --- | --- |
-| 搜尋、電影頁 | 可以 | 可以 |
-| 下載新的版本、加入別人的版本 | 可以 | 可以 |
-| 看某個下載、進它的工作區、它的影片與字幕端點 | 只有自己持有的 | 只有自己持有的，和成員相同 |
-| 暫停、繼續、重試、取消 | 只有自己持有的 | 只有自己持有的 |
-| 加入、修改、確認、移除字幕 | 自己持有的那部片的任何一條（字幕是共用的） | 同成員 |
-| 建立匯出 | 自己持有的那部片 | 同成員 |
-| 下載匯出檔 | 那部片的持有人，或建立者 | 全部 |
-| 刪除匯出檔 | 自己建立的 | 全部 |
-| 看用量 | 可以（全站的數字對所有人都一樣） | 可以 |
-| 看別人持有什麼 | 只能在電影頁看到「誰已下載這個版本」和共用者的名字 | 全部：全站的下載清單（唯讀）、儲存空間管理頁 |
-| 強制刪除任何項目 | 不行 | 可以（儲存空間管理頁） |
-| `/api/admin/…` | 不行 | 可以 |
+| Search, film page | Yes | Yes |
+| Download a new version, join someone else's version | Yes | Yes |
+| View a download, enter its workspace, its video and subtitle endpoints | Only ones they hold | Only ones they hold, same as members |
+| Pause, resume, retry, cancel | Only ones they hold | Only ones they hold |
+| Add, edit, confirm, remove subtitles | Any subtitles of a film they hold (subtitles are shared) | Same as members |
+| Create an export | For a film they hold | Same as members |
+| Download an export | Holders of that film, or its creator | All |
+| Delete an export | Ones they created | All |
+| View usage | Yes (the site-wide numbers are the same for everyone) | Yes |
+| See what others hold | Only "who has downloaded this version" and the names of sharers on the film page | Everything: the site-wide download list (read-only), the Storage management page |
+| Force delete any item | No | Yes (Storage management page) |
+| `/api/admin/…` | No | Yes |
 
-**以某部片為對象的操作只看「是不是持有人」，管理員沒有例外。** 管理員要處理別人的片（例如幫忙對字幕），先在電影頁把那個版本加入自己的片庫，之後就和其他持有人一樣；要停掉別人的下載，用儲存空間管理頁的強制刪除。這和原型的行為一致（管理員勾了「顯示所有人的下載」之後，別人的下載只能看）。好處是權限只有一條規則，而且動過這部片的人一定在持有人名單裡。
+**Operations on a given film only check "is this a holder"; administrators are no exception.** An administrator who wants to work on someone else's film (for example to help sync subtitles) first adds that version to their own Library on the film page, and from then on is like any other holder; to stop someone else's download, they use force delete on the Storage management page. This matches the prototype's behavior (after an administrator checks "Show everyone's downloads", other people's downloads are view-only). The benefit is that permissions follow a single rule, and anyone who touched the film is always on the holder list.
 
-每個端點都要在伺服器檢查，不能只靠前端不顯示按鈕。授權寫成共用的函式（`requireHolder(torrentId)`、`requireAdmin()`），每個路由明確呼叫；`requireHolder` 裡沒有「是管理員就放行」的分支。加一個測試走過所有路由，確認沒有路由漏掉檢查。
+Every endpoint must be checked on the server; hiding buttons in the front end is not enough. Authorization is written as shared functions (`requireHolder(torrentId)`, `requireAdmin()`) that each route calls explicitly; `requireHolder` has no "let administrators through" branch. Add a test that walks every route and confirms none is missing its check.
 
-管理員不能：改自己的角色、停用自己、移除自己；也不能讓系統沒有任何啟用中的管理員（`LAST_ADMIN`）。
+Administrators cannot change their own role, disable themselves or remove themselves; nor can they leave the system without any active administrator (`LAST_ADMIN`).
 
-## 防跨站請求
+## Cross-site request protection
 
-- Cookie 是 `SameSite=Lax`。
-- 會改變資料的請求必須帶 `X-Requested-With: paiban` 標頭（瀏覽器的跨站表單送不出自訂標頭），並且 `Origin` 要和 `PUBLIC_URL` 同源，或者就是這個請求送達的主機（`Host`）。
-- 有內容的請求要帶 `Content-Type: application/json`（上傳是 `multipart/form-data`）；沒有內容的請求不要求 `Content-Type`。
-- `GET` 不改變資料（`last_seen_at`、`last_used_at` 這兩個紀錄用的欄位除外）。
-- 不開 CORS。
+- The cookie is `SameSite=Lax`.
+- Requests that change data must carry the `X-Requested-With: paiban` header (a browser's cross-site form can't send custom headers), and `Origin` must be same-origin with `PUBLIC_URL`, or be the host this request reached (`Host`).
+- Requests with a body must carry `Content-Type: application/json` (uploads are `multipart/form-data`); requests without a body don't require `Content-Type`.
+- `GET` doesn't change data (except the two record-keeping fields `last_seen_at` and `last_used_at`).
+- No CORS.
 
-## 回應標頭
+## Response headers
 
-由 Caddy 加（`deploy/Caddyfile`）：`Content-Security-Policy`（只允許同源；不載入任何外部資源）、`X-Content-Type-Options: nosniff`、`Referrer-Policy: no-referrer`、`X-Frame-Options: DENY`。
+Added by Caddy (`deploy/Caddyfile`): `Content-Security-Policy` (same-origin only; no external resources loaded), `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`.
 
-`Referrer-Policy: no-referrer` 有實際的用途：使用者從這裡點連結到字幕庫或來源頁時，不會把這個網站的網址告訴對方。對外的連結另外加 `rel="noopener noreferrer"`。
+`Referrer-Policy: no-referrer` has a real purpose: when users follow a link from here to Zimuku or a source page, this site's address isn't revealed to the other side. External links also get `rel="noopener noreferrer"`.
 
-網頁不從任何外部網域載入字型、腳本或圖片。字型用 npm 套件自帶，海報由伺服器代抓。
+The web page loads no fonts, scripts or images from any external domain. Fonts come bundled with npm packages, and posters are fetched by the server on the browser's behalf.
 
-## 對外請求
+## Outbound requests
 
-伺服器會連出去的地方只有：YTS、TMDB（`api.themoviedb.org`，以及海報的 `image.tmdb.org`）、三個字幕來源和它們的下載主機、BitTorrent。前四類都經過一個共用的 HTTP 用戶端，它負責：
+The only places the server connects to are: YTS, TMDB (`api.themoviedb.org`, plus `image.tmdb.org` for posters), the three subtitle sources and their download hosts, and BitTorrent. The first four all go through one shared HTTP client, which is responsible for:
 
-- **主機白名單**：每個來源有固定的清單（見 [07-subtitle-providers.md](07-subtitle-providers.md)），YTS 的是管理員設定的那個主機。不在清單裡的網址不連。
-- **擋內部位址**：DNS 解析後，如果是私有網段、loopback、link-local、或 IPv6 的對應範圍，不連。這包含管理員自己填的 YTS 網址和 YIFY 網址（防止有人把它指到內部服務）。判斷位址是不是內部的，用 Node 內建的 `net.BlockList`，或把範圍明白列出來並寫測試；**不要用 npm 上的 `ip` 套件**，它的 `isPublic` / `isPrivate` 有已知的誤判（GHSA-2p57-rm9w-gvfp）。
-- **轉址**：最多 3 次，每次重新檢查主機和位址。YTS 不跟跨主機的轉址（[05-yts.md](05-yts.md)）。
-- **逾時與大小上限**：每種請求都有。回應邊讀邊算大小，超過就中斷。
-- **只用 https**。
-- **記錄時去掉 query string**，只記主機和路徑。
-- **字幕來源的請求先排隊**：每個來源的請求之間保持間隔，不論是哪個程式發的（[07-subtitle-providers.md](07-subtitle-providers.md) 的「共通規則」）。
+- **Host allowlist**: each source has a fixed list (see [07-subtitle-providers.md](07-subtitle-providers.md)); for YTS it is the host the administrator set. URLs not on the list are not connected to.
+- **Blocking internal addresses**: after DNS resolution, if the address is in a private range, loopback, link-local, or the corresponding IPv6 ranges, don't connect. This includes the YTS and YIFY addresses the administrator fills in (so no one can point them at internal services). To decide whether an address is internal, use Node's built-in `net.BlockList`, or list the ranges explicitly and write tests; **don't use the `ip` package from npm**, whose `isPublic` / `isPrivate` have known misclassifications (GHSA-2p57-rm9w-gvfp).
+- **Redirects**: at most 3, re-checking the host and address each time. YTS doesn't follow redirects to another host ([05-yts.md](05-yts.md)).
+- **Timeouts and size limits**: every kind of request has them. The response size is counted while reading, and reading stops once it goes over.
+- **https only**.
+- **Strip the query string when logging**; log only the host and path.
+- **Subtitle source requests are queued first**: requests to each source keep a gap between them, no matter which program sends them ("Common rules" in [07-subtitle-providers.md](07-subtitle-providers.md)).
 
-這個用戶端在階段 2 做 YTS 時就要寫好，`api` 和 `media` 共用同一份。
+This client must be done when YTS is built in phase 2; `api` and `media` share the same one.
 
-**自動對齊用的語言模型**（[08-media-pipeline.md](08-media-pipeline.md) 的「語言模型」）是例外，不走上面的用戶端：Claude 由 Anthropic 官方 SDK 連 Anthropic 的 API；OpenAI 相容的服務連管理員設定的網址，**允許內部位址**（管理員自己的模型伺服器常在區網裡）。只有管理員能設定這個網址，送出的內容是固定格式的題目，回應只取出配對的編號（不在題目中的編號丟掉），錯誤只留代碼，不會把對方的回應顯示給任何人。這個請求只從 `api` 發出（只有它讀得到金鑰），不跟轉址，回應超過 1 MB 就中斷。
+**The language model used for auto-align** ("Language model" in [08-media-pipeline.md](08-media-pipeline.md)) is an exception and doesn't go through the client above: Claude connects to Anthropic's API through Anthropic's official SDK; OpenAI-compatible services connect to the address the administrator set, and **internal addresses are allowed** (an administrator's own model server is often on the LAN). Only administrators can set this address, what is sent is a prompt in a fixed format, only the matched IDs are taken from the response (IDs not in the prompt are dropped), and errors keep only a code, so the other side's response is never shown to anyone. This request is sent only from `api` (only it can read the key), doesn't follow redirects, and is cut off when the response exceeds 1 MB.
 
-**下載細節頁的節點資料**：別人的 IP 位址只在 `torrent` 服務裡完整存在；寫進資料庫和送到瀏覽器的都遮掉後半（「61.220.x.x」），連線的識別碼是加了隨機鹽的雜湊。國家對照表在建置映像檔時下載，執行時查詢不連外。
+**Peer data on the download details page**: other people's IP addresses exist in full only inside the `torrent` service; what is written to the database and sent to the browser has the second half masked ("61.220.x.x"), and connection identifiers are hashes with a random salt. The country lookup table is downloaded when building the image, and lookups at runtime make no outside connections.
 
-### 開發和測試時的放寬
+### Relaxations for development and testing
 
-假的 YTS 和假的字幕來源跑在內部位址、用 `http://`，上面的規則會把它們全部擋掉。所以有一個明確的開關：
+The fake YTS and fake subtitle sources run on internal addresses over `http://`, and the rules above would block them all. So there is an explicit switch:
 
-- `ALLOW_LOCAL_SOURCES=1`：允許 `http://`、允許內部位址；YTS 和 YIFY 網址的驗證也跟著放寬。
-- `SOURCE_OVERRIDES`：把固定的來源主機換成別的網址（JSON，鍵是原本的主機）。用戶端在主機白名單檢查通過**之後**才換，所以白名單本身仍然有測到。
-- 這兩個變數，加上 `torrent` 的 `TORRENT_TEST_PEERS`，只能出現在開發和測試的 compose 檔。**`NODE_ENV=production` 時只要設了任何一個，程式啟動時就報錯結束。** 這一點要有測試。
+- `ALLOW_LOCAL_SOURCES=1`: allows `http://` and internal addresses; validation of the YTS and YIFY addresses is relaxed accordingly.
+- `SOURCE_OVERRIDES`: replaces the fixed source hosts with other URLs (JSON, keyed by the original host). The client swaps them only **after** the host allowlist check passes, so the allowlist itself is still tested.
+- These two variables, plus `torrent`'s `TORRENT_TEST_PEERS`, may appear only in the development and test compose files. **When `NODE_ENV=production`, if any one of them is set, the program exits with an error at startup.** This must have a test.
 
-用環境變數而不是設定頁上的選項，是因為它不該是管理員在介面上點得到的東西。
+It is an environment variable rather than an option on a settings page because it should not be something an administrator can click in the interface.
 
-## 上傳與壓縮檔
+## Uploads and archives
 
-- 副檔名和大小先檢查，再看檔頭判斷實際格式。
-- 上傳的內容永遠當成資料處理：不執行、不當成 HTML 回傳。字幕文字顯示在畫面上時一律當純文字（React 預設就是；不要用 `dangerouslySetInnerHTML`）。
-- 解壓縮的限制在 [07-subtitle-providers.md](07-subtitle-providers.md)。重點是：不相信壓縮檔裡的路徑、不解出符號連結、限制數量和總大小（防壓縮炸彈）。
-- 解壓工具用陣列參數啟動，不經過 shell；輸出目錄是程式自己建的工作目錄。
+- Check the extension and size first, then the file header to determine the actual format.
+- Uploaded content is always treated as data: never executed, never returned as HTML. Subtitle text shown on screen is always plain text (React does this by default; don't use `dangerouslySetInnerHTML`).
+- Extraction limits are in [07-subtitle-providers.md](07-subtitle-providers.md). The key points: don't trust paths inside archives, don't extract symbolic links, and limit the count and total size (against archive bombs).
+- Extraction tools are started with array arguments, not through a shell; the output directory is a working directory the program created itself.
 
-## 檔案路徑
+## File paths
 
-- 所有檔案路徑都由資料庫裡的 id 和固定的規則組出來，**不接受請求裡的任何路徑片段**。
-- 唯一來自外部的路徑是 torrent 裡的檔名和壓縮檔裡的檔名。兩者都要解析後確認落在預期的資料夾裡面。
-- 匯出檔名經過檢查後只用在 `Content-Disposition` 和最終檔名，存放的資料夾是 `/data/exports/<id>/`，所以檔名不可能跳出去。
-- 下載回應用 `Content-Disposition: attachment; filename*=UTF-8''<百分比編碼>`。
+- Every file path is built from IDs in the database and fixed rules; **no path fragment from a request is accepted**.
+- The only paths that come from outside are file names in torrents and file names in archives. Both must be resolved and confirmed to fall inside the expected folder.
+- Export file names, after checking, are used only in `Content-Disposition` and the final file name; the storage folder is `/data/exports/<id>/`, so a file name can't escape it.
+- Download responses use `Content-Disposition: attachment; filename*=UTF-8''<percent-encoded>`.
 
-## 執行外部程式
+## Running external programs
 
-ffmpeg、ffprobe、ffsubsync、解壓工具都用陣列參數啟動（`spawn(cmd, [args])`），不組字串、不經過 shell。參數裡的檔名都來自上面說的可信路徑。字幕軌的標題（「繁體中文」）是固定的字串，不是使用者輸入。
+ffmpeg, ffprobe, ffsubsync and extraction tools are all started with array arguments (`spawn(cmd, [args])`), never by building strings or going through a shell. File names in the arguments all come from the trusted paths described above. The subtitle track title ("繁體中文", Traditional Chinese) is a fixed string, not user input.
 
-## 金鑰
+## Keys
 
-| 金鑰 | 放哪裡 | 誰拿得到 |
+| Key | Where it lives | Who can get it |
 | --- | --- | --- |
-| `SECRET_KEY`、資料庫密碼、第一個管理員的密碼 | 環境變數（`.env`） | `SECRET_KEY` 只給 `api` |
-| TMDB 金鑰、SubDL 金鑰、射手網 token、語言模型的金鑰 | `secrets` 資料表，用 `SECRET_KEY` 以 AES-256-GCM 加密（每筆一個隨機的 12 位元組 nonce，名稱當作附加驗證資料） | 只有 `api` 解得開 |
+| `SECRET_KEY`, database password, first administrator's password | Environment variables (`.env`) | `SECRET_KEY` goes only to `api` |
+| TMDB key, SubDL key, Assrt (Shooter) token, language model keys | The `secrets` table, encrypted with `SECRET_KEY` using AES-256-GCM (a random 12-byte nonce per entry, with the name as additional authenticated data) | Only `api` can decrypt them |
 
-- API 只回報金鑰「有沒有設定」。沒有任何端點會回傳內容。
-- `.env` 不進版本控制。repo 裡只有 `.env.example`，裡面不能有真的值。
-- log 裡不能出現任何金鑰，包含帶在網址裡的。寫一個測試：用假的金鑰跑一次各來源的請求，確認 log 輸出裡找不到那個字串。
-- 回應裡出現的別人的金鑰，見 D28 和 [07-subtitle-providers.md](07-subtitle-providers.md)。
+- The API only reports whether a key "is set". No endpoint ever returns the contents.
+- `.env` is not under version control. The repo has only `.env.example`, which must not contain real values.
+- No key may appear in the log, including keys carried in URLs. Write a test: run each source's requests once with a fake key and confirm that string can't be found in the log output.
+- For other people's keys that appear in responses, see D28 and [07-subtitle-providers.md](07-subtitle-providers.md).
 
-## 操作紀錄
+## Activity log
 
-使用者做的每一件有後果的事寫一列 `audit_log`。`action` 是穩定的代碼，介面上的說法由前端對照。
+Every consequential thing a user does writes one `audit_log` row. `action` is a stable code; the wording in the interface is mapped by the front end.
 
-`target` 存的是資料，不是句子（和 API 的其他部分一樣）。「對象」那一欄怎麼顯示由前端決定，下表右欄是它需要的資料。
+`target` stores data, not sentences (like the rest of the API). How the "Target" column is displayed is up to the front end; the right column below is the data it needs.
 
-| 代碼 | 介面上的說法 | `target` 裡的資料 → 顯示成 |
+| Code | Wording in the interface | Data in `target` → shown as |
 | --- | --- | --- |
-| `auth.login` | 登入 | `{os, browser}` → 裝置（「Windows · Edge」） |
-| `auth.logout` | 登出 | |
-| `auth.session.revoke` | 登出其他裝置 | `{os, browser}` → 裝置 |
-| `auth.register` | 用邀請碼註冊 | `{code}` → 邀請碼（這時已經用掉了） |
-| `auth.password.change` | 變更密碼 | |
-| `auth.password.reset` | 用重設連結設定密碼 | |
-| `torrent.add` | 開始下載 / 排入下載 | `{movieTitle, version}` → 片名 · 版本 |
-| `torrent.join` | 加入片庫 | 同上 |
-| `torrent.manual` | 手動加入種子 | 同上（Brian，2026-10-09） |
-| `torrent.pause` | 暫停下載 | 同上 |
-| `torrent.resume` | 繼續下載 | 同上 |
-| `torrent.retry` | 重試下載 | 同上 |
-| `torrent.leave` | 從片庫移除 / 放棄下載 | 同上 |
-| `torrent.delete` | 刪除影片 / 取消下載 | 同上 |
-| `media.preview.request` | 要求轉預覽檔 | 同上 |
-| `subtitle.add` | 加入字幕 | `{movieTitle, language}` → 片名 · 語言 |
-| `subtitle.remove` | 移除字幕 | 同上 |
-| `subtitle.candidate.remove` | 移除候選字幕 | `{movieTitle, releaseName}` → 片名 · 版本名稱或檔名 |
-| `subtitle.confirm` | 確認字幕同步 | 同上 |
-| `export.create` | 匯出 MKV | `{movieTitle, fileName}` → 片名 |
-| `export.delete` | 刪除匯出檔 | `{fileName}` → 檔名 |
-| `admin.user.role` | 變更角色 | `{name, role}` → 名字 → 角色 |
-| `admin.user.disable` | 停用帳號 | `{name}` → 名字 |
-| `admin.user.enable` | 啟用帳號 | 同上 |
-| `admin.user.reset_link` | 產生重設密碼連結 | 同上 |
-| `admin.user.remove` | 移除帳號 | 同上 |
-| `admin.invite.create` | 建立邀請 | `{role, days}` → 角色 · 有效天數。不記邀請碼：它還能用 |
-| `admin.invite.revoke` | 撤銷邀請 | `{code}` → 邀請碼（這時已經作廢了） |
-| `admin.storage.limit` | 變更容量上限 | `{fromBytes, toBytes}` → 舊 → 新 |
-| `admin.storage.delete` | 管理員刪除 | `{itemKind, movieTitle, fileName}`（有哪個填哪個）→ 項目的種類和名稱 |
-| `admin.storage.rescan` | 重新計算用量 | |
-| `admin.settings.change` | 依改了哪一組設定，見下表 | `{keys}`：改到的設定鍵，用逗號連起來 |
-| `admin.secret.set` | 更新金鑰 | `{name}` → 金鑰的名稱（不是內容） |
-| `admin.secret.clear` | 清除金鑰 | 同上 |
-| `admin.task.retry` | 重試背景工作 | `{kind, movieTitle}` → 工作的種類 · 片名 |
+| `auth.login` | Signed in | `{os, browser}` → device ("Windows · Edge") |
+| `auth.logout` | Signed out | |
+| `auth.session.revoke` | Signed out another device | `{os, browser}` → device |
+| `auth.register` | Registered with an invite code | `{code}` → invite code (already used up by then) |
+| `auth.password.change` | Changed password | |
+| `auth.password.reset` | Set password with a reset link | |
+| `torrent.add` | Started a download / Queued a download | `{movieTitle, version}` → title · version |
+| `torrent.join` | Added to Library | Same as above |
+| `torrent.manual` | Added a torrent by hand | Same as above (Brian, 2026-10-09) |
+| `torrent.pause` | Paused a download | Same as above |
+| `torrent.resume` | Resumed a download | Same as above |
+| `torrent.retry` | Retried a download | Same as above |
+| `torrent.leave` | Removed from Library / Gave up a download | Same as above |
+| `torrent.delete` | Deleted a video / Cancelled a download | Same as above |
+| `media.preview.request` | Requested a preview file | Same as above |
+| `subtitle.add` | Added subtitles | `{movieTitle, language}` → title · language |
+| `subtitle.remove` | Removed subtitles | Same as above |
+| `subtitle.candidate.remove` | Removed candidate subtitles | `{movieTitle, releaseName}` → title · release name or file name |
+| `subtitle.confirm` | Confirmed a subtitle sync | Same as above |
+| `export.create` | Exported an MKV | `{movieTitle, fileName}` → title |
+| `export.delete` | Deleted an export | `{fileName}` → file name |
+| `admin.user.role` | Changed a role | `{name, role}` → name → role |
+| `admin.user.disable` | Disabled an account | `{name}` → name |
+| `admin.user.enable` | Enabled an account | Same as above |
+| `admin.user.reset_link` | Made a password reset link | Same as above |
+| `admin.user.remove` | Removed an account | Same as above |
+| `admin.invite.create` | Created an invite | `{role, days}` → role · days valid. The invite code is not recorded: it is still usable |
+| `admin.invite.revoke` | Revoked an invite | `{code}` → invite code (already void by then) |
+| `admin.storage.limit` | Changed the storage limit | `{fromBytes, toBytes}` → old → new |
+| `admin.storage.delete` | Deleted as administrator | `{itemKind, movieTitle, fileName}` (whichever apply) → the item's kind and name |
+| `admin.storage.rescan` | Recounted usage | |
+| `admin.settings.change` | Depends on which group of settings changed; see the table below | `{keys}`: the changed setting keys, joined with commas |
+| `admin.secret.set` | Updated a key | `{name}` → the key's name (not its contents) |
+| `admin.secret.clear` | Cleared a key | Same as above |
+| `admin.task.retry` | Retried a background task | `{kind, movieTitle}` → task kind · title |
 
-`torrent.leave` 和 `torrent.delete` 的差別是檔案有沒有真的被刪：還有別人持有是前者，最後一位是後者。
+The difference between `torrent.leave` and `torrent.delete` is whether the files were really deleted: if others still hold it, it's the former; if this was the last holder, the latter.
 
-`admin.settings.change` 在介面上的說法依改到的鍵分組（前五種是原型用的句子）：
+The interface wording for `admin.settings.change` is grouped by the keys changed (the first five are sentences the prototype used):
 
-| 改到的鍵 | 說法 |
+| Keys changed | Wording |
 | --- | --- |
-| `downloads.*`、`media.*` | 變更下載設定 |
-| `yts.baseUrl` | 更新 YTS 網址 |
-| `providers.yify.baseUrl` | 更新 YIFY Subtitles 網址 |
-| `providers.justsubtitles.mode` | 變更 JustSubtitles 查詢方式 |
-| `providers.cacheHours` | 變更快取時間 |
-| `providers.<來源>.enabled` | 啟用字幕來源 / 停用字幕來源（對象是來源的名稱） |
-| 其他（字幕庫的網址、預設語言） | 變更來源設定 |
+| `downloads.*`, `media.*` | Changed download settings |
+| `yts.baseUrl` | Updated the YTS address |
+| `providers.yify.baseUrl` | Updated the YIFY Subtitles address |
+| `providers.justsubtitles.mode` | Changed the JustSubtitles lookup method |
+| `providers.cacheHours` | Changed the cache time |
+| `providers.<source>.enabled` | Enabled a subtitle source / Disabled a subtitle source (the target is the source's name) |
+| Anything else (Zimuku address, default languages) | Changed source settings |
 
-一次儲存只寫一筆紀錄；改到好幾組時用表裡最先符合的那一種說法，`keys` 裡仍然列出全部。
+One save writes only one entry; when several groups change, use the wording of the first matching row in the table, and `keys` still lists them all.
 
-這兩張表裡，下面這幾種說法是新的（原型沒有記錄那些動作，或沒有那個功能）：暫停下載、繼續下載、登出其他裝置、用重設連結設定密碼、要求轉預覽檔、移除候選字幕、重新計算用量、清除金鑰、重試背景工作、變更來源設定。其餘的都是原型用的句子。
+In these two tables, the following wordings are new (the prototype didn't log those actions, or didn't have that feature): Paused a download, Resumed a download, Signed out another device, Set password with a reset link, Requested a preview file, Removed candidate subtitles, Recounted usage, Cleared a key, Retried a background task, Changed source settings. All others are sentences the prototype used.
 
-紀錄裡不放密碼、金鑰、token、還能用的邀請碼、重設連結。
+The log never contains passwords, keys, tokens, still-usable invite codes or reset links.
 
-## 上線前的檢查清單
+## Pre-launch checklist
 
-- [ ] 沒登入時，除了 `/api/health`、登入、邀請、重設相關的端點，其他都回 401
-- [ ] 成員呼叫任何 `/api/admin/…` 都回 403
-- [ ] 成員呼叫不是自己持有的下載、字幕、影片的端點都回 403（看不到的匯出回 404，和 [04-api.md](04-api.md) 一致：不透露它存在）；管理員對不是自己持有的片也一樣（匯出檔的下載與刪除、`scope=all` 的清單除外）
-- [ ] `NODE_ENV=production` 時設了 `ALLOW_LOCAL_SOURCES`、`SOURCE_OVERRIDES` 或 `TORRENT_TEST_PEERS`，三個程式都拒絕啟動
-- [ ] 少了 `X-Requested-With` 的寫入請求被拒絕
-- [ ] 停用帳號後，他原本的 session 立刻失效
-- [ ] log 和 `audit_log` 裡找不到密碼、金鑰、session 值
-- [ ] JustSubtitles 回應裡帶 `api_key` 的那筆，存進資料庫的網址沒有 query string
-- [ ] 管理員把 YTS 網址設成 `https://127.0.0.1` 或內部主機名稱時，請求被擋下
-- [ ] 上傳一個含 `../` 路徑的 zip、一個含符號連結的 zip、一個解開超過上限的 zip，都被拒絕而且沒有在工作目錄以外留下任何檔案
-- [ ] 字幕文字含 `<script>` 時，畫面上顯示的是文字
-- [ ] 匯出檔名含 `/` 被拒絕
-- [ ] repo 裡沒有 `.env`、沒有任何真的金鑰
+- [ ] When not signed in, every endpoint returns 401 except `/api/health` and the sign-in, invite and reset endpoints
+- [ ] A member calling any `/api/admin/…` gets 403
+- [ ] A member calling endpoints for downloads, subtitles or videos they don't hold gets 403 (exports they can't see return 404, consistent with [04-api.md](04-api.md): don't reveal it exists); the same goes for administrators on films they don't hold (except downloading and deleting exports, and lists with `scope=all`)
+- [ ] When `NODE_ENV=production` and `ALLOW_LOCAL_SOURCES`, `SOURCE_OVERRIDES` or `TORRENT_TEST_PEERS` is set, all three programs refuse to start
+- [ ] Write requests missing `X-Requested-With` are rejected
+- [ ] After an account is disabled, its existing sessions stop working immediately
+- [ ] No passwords, keys or session values can be found in the log or `audit_log`
+- [ ] For the JustSubtitles response entry that carries `api_key`, the URL stored in the database has no query string
+- [ ] When an administrator sets the YTS address to `https://127.0.0.1` or an internal host name, requests are blocked
+- [ ] Uploading a zip with a `../` path, a zip with a symbolic link, and a zip that expands past the limit are all rejected and leave no files outside the working directory
+- [ ] When subtitle text contains `<script>`, the screen shows it as text
+- [ ] An export file name containing `/` is rejected
+- [ ] The repo has no `.env` and no real keys

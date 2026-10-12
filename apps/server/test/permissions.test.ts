@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { call, createUser, login, type TestApp, testApp, testDb } from './helpers.js';
 
 /**
- * docs/15-testing.md, "權限": generated from the route table, so a new route is covered without
+ * docs/15-testing.md, "permissions": generated from the route table, so a new route is covered without
  * anyone remembering to add it. Signed out: 401 except the public ones. Member: 403 on /api/admin.
  */
 const PUBLIC = new Set([

@@ -9,7 +9,7 @@ import { type StreamCounts, streamCounts } from './probe.js';
 import { Cancelled, run, watched } from './proc.js';
 
 /**
- * The export job, `export.mux` (docs/08-media-pipeline.md, "封裝"). The original video and audio
+ * The export job, `export.mux` (docs/08-media-pipeline.md, "Packing (`export.mux`)"). The original video and audio
  * are copied untouched next to the confirmed subtitles the api wrote into tracks/ when the export
  * was created. Same rules as the other media jobs: claim with a conditional update, check every
  * two seconds that the export is still wanted, write .part then rename, finish with a conditional
@@ -185,7 +185,7 @@ export async function exportJob(d: JobDeps, id: string): Promise<'done' | 'faile
       log.warn({ export: id, stderr: r.stderr.slice(0, 300) }, 'ffmpeg mux failed');
       throw new MuxFailure(/no space left/i.test(r.stderr) ? 'DISK_FULL' : 'MUX_FAILED');
     }
-    // Checked once before the name becomes final (docs/08, "做完之後檢查一次").
+    // Checked once before the name becomes final (docs/08, "check once when done").
     const after = await probeCounts(join(dir, part));
     if (!after || after.video !== before.video || after.audio !== before.audio || after.subtitle !== row.tracks.length)
       throw new MuxFailure('VERIFY_FAILED');
@@ -234,7 +234,7 @@ export async function exportJob(d: JobDeps, id: string): Promise<'done' | 'faile
 }
 
 /**
- * The export stopped being wanted while it ran (docs/08, "結束的四種情況"): cancelled by a person
+ * The export stopped being wanted while it ran (docs/08, "Four ways it ends"): cancelled by a person
  * (remove the tracks and the row), or its film was removed (the torrent service already marked it
  * failed; only the tracks are left to remove). The .part is already gone.
  */
@@ -271,7 +271,7 @@ export async function finishCancelled(d: JobDeps, id: string): Promise<void> {
 /**
  * First failure: back to queued, tracks and reservation kept, the task counts one attempt; the next
  * reconciliation tries again. Second failure, or a missing source (not retried): failed, the
- * reservation released, the tracks removed, the creator told (docs/08, "失敗的工作自動再試一次").
+ * reservation released, the tracks removed, the creator told (docs/08, "a failed job is retried once automatically").
  */
 async function failAttempt(
   d: JobDeps,

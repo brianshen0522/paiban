@@ -1,5 +1,5 @@
 /**
- * Attempt counters kept in memory: the api runs as a single instance (docs/12-auth.md, "嘗試次數限制").
+ * Attempt counters kept in memory: the api runs as a single instance (docs/12-auth.md, "Attempt limits").
  * A key is blocked once `limit` attempts fall inside the window; it reports how long until the
  * oldest of them leaves the window.
  */

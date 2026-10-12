@@ -1,269 +1,269 @@
-# 03 資料模型
+# 03 Data model
 
-欄位、型別和約束以 `db/schema.sql` 為準（它在嵌入式的 PostgreSQL 裡實際跑過，測試在 `db/schema.test.mjs`）。這份文件說明每張表是做什麼的、狀態怎麼變、誰可以改哪些欄位；這些行為以這份文件為準。
+Columns, types and constraints follow `db/schema.sql` (it has actually run in an embedded PostgreSQL; the tests are in `db/schema.test.mjs`). This document explains what each table is for, how states change, and who may change which columns; for these behaviors, this document is authoritative.
 
-正式專案用 Drizzle 定義 schema 並產生遷移檔，但欄位、檢查條件和索引要和 `db/schema.sql` 等價。`db/schema.sql` 裡的一個 view 和三個函式請保留為 SQL，不要改寫成應用程式的邏輯：`storage_usage`、`storage_used_bytes()`、`storage_admit()`、`provider_take_slot()`。
+The real project defines the schema with Drizzle and generates migration files, but the columns, check constraints and indexes must be equivalent to `db/schema.sql`. Keep the one view and three functions in `db/schema.sql` as SQL; do not rewrite them as application logic: `storage_usage`, `storage_used_bytes()`, `storage_admit()`, `provider_take_slot()`.
 
-## 資料表一覽
+## Tables at a glance
 
-| 資料表 | 一列代表 | 擁有檔案 |
+| Table | One row is | Owns files |
 | --- | --- | --- |
-| `users` | 一位使用者 | |
-| `sessions` | 一個登入中的裝置 | |
-| `invites` | 一個邀請碼 | |
-| `password_resets` | 一個重設密碼連結 | |
-| `settings` | 一項設定 | |
-| `secrets` | 一把加密過的金鑰 | |
-| `provider_cache` | 一筆對外查詢的結果（我們解析、清理過的，不是原始回應） | |
-| `source_health` | 一個外部來源最近一次的狀況 | |
-| `provider_slots` | 一個來源下一次可以發請求的時間 | |
-| `movies` | 一部有人下載過的電影（手動加入、YTS 沒有的，`yts_id` 是空的，以 TMDB 編號區分） | 海報（不計入用量） |
-| `torrents` | 一個下載（一個 info hash）。`origin` 是 `yts` 或 `manual`（手動加入，存著 `metainfo` 和 `trackers`） | `/data/torrents/<hash>` |
-| `torrent_inspections` | 一個正要手動加入的磁力連結或 .torrent 檔（[06-torrent-worker.md](06-torrent-worker.md)「手動加入」）。加入後刪掉 | |
-| `torrent_holders` | 「某人持有某個下載」 | |
-| `media_files` | 一個下載完成的主影片檔和它的衍生檔 | `/data/media/<id>` |
-| `subtitle_searches` | 某部片在某個來源的最近一次搜尋 | |
-| `subtitle_candidates` | 一條候選字幕 | `/data/subtitles/candidates/<id>` |
-| `subtitles` | 一條已加入的字幕和它的同步文件 | `/data/subtitles/<id>` |
-| `subtitle_revisions` | 同步文件的一個歷史版本 | |
-| `exports` | 一個匯出檔 | `/data/exports/<id>` |
-| `notifications` | 給某位使用者的一則通知 | |
-| `audit_log` | 一筆操作紀錄 | |
-| `tasks` | 一個看得到的背景工作 | |
-| `storage_findings` | 重新計算用量時發現的一個孤兒資料夾，或一筆檔案不見了的紀錄 | |
-| `service_heartbeats` | 一個服務的心跳 | |
+| `users` | a user | |
+| `sessions` | a signed-in device | |
+| `invites` | an invite code | |
+| `password_resets` | a password reset link | |
+| `settings` | a setting | |
+| `secrets` | an encrypted key | |
+| `provider_cache` | the result of one outbound query (parsed and cleaned by us, not the raw response) | |
+| `source_health` | the latest status of one external source | |
+| `provider_slots` | the next time a source may be sent a request | |
+| `movies` | a film someone has downloaded (for films added by hand that YTS doesn't have, `yts_id` is empty and the TMDB id tells them apart) | poster (not counted in usage) |
+| `torrents` | a download (one info hash). `origin` is `yts` or `manual` (added by hand; stores `metainfo` and `trackers`) | `/data/torrents/<hash>` |
+| `torrent_inspections` | a magnet link or .torrent file that is about to be added by hand ([06-torrent-worker.md](06-torrent-worker.md), "Adding by hand (Brian, 2026-10-09; D26)"). Deleted once added | |
+| `torrent_holders` | "someone holds a download" | |
+| `media_files` | the main video file of a finished download and its derived files | `/data/media/<id>` |
+| `subtitle_searches` | the latest search for a film on a source | |
+| `subtitle_candidates` | a candidate subtitle | `/data/subtitles/candidates/<id>` |
+| `subtitles` | an added subtitle and its sync doc | `/data/subtitles/<id>` |
+| `subtitle_revisions` | a past version of a sync doc | |
+| `exports` | an export | `/data/exports/<id>` |
+| `notifications` | a notification for a user | |
+| `audit_log` | an activity log entry | |
+| `tasks` | a visible background task | |
+| `storage_findings` | an orphan folder, or a record whose file has gone missing, found while recalculating usage | |
+| `service_heartbeats` | a service's heartbeat | |
 
-## 兩條貫穿全部的規則
+## Two rules that run through everything
 
-1. **擁有檔案的資料表沒有「到期就清掉」的欄位，也沒有任何程式會定時刪它的列。** 刪除只會因為有人按了刪除。
-2. **所有算進容量上限的位元組都是資料表裡的欄位。** 目前用了多少是一個查詢（`storage_usage`），能不能再放是一個函式（`storage_admit`）。不要在應用程式裡另外加總。
+1. **Tables that own files have no "clean up when expired" column, and no program deletes their rows on a schedule.** Deletion happens only because someone pressed delete.
+2. **Every byte that counts toward the storage limit is a column in a table.** How much is used is a query (`storage_usage`); whether more can fit is a function (`storage_admit`). Do not add things up separately in the application.
 
-## 下載：`torrents`
+## Downloads: `torrents`
 
-一個 info hash 一列，不論有幾個人要。
+One row per info hash, however many people want it.
 
-### 兩個狀態欄位
+### The two state columns
 
-| 欄位 | 誰寫 | 值 |
+| Column | Written by | Values |
 | --- | --- | --- |
-| `want` | 只有 `api` | `run`、`pause`、`remove`：使用者希望它怎樣 |
-| `state` | 只有 `torrent`（例外：`api` 在建立和重試時寫入 `queued`） | `queued`、`downloading`、`paused`、`completed`、`failed`：它實際上怎樣 |
+| `want` | only `api` | `run`, `pause`, `remove`: what the user wants it to be |
+| `state` | only `torrent` (exception: `api` writes `queued` on create and retry) | `queued`, `downloading`, `paused`, `completed`, `failed`: what it actually is |
 
-`torrent` 的工作就是讓 `state` 追上 `want`。兩邊各寫各的欄位，就不會互相蓋掉。`torrent` 更新 `state` 時一律帶條件（例如 `where id = $1 and state = 'queued' and want = 'run'`），條件不成立就代表情況變了，重新讀再決定。
+The job of `torrent` is to make `state` catch up with `want`. Each side writes only its own column, so they never overwrite each other. `torrent` always updates `state` with a condition (for example `where id = $1 and state = 'queued' and want = 'run'`); if the condition fails, things have changed, so it reads again and then decides.
 
-`api` 寫 `want` 的時機：暫停設成 `pause`；繼續和重試設成 `run`；最後一位持有人移除、或管理員強制刪除時設成 `remove`。
+When `api` writes `want`: pausing sets `pause`; resuming and retrying set `run`; the last holder removing it, or an administrator force deleting it, sets `remove`.
 
-**`want = 'remove'` 的列正在被刪除。** 從這一刻起，所有端點都把它當成不存在（回 `NOT_FOUND`），清單裡也不列出。唯一的例外是 `POST /api/torrents` 遇到同一個 info hash：回 `TORRENT_STATE`，介面請使用者稍後再試（通常幾秒內就刪完了）。
+**A row with `want = 'remove'` is being deleted.** From that moment on, every endpoint treats it as nonexistent (returns `NOT_FOUND`), and lists leave it out. The only exception is `POST /api/torrents` hitting the same info hash: it returns `TORRENT_STATE`, and the interface asks the user to try again later (deletion usually finishes within a few seconds).
 
-### 狀態怎麼變
+### How the state changes
 
 ```mermaid
 stateDiagram-v2
-  [*] --> queued: api 接受下載(admission 通過)
-  queued --> downloading: torrent 有空位
-  downloading --> completed: 下載並驗證完成
-  downloading --> failed: 停滯、逾時、磁碟錯誤
+  [*] --> queued: api admits the download (admission passed)
+  queued --> downloading: torrent has a free slot
+  downloading --> completed: downloaded and verified
+  downloading --> failed: stalled, timed out, disk error
   queued --> paused: want = pause
   downloading --> paused: want = pause
   paused --> queued: want = run
-  failed --> queued: api 重試(admission 再次通過)
-  completed --> [*]: want = remove,檔案刪除後刪列
+  failed --> queued: api retries (admission passed again)
+  completed --> [*]: want = remove, row deleted after files are deleted
   queued --> [*]: want = remove
   downloading --> [*]: want = remove
   paused --> [*]: want = remove
   failed --> [*]: want = remove
 ```
 
-`completed` 之後 `state` 就不再變，直到被移除。做種時 `uploaded_bytes` 和 `seeding` 還會繼續更新。完成後的分析、預覽檔狀態都在 `media_files`。
+After `completed`, `state` no longer changes until removal. While seeding, `uploaded_bytes` and `seeding` keep being updated. The analysis and preview file states after completion live in `media_files`.
 
-`phase` 只在 `downloading` 時有意義：`metadata`（還在向 peers 要種子資訊）→ `data` →（必要時）`verifying`。
+`phase` only means something during `downloading`: `metadata` (still asking peers for the torrent info) → `data` → (when needed) `verifying`.
 
-### 介面上的狀態
+### Statuses in the interface
 
-API 回給前端的 `TorrentStatus` 是算出來的，不是存起來的：
+The `TorrentStatus` the API returns to the frontend is computed, not stored:
 
-| `state` | `media_files.analysis_state` | 顯示 |
+| `state` | `media_files.analysis_state` | Shown as |
 | --- | --- | --- |
-| `queued` | | 排隊中 |
-| `downloading` | | 下載中 |
-| `paused` | | 已暫停 |
-| `failed` | | 失敗 |
-| `completed` | `pending` 或 `running` | 分析中 |
-| `completed` | `ready`、`failed`、`none` | 完成（`ready`） |
+| `queued` | | Queued |
+| `downloading` | | Downloading |
+| `paused` | | Paused |
+| `failed` | | Failed |
+| `completed` | `pending` or `running` | Analyzing |
+| `completed` | `ready`, `failed`, `none` | Done (`ready`) |
 
-分析失敗時電影仍然算完成、可以進工作區，只是沒有波形和人聲資料，工作台會說明並提供重試。
+When analysis fails, the film still counts as done and can be opened in the workspace; it just has no waveform or speech data, and the workbench explains this and offers a retry.
 
-片庫（`GET /api/library`）列的是 `state = 'completed'` 的下載，所以包含「分析中」的片：它們已經可以進工作區找字幕了，只是波形還沒好。
+The library (`GET /api/library`) lists downloads with `state = 'completed'`, so it includes films that are "Analyzing": they can already be opened in the workspace to find subtitles; only the waveform isn't ready yet.
 
-### 計入容量的欄位
+### Columns that count toward storage
 
-| 欄位 | 什麼時候算 |
+| Column | When it counts |
 | --- | --- |
-| `size_bytes` | YTS 列出的大小。接受下載時用它檢查空間 |
-| `length_bytes` | 拿到種子資訊後的實際大小。比 `size_bytes` 大時以它為準 |
-| `preview_reserve_bytes` | 為預覽資產預留的量，接受下載時依當時的設定算好；同時把「要不要轉預覽影片、轉成什麼解析度」記在 `preview_proxy_res`（D40）。完成時這兩個值原封不動搬到 `media_files`，這裡的預留量歸零 |
-| `disk_bytes` | 實際佔用。每次失敗時量一次（殘留），完成時再量一次（整個資料夾） |
+| `size_bytes` | The size YTS lists. Used to check space when the download is admitted |
+| `length_bytes` | The actual size once the torrent info arrives. Takes precedence when larger than `size_bytes` |
+| `preview_reserve_bytes` | The amount reserved for preview assets, computed from the settings at the time the download is admitted; "whether to make a preview video, and at what resolution" is recorded in `preview_proxy_res` at the same time (D40). On completion both values are moved unchanged to `media_files`, and the reservation here goes to zero |
+| `disk_bytes` | Actual space used. Measured on every failure (leftovers), and again on completion (the whole folder) |
 
-未完成的三個狀態算 `max(size_bytes, length_bytes) + preview_reserve_bytes`；`failed` 算 `disk_bytes`；`completed` 算 `disk_bytes`。規則和例子在 [10-storage.md](10-storage.md)。
+The three unfinished states count `max(size_bytes, length_bytes) + preview_reserve_bytes`; `failed` counts `disk_bytes`; `completed` counts `disk_bytes`. Rules and examples are in [10-storage.md](10-storage.md).
 
-### 即時檢視：`torrent_live`
+### Live view: `torrent_live`
 
-下載細節頁開著時才有內容的暫存資料（unlogged）：`wanted_until`（頁面每次要資料就延後 10 秒）、`data`（最新一份 `TorrentLive`）、`updated_at`。下載被刪除時跟著刪。見 [06-torrent-worker.md](06-torrent-worker.md) 的「即時檢視」。
+Temporary data (unlogged) that only has content while a download details page is open: `wanted_until` (pushed back 10 seconds each time the page asks for data), `data` (the latest `TorrentLive`), `updated_at`. Deleted along with the download. See "Live view (download details page)" in [06-torrent-worker.md](06-torrent-worker.md).
 
-### 持有人：`torrent_holders`
+### Holders: `torrent_holders`
 
-- 建立下載的人自動成為第一位持有人。
-- 之後每個要同一個版本的人加一列。
-- 持有人移除自己：刪掉他那一列。如果刪完沒有任何持有人了，同一個交易裡把 `want` 設成 `remove`。
-- **零持有人但仍存在**只有一種來源：最後一位持有人的帳號被管理員移除。這種下載會留在磁碟上，出現在管理員的儲存空間頁，由管理員決定刪不刪。帳號被移除不能連帶刪檔。
+- The person who creates the download automatically becomes the first holder.
+- After that, each person who wants the same version adds a row.
+- A holder removing themselves: delete their row. If no holders are left after that, set `want` to `remove` in the same transaction.
+- **Zero holders but still present** has only one cause: the last holder's account was removed by an administrator. Such a download stays on disk, appears on the administrator's Storage page, and the administrator decides whether to delete it. Removing an account must not delete files along with it.
 
-`requested_by` 是發起下載的人，只用來算「每人同時下載上限」。
+`requested_by` is the person who started the download; it is only used for the "concurrent downloads per person" limit.
 
-`last_used_at`：有人開啟這部片的工作區、或替它建立匯出時更新，同一列最多每小時寫一次。它只用來在儲存空間頁顯示「最近使用」，幫人決定要刪哪一部；沒有任何程式會依它做事。
+`last_used_at`: updated when someone opens this film's workspace or creates an export for it, at most once per hour per row. It is only used to show "last used" on the Storage page, to help people decide which film to delete; no program acts on it.
 
-## 影片與衍生檔：`media_files`
+## Videos and derived files: `media_files`
 
-下載完成時由 `torrent` 建立，和 `torrents.state = 'completed'` 在同一個交易裡。主影片檔是 torrent 裡最大的影片檔（副檔名 `.mp4`、`.mkv`、`.avi`、`.mov`、`.m4v`、`.webm`）。
+Created by `torrent` when a download completes, in the same transaction as `torrents.state = 'completed'`. The main video file is the largest video file in the torrent (extensions `.mp4`, `.mkv`, `.avi`, `.mov`, `.m4v`, `.webm`).
 
-| 欄位組 | 值 | 說明 |
+| Columns | Values | Notes |
 | --- | --- | --- |
-| `probe_state` | `pending` → `running` → `ready` / `failed` | 探測（ffprobe）。每個下載完成的檔案都會做，不到一秒。它有自己的狀態，是為了能像其他工作一樣被認領，也為了讓 ffprobe 讀不了的檔案停在 `failed`，不會被一試再試 |
-| `analysis_state` | `none` → `pending` → `running` → `ready` / `failed` | 波形和人聲。`none` 是「自動分析關掉了，還沒有人要求」。探測沒有成功之前不會開始 |
-| `audio_state` | `none`，或 `pending` → `running` → `ready` / `failed` | `audio.m4a`。能直接播的版本永遠是 `none` |
-| `proxy_state` | `none`，或 `pending` → `running` → `ready` / `failed` | `proxy.mp4`。能直接播、或自動轉檔關掉時是 `none` |
-| `direct_play` | 布林 | ffprobe 之後才確定。規則在 [08-media-pipeline.md](08-media-pipeline.md)：MP4 裡的 H.264（8-bit 4:2:0）加 AAC 或 MP3；或 WebM 裡的 VP8、VP9、AV1 加 Opus 或 Vorbis |
-| `reserve_bytes` | 位元組 | 還沒做完的預覽資產佔的預留量。每次狀態變動時重算：進行中或等待中的資產各算它的估計值，其餘算 0 |
-| `asr_state`、`asr_language` | `none`，或 `pending` → `running` → `ready` / `failed`；聽到的語言 | 語音辨識（`asr.json`），分析完成後才開始。`none` 是辨識關掉了或片子沒有聲音。失敗不重試，「重新分析」會再排一次 |
-| `analysis_bytes`、`audio_bytes`、`proxy_bytes` | 位元組 | 實際大小，檔案完成時寫入。`analysis_bytes` 是 `probe.json`、`peaks.bin`、`ref.npz`、`speech.json`、`asr.json` 的總和 |
-| `error` | `{analysis?, audio?, proxy?, asr?}`，每種資產一格錯誤代碼 | 那個資產的失敗，或沒有做預覽影片的原因（`PREVIEW_NO_SPACE`）。那個資產重新被要求時清掉。代碼的清單是 `packages/shared/src/contracts/api.ts` 的 `MediaErrorCode` |
+| `probe_state` | `pending` → `running` → `ready` / `failed` | Probe (ffprobe). Done for every finished file; takes under a second. It has its own state so it can be claimed like other jobs, and so a file ffprobe can't read stays at `failed` instead of being retried over and over |
+| `analysis_state` | `none` → `pending` → `running` → `ready` / `failed` | Waveform and speech. `none` means "automatic analysis is off and nobody has asked for it yet". Doesn't start until the probe has succeeded |
+| `audio_state` | `none`, or `pending` → `running` → `ready` / `failed` | `audio.m4a`. Always `none` for versions that play directly |
+| `proxy_state` | `none`, or `pending` → `running` → `ready` / `failed` | `proxy.mp4`. `none` when the file plays directly or automatic transcoding is off |
+| `direct_play` | boolean | Only known after ffprobe. Rules are in [08-media-pipeline.md](08-media-pipeline.md): H.264 (8-bit 4:2:0) with AAC or MP3 in MP4; or VP8, VP9, AV1 with Opus or Vorbis in WebM |
+| `reserve_bytes` | bytes | Reservation held by preview assets that aren't done yet. Recomputed on every state change: each asset that is in progress or waiting counts its estimate; the rest count 0 |
+| `asr_state`, `asr_language` | `none`, or `pending` → `running` → `ready` / `failed`; the language heard | Speech recognition (`asr.json`); starts only after analysis is done. `none` means recognition is off or the film has no sound. A failure isn't retried; "Analyze again" queues it once more |
+| `analysis_bytes`, `audio_bytes`, `proxy_bytes` | bytes | Actual sizes, written when the file is done. `analysis_bytes` is the total of `probe.json`, `peaks.bin`, `ref.npz`, `speech.json`, `asr.json` |
+| `error` | `{analysis?, audio?, proxy?, asr?}`, one error code slot per asset | That asset's failure, or why no preview video was made (`PREVIEW_NO_SPACE`). Cleared when that asset is requested again. The list of codes is `MediaErrorCode` in `packages/shared/src/contracts/api.ts` |
 
-資產在最後一次嘗試也失敗時（見 [08-media-pipeline.md](08-media-pipeline.md) 的「工作的共通規矩」），它的預留量才釋出；之後要再做，得重新通過 admission。
+An asset's reservation is released only when its last attempt also fails (see "Common rules for jobs" in [08-media-pipeline.md](08-media-pipeline.md)); to make it again after that, it has to pass admission again.
 
-## 字幕
+## Subtitles
 
-### 候選：`subtitle_searches` 和 `subtitle_candidates`
+### Candidates: `subtitle_searches` and `subtitle_candidates`
 
-- 每部片每個來源一列 `subtitle_searches`，記錄最近一次搜尋的狀態和筆數。
-- 搜尋結果寫進 `subtitle_candidates`。同一個來源重新搜尋時，**還沒抓過檔案的**（`new`）和**抓失敗的**（`failed`）舊結果被新結果取代；已經抓好檔案的保留（那是使用者按「排名」或「加入」的結果）。只取代這次搜尋涵蓋的語言（繁體中文涵蓋所有中文的猜測，簡體中文涵蓋 `zh-Hans` 和 `zh`，English 只有 `en`），所以只查英文時不會把之前找到、還沒抓的中文候選清掉。來源這次失敗時什麼都不取代。
-- 上傳的檔案也是候選，`provider = 'upload'`，`provider_ref` 是檔案的 sha256，`release_name` 是檔名。**檔案一收到就建立這一列**（`fetch_state = 'fetching'`），處理完變成 `ready` 或 `failed`；這樣讀不了的檔案會以「失敗」的樣子留在清單上並說明原因，而不是無聲無息地消失。一個壓縮檔裡有幾個字幕檔，就產生幾條候選。同一個檔案再上傳一次不會多一列：已經 `ready` 的原樣回傳，`failed` 的重新處理。
+- One `subtitle_searches` row per film per source, recording the state and result count of the latest search.
+- Search results are written to `subtitle_candidates`. When the same source is searched again, old results **whose file hasn't been fetched yet** (`new`) and **whose fetch failed** (`failed`) are replaced by the new results; those whose file has already been fetched are kept (they come from the user pressing "Auto-align and rank all" or "Add"). Only the languages this search covers are replaced (Traditional Chinese covers every Chinese guess, Simplified Chinese covers `zh-Hans` and `zh`, English only `en`), so searching only English doesn't wipe out Chinese candidates found earlier that haven't been fetched. When the source fails this time, nothing is replaced.
+- Uploaded files are candidates too: `provider = 'upload'`, `provider_ref` is the file's sha256, `release_name` is the file name. **The row is created as soon as the file is received** (`fetch_state = 'fetching'`) and becomes `ready` or `failed` after processing; that way an unreadable file stays on the list as "failed" with an explanation instead of silently disappearing. An archive with several subtitle files produces that many candidates. Uploading the same file again doesn't add a row: one that is already `ready` is returned as is, and a `failed` one is processed again.
 
-`fetch_state`：`new` → `fetching` → `ready` / `failed`。`ready` 表示檔案已下載、解壓縮、轉成 UTF-8 的句子清單，`language` 也改成依內容判斷的結果。`failed` 時 `fetch_error` 是原因：
+`fetch_state`: `new` → `fetching` → `ready` / `failed`. `ready` means the file has been downloaded, extracted and turned into a UTF-8 list of lines, and `language` has been changed to the result detected from the content. On `failed`, `fetch_error` is the reason:
 
-| `fetch_error` | 意思 |
+| `fetch_error` | Meaning |
 | --- | --- |
-| `DOWNLOAD_FAILED` | 抓不到：逾時、來源回錯誤、下載網址的主機不在允許清單裡 |
-| `ARCHIVE_INVALID` | 壓縮檔打不開，或違反解壓縮的限制 |
-| `NO_SUBTITLE` | 壓縮檔打得開，但裡面沒有字幕檔 |
-| `PARSE_FAILED` | 檔案讀到了，但解析不出任何一句 |
+| `DOWNLOAD_FAILED` | Couldn't fetch it: timeout, the source returned an error, or the download URL's host isn't on the allowlist |
+| `ARCHIVE_INVALID` | The archive won't open, or breaks the extraction limits |
+| `NO_SUBTITLE` | The archive opens, but there's no subtitle file in it |
+| `PARSE_FAILED` | The file was read, but no line could be parsed from it |
 
-失敗的候選留在清單上，使用者可以把它拿掉（`DELETE /api/candidates/:id`，任何候選都可以這樣移除，連同它抓下來的檔案）。失敗的候選不能「加入」；要再試，就重新搜尋（同一個來源裡失敗的會被新的結果取代）或重新上傳。
+Failed candidates stay on the list, and the user can remove them (`DELETE /api/candidates/:id`; any candidate can be removed this way, along with the file it fetched). A failed candidate can't be "added"; to try again, search again (failed ones from the same source are replaced by the new results) or upload again.
 
-`fetch_started_at` 是它變成 `fetching` 的時間。停在 `fetching` 超過 10 分鐘的候選，由 `media` 的對帳步驟改成 `failed`（`DOWNLOAD_FAILED`）：那通常表示處理它的程式中途被重啟了。這樣清單上不會有永遠「處理中」的列。
+`fetch_started_at` is when it became `fetching`. A candidate stuck in `fetching` for more than 10 minutes is changed to `failed` (`DOWNLOAD_FAILED`) by the reconciliation step in `media`: that usually means the program handling it was restarted midway. This way the list never has rows that are "Processing" forever.
 
-`align_state`：`none` → `queued` → `running` → `done` / `failed`。`done` 時 `align_score` 和 `align_result` 有值。
+`align_state`: `none` → `queued` → `running` → `done` / `failed`. On `done`, `align_score` and `align_result` have values.
 
-`download_url` 存進去之前一律去掉 query string（D28）。
+`download_url` always has its query string stripped before it is stored (D28).
 
-### 已加入：`subtitles`
+### Added: `subtitles`
 
-「加入」把候選的檔案複製到 `/data/subtitles/<新 id>/`，建立一列：
+"Add" copies the candidate's files to `/data/subtitles/<new id>/` and creates a row:
 
-- 資料夾裡有 `original.<ext>`（原始位元組）和 `cues.json`（句子清單，之後所有地方都用這一份）。加入時做了簡轉繁的話，`cues.json` 是轉換後的，轉換前的另存成 `cues.original.json`，`converted_s2t = true`。
-- `format` 是原始檔的格式；`.ssa` 記成 `ass`。
-- `doc` 是同步文件（型別 `SyncDoc`，定義在 `packages/shared/src/sync-core/core.ts`）。候選如果已經對齊過，初始的 `doc` 就用那次的結果；否則是「不動」。
-- `doc_rev` 從 0 開始，每次儲存加 1。「確認」不改文件，所以不加 1（存一份歷史、發 `subtitle` 事件，事件裡的 `rev` 是同一個）。儲存時要帶上原本的 `rev`，不一致就拒絕（`REVISION_CONFLICT`）。
-- `status`：`draft` 或 `confirmed`。**會改變時間或文字的儲存（送來的 `segments` 或 `edits` 和資料庫裡的不一樣）會把它變回 `draft`**；只動到對齊點或檢查點狀態的儲存不會。只有「確認」會把它變成 `confirmed`。
-- `score`：最後一次儲存時算出的對齊分數（伺服器算，不採用前端送來的數字）。
-- `updated_by`：最後一次儲存的人。版本衝突時用它告訴對方是誰改的。
-- `(torrent_id, sha256)` 唯一：同一部片不能加入兩條內容完全相同的字幕。`sha256` 是 `cues.json` 的雜湊（也就是簡轉繁之後的內容）。
+- The folder holds `original.<ext>` (the original bytes) and `cues.json` (the list of lines, which every other place uses from then on). If Simplified-to-Traditional conversion was done on add, `cues.json` is the converted one, the pre-conversion one is saved as `cues.original.json`, and `converted_s2t = true`.
+- `format` is the original file's format; `.ssa` is recorded as `ass`.
+- `doc` is the sync doc (type `SyncDoc`, defined in `packages/shared/src/sync-core/core.ts`). If the candidate has already been aligned, the initial `doc` uses that result; otherwise it is "unchanged".
+- `doc_rev` starts at 0 and goes up by 1 on each save. "Confirm" doesn't change the doc, so it doesn't add 1 (it saves a history entry and sends a `subtitle` event whose `rev` is the same). A save must carry the original `rev`; if it doesn't match, the save is rejected (`REVISION_CONFLICT`).
+- `status`: `draft` or `confirmed`. **A save that changes timing or text (the `segments` or `edits` sent differ from those in the database) turns it back into `draft`**; a save that only touches anchors or checkpoint states doesn't. Only "Confirm" turns it into `confirmed`.
+- `score`: the sync score computed at the last save (computed by the server; numbers sent by the frontend are not used).
+- `updated_by`: the person who saved last. Used to tell the other person who made the change when there is a revision conflict.
+- `(torrent_id, sha256)` is unique: the same film can't have two subtitles with exactly the same content added. `sha256` is the hash of `cues.json` (that is, the content after Simplified-to-Traditional conversion).
 
-字幕屬於「那部片」，不屬於某個人。所有持有人看到同一份、改同一份。
+Subtitles belong to "the film", not to any one person. All holders see the same copy and edit the same copy.
 
-### 歷史：`subtitle_revisions`
+### History: `subtitle_revisions`
 
-在三個時機存一份快照：確認時、套用自動對齊的結果時、全部重設時。後兩者是前端在儲存時用 `reason` 告訴伺服器的（`PUT /api/subtitles/:id/doc` 的 `reason: 'auto-align' | 'reset'`）。目前只用來追查問題和給未來的「回到某個版本」功能，第一版的介面不顯示。
+A snapshot is saved at three moments: on confirm, when an auto-align result is applied, and on reset all. The latter two are told to the server by the frontend with `reason` when saving (`reason: 'auto-align' | 'reset'` on `PUT /api/subtitles/:id/doc`). For now it is only used for tracking down problems and for a future "go back to a version" feature; the first version's interface doesn't show it.
 
-## 匯出：`exports`
+## Exports: `exports`
 
-`queued` → `running` → `done` / `failed`。
+`queued` → `running` → `done` / `failed`.
 
-- `torrent_id` 在電影被刪除時變成 null，匯出檔保留。所以顯示用的片名和版本另外存在 `movie_title`、`version_label`。
-- `tracks` 記錄當時封裝了哪些字幕（含它們的 `rev`），之後字幕再被修改也不影響已經匯出的檔案。
-- `reserved_bytes` 在 `queued` / `running` 時算進用量；`done` 之後改算 `size_bytes`。失敗時兩者都是 0，寫到一半的檔案由該工作自己刪掉，原因記在 `error_code`。
-- 使用者刪除一個還在排隊的匯出（`queued`）：`api` 直接刪掉 `tracks/` 和這一列，不用等 `media`。
-- 使用者刪除一個進行中的匯出（`running`）：`api` 把 `cancel_requested` 設成 true，`media` 看到後終止 ffmpeg、刪掉半成品、刪掉這一列。從設成 true 的那一刻起，清單和事件都當它已經不在（`GET /api/exports` 不列出，再刪一次回 `NOT_FOUND`）。`media` 剛好在這之間重啟的話，啟動時把這種列收掉（刪 `tracks/` 和這一列）。
-- 封裝到一半，來源的電影被刪除：這次匯出失敗（`SOURCE_MISSING`），預留釋出。
+- `torrent_id` becomes null when the film is deleted, and the export is kept. That's why the film title and version for display are stored separately in `movie_title` and `version_label`.
+- `tracks` records which subtitles were packed at the time (including their `rev`), so later changes to the subtitles don't affect files already exported.
+- `reserved_bytes` counts toward usage while `queued` / `running`; after `done`, `size_bytes` counts instead. On failure both are 0; a half-written file is deleted by the job itself, and the reason is recorded in `error_code`.
+- A user deletes an export that is still queued (`queued`): `api` deletes `tracks/` and the row directly, without waiting for `media`.
+- A user deletes an export in progress (`running`): `api` sets `cancel_requested` to true; when `media` sees it, it kills ffmpeg, deletes the partial file, and deletes the row. From the moment it is set to true, lists and events treat it as already gone (`GET /api/exports` doesn't list it; deleting it again returns `NOT_FOUND`). If `media` happens to restart in between, it cleans up such rows on startup (deletes `tracks/` and the row).
+- The source film is deleted halfway through packing: this export fails (`SOURCE_MISSING`) and its reservation is released.
 
-## 設定與金鑰
+## Settings and keys
 
-- `settings`：一項一列，`value` 是 JSON。鍵的清單和驗證規則在 [13-settings.md](13-settings.md)。
-- `secrets`：三把金鑰（`tmdbKey`、`subdlKey`、`assrtToken`），用 `SECRET_KEY` 以 AES-256-GCM 加密。API 只回報「有沒有設定」，永遠不回傳內容。（原本的 `llmKey` 在升級時搬進第一個 LLM 設定檔後刪除。）
-- `llm_profiles`、`llm_usage`、`translations`：語言模型的設定檔（金鑰同樣加密，附加資料是 `llm:<id>`）、每次呼叫的紀錄、字幕翻譯的進度（已翻好的句子存在 `lines`，完成才寫出字幕）。見 [18-llm.md](18-llm.md)；遷移 `0005_llm.sql`。字幕的 `provider` 多一種 `translated`（AI 翻譯），`language` 可以是任何 BCP 47 語言代碼。2026-10-09 再多一種 `bundled`（下載帶來的字幕，`added_by` 是空的；遷移 `0008_bundled_subtitles.sql`）。
+- `settings`: one row per setting; `value` is JSON. The list of keys and validation rules are in [13-settings.md](13-settings.md).
+- `secrets`: three keys (`tmdbKey`, `subdlKey`, `assrtToken`), encrypted with AES-256-GCM using `SECRET_KEY`. The API only reports "whether it is set", never the content. (The former `llmKey` was moved into the first LLM profile during the upgrade and then deleted.)
+- `llm_profiles`, `llm_usage`, `translations`: language model profiles (keys are encrypted the same way, with additional data `llm:<id>`), a record of each call, and subtitle translation progress (translated lines are stored in `lines`; subtitles are written out only on completion). See [18-llm.md](18-llm.md); migration `0005_llm.sql`. Subtitle `provider` gains a `translated` value (AI translation), and `language` can be any BCP 47 language code. On 2026-10-09 another value was added, `bundled` (subtitles that came with the download; `added_by` is empty; migration `0008_bundled_subtitles.sql`).
 
-## 活動
+## Activity
 
-- `notifications`：`kind` 加上 `data`（片名、版本、是誰…）。句子由前端組，所以這裡不存中文。
-- `audit_log`：`action` 是穩定的代碼（清單在 [12-auth.md](12-auth.md)）；`target` 是對象的資料（片名、版本、名字…），同樣不存句子；`actor_name` 另外存一份，帳號被移除後紀錄仍然讀得懂。
-- `tasks`：看得到的背景工作，種類是 `analyze`、`preview`、`align`、`rank`、`export`、`rescan`。pg-boss 決定工作什麼時候跑；`tasks` 負責三件事：給「系統狀態」頁顯示（`subject` 是顯示要用的資料）、讓失敗的工作能重試（`input` 是當初的參數，只放 id 和選項，不放字幕內容）、把結果交回給 `api`（`result`）。誰建立這一列、什麼時候變成 `cancelled`，寫在 [08-media-pipeline.md](08-media-pipeline.md) 的「工作的共通規矩」。
-- `source_health`：每個外部來源一列，記最近一次查詢或測試的結果（狀態、代碼、資料、時間）。總覽頁和來源設定頁讀它。
-- `storage_findings`：最近一次重新計算用量時，對不起來的東西。每次重新計算整批換新。
-- `service_heartbeats`：三個 Node 服務各一列。
-- `provider_slots`：每個來源一列，記下一次可以發請求的時間。用 `provider_take_slot()` 取號，見 [07-subtitle-providers.md](07-subtitle-providers.md)。
+- `notifications`: `kind` plus `data` (film title, version, who…). Sentences are put together by the frontend, so no Chinese is stored here.
+- `audit_log`: `action` is a stable code (the list is in [12-auth.md](12-auth.md)); `target` is data about the object (film title, version, name…), again with no sentences stored; `actor_name` is stored separately, so entries still make sense after the account is removed.
+- `tasks`: visible background tasks, of kinds `analyze`, `preview`, `align`, `rank`, `export`, `rescan`. pg-boss decides when jobs run; `tasks` is responsible for three things: showing them on the "System status" page (`subject` is the data needed for display), letting failed jobs be retried (`input` is the original parameters, only ids and options, never subtitle content), and handing results back to `api` (`result`). Who creates the row and when it becomes `cancelled` is written in "Common rules for jobs" in [08-media-pipeline.md](08-media-pipeline.md).
+- `source_health`: one row per external source, recording the result of the latest query or test (status, code, data, time). Read by the Overview page and the Sources page.
+- `storage_findings`: things that didn't add up in the latest usage recalculation. Replaced as a whole batch on every recalculation.
+- `service_heartbeats`: one row for each of the three Node services.
+- `provider_slots`: one row per source, recording the next time a request may be sent. Slots are taken with `provider_take_slot()`; see [07-subtitle-providers.md](07-subtitle-providers.md).
 
-`notifications`、`audit_log`、`tasks` 會一直累積。它們只有文字，量很小，不清理；頁面用分頁讀。pg-boss 會維護它自己的資料表（封存、清掉完成的工作），那是佇列內部的事，和使用者的檔案無關。
+`notifications`, `audit_log` and `tasks` keep growing. They are text only and small, so they aren't cleaned up; pages read them with pagination. pg-boss maintains its own tables (archiving, clearing finished jobs); that is internal to the queue and has nothing to do with users' files.
 
-## 交易的邊界
+## Transaction boundaries
 
-下面這些動作必須各自在**一個資料庫交易**裡完成：
+Each of the following actions must be completed in **one database transaction**:
 
-| 動作 | 交易裡做的事 |
+| Action | What the transaction does |
 | --- | --- |
-| 接受下載 | 先用 `select … for update` 找同一個 info hash 的列。有而且 `want` 不是 `remove`：當成「加入別人的下載」。有而且是 `remove`：回 `TORRENT_STATE`。沒有：`storage_admit(need)` → 通過才寫入 `movies`（沒有的話）、`torrents`（含預覽預留和預覽計畫）、`torrent_holders`。兩個人同時下載同一個全新的版本時，兩邊都找不到列可以鎖，後寫入的那個會撞到 `info_hash` 的唯一限制：接住這個錯誤，整個交易重來一次，這次它會找到那一列，變成「加入」 |
-| 加入別人的下載 | 鎖住那一列，確認 `want` 不是 `remove`，寫入 `torrent_holders`（不需要 admission） |
-| 重試失敗的下載 | `storage_admit(max(size_bytes, length_bytes) + preview_reserve_bytes, disk_bytes)` → 通過才把 `state` 改成 `queued`、`want` 改成 `run`。預覽預留和預覽計畫在失敗期間一直留在這一列上（只是不計入用量），重試時直接沿用 |
-| 拿到種子資訊後發現比列出的大 | 多出來的量在 64 MB 以內：直接寫入 `length_bytes`。超過：`storage_admit(差額)` → 通過才寫入；不通過就寫入 `length_bytes` 並標成失敗（`SIZE_MISMATCH`）。細節在 [06-torrent-worker.md](06-torrent-worker.md) |
-| 持有人移除 | 鎖住那一列，刪 `torrent_holders`；沒有持有人了就把 `want` 設成 `remove` |
-| 下載完成 | `state = 'completed'`、量 `disk_bytes`、建立 `media_files`（預留量和預覽計畫從 `torrents` 搬過來） |
-| 要求預覽檔（事後） | `storage_admit(缺的資產的估計值)` → 通過才把缺的資產設成 `pending` 並寫入 `reserve_bytes` |
-| 開始匯出 | `storage_admit(估計值)` → 通過才寫入 `exports` |
-| 儲存同步文件 | 檢查 `doc_rev` → 更新 `doc`、`doc_rev + 1`、`status`、`score`、`updated_by` |
+| Admitting a download | First use `select … for update` to find a row with the same info hash. If there is one and `want` is not `remove`: treat it as "joining someone else's download". If there is one and it is `remove`: return `TORRENT_STATE`. If there is none: `storage_admit(need)` → only on success write `movies` (if missing), `torrents` (including the preview reservation and preview plan), `torrent_holders`. When two people download the same brand-new version at once, neither finds a row to lock, and the one that writes later hits the unique constraint on `info_hash`: catch that error and rerun the whole transaction; this time it finds the row and becomes a "join" |
+| Joining someone else's download | Lock the row, make sure `want` is not `remove`, write `torrent_holders` (no admission needed) |
+| Retrying a failed download | `storage_admit(max(size_bytes, length_bytes) + preview_reserve_bytes, disk_bytes)` → only on success change `state` to `queued` and `want` to `run`. The preview reservation and preview plan stay on the row the whole time it is failed (they just don't count toward usage) and are reused as is on retry |
+| Finding out from the torrent info that it is larger than listed | Extra amount within 64 MB: write `length_bytes` directly. Over that: `storage_admit(difference)` → only on success write it; on failure write `length_bytes` and mark it failed (`SIZE_MISMATCH`). Details are in [06-torrent-worker.md](06-torrent-worker.md) |
+| A holder removing it | Lock the row, delete from `torrent_holders`; if no holders are left, set `want` to `remove` |
+| Download completing | `state = 'completed'`, measure `disk_bytes`, create `media_files` (reservation and preview plan moved over from `torrents`) |
+| Requesting a preview file (afterwards) | `storage_admit(estimate for the missing assets)` → only on success set the missing assets to `pending` and write `reserve_bytes` |
+| Starting an export | `storage_admit(estimate)` → only on success write `exports` |
+| Saving a sync doc | Check `doc_rev` → update `doc`, `doc_rev + 1`, `status`, `score`, `updated_by` |
 
-`storage_admit` 裡面有 advisory lock，所以同時進來的請求會排隊，不會兩個都擠進最後一點空間。
+`storage_admit` takes an advisory lock inside, so concurrent requests queue up instead of both squeezing into the last bit of space.
 
-「加入」和「移除」都先鎖住 `torrents` 那一列，所以不會發生「最後一位剛移除、另一個人同時加入，結果加入的人拿到一部正在被刪的片」：後到的那個會看到前一個的結果。
+"Join" and "remove" both lock the `torrents` row first, so it can't happen that "the last holder has just removed it while someone else joins at the same moment, and the joiner ends up with a film that is being deleted": whichever comes second sees the result of the first.
 
-這些交易都用預設的隔離層級（READ COMMITTED）。正確性靠的是 `storage_admit` 裡的鎖、列鎖和帶條件的更新，不是靠更高的隔離層級。改成 REPEATABLE READ 反而會出錯：`storage_admit` 會看不到前一個拿到鎖的人剛寫入的用量。
+These transactions all use the default isolation level (READ COMMITTED). Correctness relies on the lock in `storage_admit`, row locks and conditional updates, not on a higher isolation level. Switching to REPEATABLE READ would actually break things: `storage_admit` wouldn't see the usage just written by whoever held the lock before.
 
-## 刪除一個下載時發生的事
+## What happens when a download is deleted
 
-在那之前，`api` 把 `want` 設成 `remove` 的同一個交易裡，先處理這部片的**所有匯出**（Brian，2026-10-06：刪除整部片連匯出檔一起刪）：排隊中、完成、失敗的直接刪列（`tasks` 標成 `cancelled`），交易之後刪 `/data/exports/<id>`；封裝中的設 `cancel_requested`，由 `media` 停下來之後刪。建立者不是按下刪除的人時，各收到一則 `item.deleted`。所以到了 `torrent` 這裡，通常已經沒有這部片的匯出。
+Before that, in the same transaction in which `api` sets `want` to `remove`, it first handles **all exports** of this film (Brian, 2026-10-06: deleting a whole film deletes its exports too): queued, done and failed ones have their rows deleted directly (`tasks` marked `cancelled`), and `/data/exports/<id>` is deleted after the transaction; ones being packed get `cancel_requested` set and are deleted by `media` after it stops. When the creator is not the person who pressed delete, each creator receives an `item.deleted`. So by the time it reaches `torrent`, there are usually no exports of this film left.
 
-由 `torrent` 執行（它看到 `want = 'remove'`）：
+Carried out by `torrent` (when it sees `want = 'remove'`):
 
-1. 從 WebTorrent 用戶端移除，不保留檔案。
-2. 記下這個下載底下的 `media_files`、`subtitles`、`subtitle_candidates` 的 id。
-3. 刪除 `/data/torrents/<hash>`、`/data/media/<media id>`、每一個 `/data/subtitles/<id>` 和 `/data/subtitles/candidates/<id>`。
-4. 在一個交易裡：
-   - 萬一還有這部片沒做完、也沒被要求取消的匯出（`queued`、`running`，而且 `cancel_requested` 是 false；正常情況下 `api` 已經處理掉了），標成 `failed`，原因 `SOURCE_MISSING`，預留歸零；它們的 `tasks` 也標成 `failed`；替建立者各寫一則 `export.failed` 的通知。這是保險：匯出的列不會被外鍵連帶刪除。
-   - 這個下載底下其他還沒結束的 `tasks`（`queued`、`running`）標成 `cancelled`。
-   - 刪除 `torrents` 那一列。外鍵會連帶刪掉持有人、影片、字幕、候選；`exports.torrent_id` 和 `tasks.torrent_id` 變成 null。
+1. Remove it from the WebTorrent client, without keeping the files.
+2. Note the ids of the `media_files`, `subtitles` and `subtitle_candidates` under this download.
+3. Delete `/data/torrents/<hash>`, `/data/media/<media id>`, and every `/data/subtitles/<id>` and `/data/subtitles/candidates/<id>`.
+4. In one transaction:
+   - If any exports of this film are still unfinished and haven't been asked to cancel (`queued`, `running`, with `cancel_requested` false; normally `api` has already dealt with them), mark them `failed` with reason `SOURCE_MISSING` and zero their reservation; mark their `tasks` `failed` as well; write an `export.failed` notification for each creator. This is a safety net: export rows are not cascade-deleted by foreign keys.
+   - Mark other unfinished `tasks` under this download (`queued`, `running`) as `cancelled`.
+   - Delete the `torrents` row. Foreign keys cascade-delete holders, videos, subtitles and candidates; `exports.torrent_id` and `tasks.torrent_id` become null.
 
-   這一步標成失敗的匯出，留在磁碟上的 `tracks/` 由 `torrent` 在這一步之後順手刪掉（排隊中的沒有別人會收；進行中的封裝工作也會自己收，兩邊都刪不算錯誤，而且 `media` 剛好不在執行時也不會留下來）。
-5. 如果那部電影已經沒有任何下載，刪掉 `movies` 那一列和海報快取。
-6. `NOTIFY`：`torrent.removed`、`usage`；每一列被改動的 `tasks` 各一則 `task`（正在等那個工作的請求會被叫醒，系統狀態頁會更新）；每個被標成失敗的匯出各一則 `export`；每則通知各一則 `notification`。
+   For exports marked failed in this step, `torrent` also deletes the `tracks/` left on disk right after this step (nobody else would clean up queued ones; an in-progress packing job also cleans up after itself, deleting from both sides isn't an error, and nothing is left behind even if `media` happens not to be running).
+5. If the film no longer has any downloads, delete the `movies` row and the poster cache.
+6. `NOTIFY`: `torrent.removed`, `usage`; one `task` for each changed `tasks` row (requests waiting on that job are woken up and the System status page updates); one `export` for each export marked failed; one `notification` for each notification.
 
-整個流程可以重跑：做到一半當掉，重啟後看到 `want = 'remove'` 再做一次，刪不存在的檔案不算錯誤。
+The whole process can be rerun: if it crashes halfway, after a restart it sees `want = 'remove'` and does it again; deleting files that don't exist isn't an error.
 
-**刪除不等別的程式。** 這部片可能正好有工作在跑（轉預覽檔、抓字幕、封裝）。`torrent` 不等它們，它們自己會停，而且不會留下東西。靠的是每個會在 `/data` 底下寫檔的程式都守這四條（`media` 的每一種工作，以及 `api` 的「加入字幕」）：
+**Deletion doesn't wait for other programs.** This film may have jobs running right then (making the preview file, fetching subtitles, packing). `torrent` doesn't wait for them; they stop on their own and leave nothing behind. This relies on every program that writes files under `/data` following these four rules (every kind of job in `media`, plus "add subtitles" in `api`):
 
-- **不替正在被刪除的片開工。** 對帳和認領都跳過 `want = 'remove'` 的下載。
-- **執行中每 2 秒確認一次**：它處理的那一列還在、狀態還是「進行中」、那個下載的 `want` 不是 `remove`。不成立就終止子程序，刪掉自己的半成品，結束。
-- **建立資料夾、寫出檔案、把 `.part` 改名之前，再確認一次。**
-- **最後那一筆「我做完了」的更新要帶條件，而且條件寫在同一個敘述裡**：那一列還在、狀態還是它認領時的樣子、**而且那個下載的 `want` 不是 `remove`**。改不到（影響 0 列）就表示在它寫檔的同時東西被刪了、或正在被刪：**把自己剛寫出來的檔案刪掉**，它建立的資料夾空了也一併刪掉。這是它自己的產物，不是任何人的檔案。途中新增的列也一樣：多個字幕檔時新增的候選、`api` 加入字幕時新增的那一列，都用「那個下載存在而且 `want` 不是 `remove`」當條件來新增（`insert … select … from torrents where id = $1 and want <> 'remove'`），新增不到就把剛寫的資料夾刪掉。
+- **Don't start work on a film that is being deleted.** Reconciliation and claiming both skip downloads with `want = 'remove'`.
+- **Check every 2 seconds while running**: the row it is working on still exists, its state is still "in progress", and the download's `want` is not `remove`. If not, kill the child process, delete its own partial output, and exit.
+- **Check once more before creating a folder, writing out a file, or renaming a `.part`.**
+- **The final "I'm done" update must be conditional, with the condition in the same statement**: the row still exists, its state is still what it was when claimed, **and the download's `want` is not `remove`**. If nothing changes (0 rows affected), the thing was deleted, or is being deleted, while it was writing files: **delete the files it just wrote**, and also the folder it created if that is now empty. These are its own output, not anyone's files. Rows added along the way follow the same rule: the candidates added for multiple subtitle files, and the row `api` adds when adding subtitles, are all inserted with "the download exists and `want` is not `remove`" as the condition (`insert … select … from torrents where id = $1 and want <> 'remove'`); if nothing is inserted, delete the folder it just wrote.
 
-前三條讓工作盡快停下來；第四條保證不管時間怎麼交錯，都不會在刪除之後又冒出一個沒有人知道的資料夾。關鍵在 `want`：它在 `torrent` 開始刪任何東西之前就已經是 `remove`，所以任何在那之後才完成的工作，最後那一筆一定改不到；在那之前完成的，它的產物會被 `torrent` 連同資料夾一起刪掉。
+The first three rules make jobs stop as soon as possible; the fourth guarantees that however the timing interleaves, no folder nobody knows about ever appears after the deletion. The key is `want`: it is already `remove` before `torrent` starts deleting anything, so any job that finishes after that is sure to change nothing with its final update; a job that finishes before that has its output deleted by `torrent` along with the folder.
 
-其他後果：
+Other consequences:
 
-- 這部片的匯出全部跟著刪除（見上面 `api` 的那一步）。正在封裝的那個工作在下一次檢查時發現 `cancel_requested`，就終止 ffmpeg、刪掉 `.part` 和 `tracks/`，再刪掉那一列。
-- 被取消的 `tasks` 留著當紀錄，`torrent_id` 是空的。
+- All of this film's exports are deleted along with it (see the `api` step above). The job that is packing finds `cancel_requested` at its next check, kills ffmpeg, deletes the `.part` and `tracks/`, and then deletes the row.
+- Cancelled `tasks` are kept as records, with an empty `torrent_id`.

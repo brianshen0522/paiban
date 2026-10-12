@@ -29,7 +29,7 @@ const INVITE_ERRORS = (): Record<string, string> => ({
   RATE_LIMITED: t.register.rateLimited,
 });
 
-/** The same checks the server makes, so mistakes show before sending (docs/11-pages.md, "用邀請碼註冊"). */
+/** The same checks the server makes, so mistakes show before sending (docs/11-pages.md, "Register with an invite code (24)"). */
 function check(v: Record<Fields, string>): Errors {
   const e: Errors = {};
   if (!v.code.trim()) e.code = t.register.codeRequired;

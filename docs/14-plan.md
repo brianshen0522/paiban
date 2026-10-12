@@ -1,75 +1,75 @@
-# 14 實作計畫
+# 14 Implementation plan
 
-十個階段。每個階段結束時系統都是可以跑、可以示範的狀態，而且都有明確的驗收條件。
+Ten phases. At the end of each phase the system runs and can be demonstrated, and each phase has clear acceptance criteria.
 
-## 每個階段都適用的規矩
+## Rules for every phase
 
-**開始前**：重讀這個階段列出的文件。
+**Before starting**: reread the documents listed for the phase.
 
-**進行中**：
-- 小步提交。每個提交都能通過型別檢查、lint 和測試。
-- 規格有疑問或發現矛盾時，先寫進 `docs/agent-notes.md`。能依 [00-decisions.md](00-decisions.md) 判斷的就自己判斷並記下理由；要改動來源是「指定」「代決」「假設」的決定、或會影響其他階段的，停下來問 Brian（和 `AGENTS.md` 的規則相同）。
-- 偏離規格的地方記在 `docs/changes.md`：改了什麼、為什麼、影響哪些文件，並同步修改那些文件。規格是活的，但不能悄悄地變。
+**While working**:
+- Commit in small steps. Every commit passes type checking, lint and tests.
+- When the spec is unclear or contradicts itself, first write it in `docs/agent-notes.md`. If [00-decisions.md](00-decisions.md) lets you decide, decide and write down why; if it means changing a decision whose source is "Specified", "Decided for Brian" or "Assumption", or it affects other phases, stop and ask Brian (same rule as in `AGENTS.md`).
+- Record departures from the spec in `docs/changes.md`: what changed, why, which documents it affects, and update those documents at the same time. The spec is alive, but it must not change quietly.
 
-**結束時**：
-1. 型別檢查、lint、全部測試都通過。
-2. 驗收條件逐條確認，能自動化的都寫成測試。
-3. 寫 `docs/reports/phase-N.md`：做了什麼、驗收結果、偏離規格的地方、發現的問題、下個階段開始前需要 Brian 決定或提供的東西、怎麼在本機把這個階段的成果跑起來看。
-4. **停下來等 Brian 確認**，不要自己接著做下一個階段。
+**When finishing**:
+1. Type checking, lint and all tests pass.
+2. Check the acceptance criteria one by one; write every one that can be automated as a test.
+3. Write `docs/reports/phase-N.md`: what was done, the acceptance results, departures from the spec, problems found, what Brian needs to decide or provide before the next phase starts, and how to run this phase's work locally to see it.
+4. **Stop and wait for Brian to confirm.** Do not go on to the next phase on your own.
 
-**完成的定義**（每個功能）：型別完整；有測試；文案是繁體中文而且集中在文案檔；有載入中、空的、出錯的狀態；鍵盤能操作；400 px 寬不破版；淺色深色都正常；沒有新的安全檢查清單項目被違反（[12-auth.md](12-auth.md)）。
+**Definition of done** (per feature): fully typed; has tests; copy is in Traditional Chinese and kept in the copy files; has loading, empty and error states; works from the keyboard; does not break at 400 px wide; both light and dark work; no new security checklist item is violated ([12-auth.md](12-auth.md)).
 
-## 需要 Brian 提供的東西
+## What Brian needs to provide
 
-| 東西 | 哪個階段需要 | 沒有的話 |
+| Item | Needed in phase | Without it |
 | --- | --- | --- |
-| 部署機器的資訊：CPU、記憶體、磁碟大小、作業系統、是 x86-64 還是 ARM、Docker 版本 | 0 | 先假設 x86-64 的 Linux。ARM 上的原生模組沒有驗證過 |
-| 目前能用的 YTS 網址 | 0、2 | 用假的 YTS 開發，真的那一段延後確認 |
-| TMDB 金鑰 | 0、5 | JustSubtitles 用片名比對；射手網沒有中文片名可查 |
-| 射手網（偽）的 API token | 0、5 | 射手網只能依文件和假資料開發，真實行為延後確認 |
-| SubDL 金鑰（選擇性） | 5 | 備援模式只能依文件開發 |
-| 字幕庫目前的搜尋網址 | 5 | 協助式的按鈕先不顯示 |
-| 能不能在路由器上開連入埠 | 0、3 | 照常能下載，只是比較慢 |
-| 網站要用什麼網址、HTTPS 怎麼處理 | 9 | 先用 `http://localhost:8080` |
+| Information on the deployment machine: CPU, memory, disk size, operating system, x86-64 or ARM, Docker version | 0 | Assume x86-64 Linux for now. Native modules on ARM have not been verified |
+| A YTS address that works now | 0, 2 | Develop against the fake YTS; postpone confirming the real part |
+| TMDB key | 0, 5 | JustSubtitles matches by title; Assrt has no Chinese title to look up |
+| API token for Assrt (Shooter) | 0, 5 | Assrt can only be developed from the docs and fake data; real behavior is confirmed later |
+| SubDL key (optional) | 5 | Fallback mode can only be developed from the docs |
+| Zimuku's current search address | 5 | The assisted button is not shown for now |
+| Whether an incoming port can be opened on the router | 0, 3 | Downloads still work, just slower |
+| What address the site uses, and how HTTPS is handled | 9 | Use `http://localhost:8080` for now |
 
-金鑰由 Brian 自己在管理頁輸入或寫進他本機的 `.env`。**不要請他把金鑰貼在對話裡，也不要把任何金鑰寫進 repo。**
+Brian enters keys himself on the admin pages or writes them into his local `.env`. **Do not ask him to paste keys into the conversation, and do not write any key into the repo.**
 
 ---
 
-## 階段 0：確認假設
+## Phase 0: check the assumptions
 
-**目的**：在寫任何功能之前，把這份規格依賴的外部事實確認一遍。這份交接包裡有一些沒辦法在準備它的環境裡驗證的東西（[16-risks.md](16-risks.md)），現在補上。
+**Goal**: before writing any feature, check the external facts this spec depends on. This handover pack contains things that could not be verified in the environment where it was prepared ([16-risks.md](16-risks.md)); fill those in now.
 
-**讀**：README、AGENTS、00、02、16；05、07、08（第 2 和第 4 項要拿實際的結果和它們比對）；以及 `reference/` 每個資料夾。
+**Read**: README, AGENTS, 00, 02, 16; 05, 07, 08 (items 2 and 4 compare actual results against them); and every folder in `reference/`.
 
-**這個階段需要的環境**：
+**Environment this phase needs**:
 
-| 需要 | 哪幾項 | 沒有的話 |
+| Need | Items | Without it |
 | --- | --- | --- |
-| 可以用的 Docker（daemon 在跑） | 1、2、3 | 第 2 項改在主機上跑，並在報告裡寫明主機上 Node、ffmpeg、Python、ffsubsync 的版本；第 1、3 項列為「無法確認」。能不能先進階段 1 由 Brian 決定；第一次有 Docker 可用時要補做 |
-| 對外的網路 | 4、5、6 | 列為「無法確認」，其他照做 |
-| 桌面瀏覽器（Chrome、Firefox、Safari） | 7 | 把測試頁和檔案準備好，寫清楚步驟，請 Brian 自己開一次，把結果告訴你 |
-| 部署用的那台機器 | 5、6 的結論 | 在開發機上做，報告裡註明「這是開發機的結果」；網路和效能的結論到階段 9 在部署的機器上再量一次 |
+| A working Docker (daemon running) | 1, 2, 3 | Run item 2 on the host instead, and state the host's Node, ffmpeg, Python and ffsubsync versions in the report; list items 1 and 3 as "Could not confirm". Brian decides whether to move on to Phase 1 first; redo them the first time Docker is available |
+| Outbound network | 4, 5, 6 | List as "Could not confirm"; do the rest as normal |
+| Desktop browsers (Chrome, Firefox, Safari) | 7 | Prepare the test page and files, write clear steps, ask Brian to open it once himself and tell you the results |
+| The machine used for deployment | Conclusions of 5, 6 | Do it on the development machine and note in the report "these are development machine results"; measure the network and performance conclusions again on the deployment machine in Phase 9 |
 
-做不到的不要假裝做了，也不要換成別的做法充數：寫進報告。
+Do not pretend to have done what you couldn't do, and don't substitute another approach to fill the gap: write it in the report.
 
-**做**：
+**Do**:
 
-1. **骨架**：依 [02-architecture.md](02-architecture.md) 建立 monorepo（`apps/web`、`apps/server`、`packages/shared`）、TypeScript、lint、格式化、測試工具。
-   - `deploy/` 的三個範例檔改名成正式的檔案（`docker-compose.yml`、`Dockerfile`、`Caddyfile`），依實際情況修正；`.env.example` 留著。文件裡提到 `*.example` 檔名的地方跟著改。
-   - `deploy/.env`（compose 讀的是和它放在一起的那一個）：沒有就從 `.env.example` 複製；已經有的話（Brian 可能先建好並填了金鑰）保留裡面的值。還空著的 `POSTGRES_PASSWORD`、`SECRET_KEY`、`BOOTSTRAP_ADMIN_PASSWORD` 由你用亂數產生後寫進去，`BOOTSTRAP_ADMIN_USERNAME` 空著的話填 `admin`（兩個要一起有值，見 [12-auth.md](12-auth.md)）。不提交、不印在對話或 log 裡。告訴 Brian 檔案在哪裡、管理員的帳密是哪兩個變數，請他自己打開看。
-   - `docker compose up --build` 起得來，五個容器都在：`GET /api/health` 回 `{ok: true}`，瀏覽器打開看到一個寫著站名的頁面。`torrent` 和 `media` 這時還沒有功能，但要是一個會持續執行的程式（直接結束的話容器會一直重啟）：每隔一段時間在 log 裡寫一行就好，寫進資料庫的心跳等階段 1 有了資料表再做。映像檔要完整（有 ffmpeg、ffsubsync、解壓工具）。
-   - 記下映像檔裡 ffmpeg、Python、ffsubsync 的實際版本。這份規格的數字是在 ffmpeg 6.1.1 上量的；Dockerfile 範例用的基底映像檔很可能帶的是更新的版本。
-2. **在建好的映像檔裡跑參考測試**：
-   - `reference/sync-core`：`node --test core.test.ts`（17 項）
-   - `reference/subtitles`：`npm ci && npm test`（5 項）
-   - `db`：`npm ci && npm test`（11 項）
-   - `reference/torrent`：`npm ci && npm test`（本機兩個用戶端互傳，成功時印出 PASS）
-   - `reference/pipeline/analyze.sh` 對 `fixtures/clip.mp4`：產出的 `speech.json` 和 `peaks.bin` 要和 `fixtures/data.json` 裡的一致
-   - `reference/pipeline/align.ts` 對三份弄錯的字幕：結果要和 [08-media-pipeline.md](08-media-pipeline.md) 的表格一致
-   - `reference/pipeline/preview.sh` 和 `mux.sh` 各跑一次
+1. **Skeleton**: following [02-architecture.md](02-architecture.md), set up the monorepo (`apps/web`, `apps/server`, `packages/shared`), TypeScript, lint, formatting, and test tooling.
+   - Rename the three example files in `deploy/` to their real names (`docker-compose.yml`, `Dockerfile`, `Caddyfile`) and fix them to match reality; keep `.env.example`. Update every place in the docs that mentions a `*.example` file name.
+   - `deploy/.env` (compose reads the one that sits next to it): if it doesn't exist, copy it from `.env.example`; if it already exists (Brian may have created it and filled in keys), keep its values. Generate random values for `POSTGRES_PASSWORD`, `SECRET_KEY` and `BOOTSTRAP_ADMIN_PASSWORD` if they are still empty and write them in; if `BOOTSTRAP_ADMIN_USERNAME` is empty, fill in `admin` (both must have values together, see [12-auth.md](12-auth.md)). Don't commit it, and don't print it in the conversation or logs. Tell Brian where the file is and which two variables hold the administrator's username and password, and ask him to open it himself.
+   - `docker compose up --build` comes up with all five containers: `GET /api/health` returns `{ok: true}`, and opening the browser shows a page with the site name. `torrent` and `media` have no features yet, but they must be programs that keep running (if they exit right away the container keeps restarting): writing a line to the log every so often is enough; the heartbeat written to the database waits until Phase 1 has the tables. The image must be complete (ffmpeg, ffsubsync, extraction tools).
+   - Record the actual versions of ffmpeg, Python and ffsubsync in the image. The numbers in this spec were measured on ffmpeg 6.1.1; the base image used by the example Dockerfile very likely ships a newer version.
+2. **Run the reference tests in the built image**:
+   - `reference/sync-core`: `node --test core.test.ts` (17 tests)
+   - `reference/subtitles`: `npm ci && npm test` (5 tests)
+   - `db`: `npm ci && npm test` (11 tests)
+   - `reference/torrent`: `npm ci && npm test` (two local clients transfer to each other; prints PASS on success)
+   - `reference/pipeline/analyze.sh` on `fixtures/clip.mp4`: the `speech.json` and `peaks.bin` it produces must match those in `fixtures/data.json`
+   - `reference/pipeline/align.ts` on the three wrong subtitles: the results must match the table in [08-media-pipeline.md](08-media-pipeline.md)
+   - Run `reference/pipeline/preview.sh` and `mux.sh` once each
 
-   交接的材料（`reference/`、`fixtures/`、`db/`）不在映像檔裡（`.dockerignore` 排除了它們），所以要把 repo 掛進容器裡跑。大致是這樣；這道指令**沒有實際跑過**（準備交接包的環境沒有 Docker），依實際情況調整：
+   The handover material (`reference/`, `fixtures/`, `db/`) is not in the image (`.dockerignore` excludes it), so mount the repo into the container to run them. Roughly like this; this command **has never actually been run** (the environment that prepared the handover pack had no Docker), so adjust it as needed:
 
    ```bash
    docker compose -f deploy/docker-compose.yml run --rm --no-deps \
@@ -77,222 +77,222 @@
      node --test reference/sync-core/core.test.ts
    ```
 
-   重點是「在映像檔的 Node、ffmpeg、ffsubsync 上跑」，不是在開發機上跑。把這幾道指令寫成一支腳本留在 repo 裡。
+   The point is "run on the image's Node, ffmpeg and ffsubsync", not on the development machine. Write these commands as a script and keep it in the repo.
 
-   怎樣算通過：
+   What counts as passing:
 
-   | 項目 | 標準 |
+   | Item | Standard |
    | --- | --- |
-   | 四組測試 | 全部通過，數量相符 |
-   | `analyze.sh` | `speech.json` 的區段和 `fixtures/data.json` 的 `speech` 相同；`peaks.bin` 和 `data.json` 的 `peaks`（base64 解開）相同 |
-   | `align.ts` | 三份字幕各自的分段數和速率和 [08-media-pipeline.md](08-media-pipeline.md) 表格的最後一欄相同，位移相差在 0.01 秒以內，`agree` 是 true |
-   | `preview.sh`（對 `fixtures/clip.hevc10.mp4`） | 產出 `audio.m4a` 和 `proxy.mp4`；`proxy.mp4` 是 H.264 加立體聲 AAC，每一格的時間戳和來源相同 |
-   | `mux.sh`（對 `fixtures/clip.mp4` 加兩條 `truth` 字幕） | 一條影像、一條聲音、兩條字幕；語言標籤和預設軌正確；影像和聲音的封包和來源相同 |
+   | The four test suites | All pass, with matching counts |
+   | `analyze.sh` | The regions in `speech.json` equal `speech` in `fixtures/data.json`; `peaks.bin` equals `peaks` in `data.json` (base64-decoded) |
+   | `align.ts` | For each of the three subtitles, the number of segments and the rate equal the last column of the table in [08-media-pipeline.md](08-media-pipeline.md), the offset is within 0.01 seconds, and `agree` is true |
+   | `preview.sh` (on `fixtures/clip.hevc10.mp4`) | Produces `audio.m4a` and `proxy.mp4`; `proxy.mp4` is H.264 with stereo AAC, and every frame's timestamp equals the source's |
+   | `mux.sh` (on `fixtures/clip.mp4` plus two `truth` subtitles) | One video track, one audio track, two subtitle tracks; language tags and default track correct; video and audio packets identical to the source |
 
-   映像檔裡的 ffmpeg 版本和 6.1.1 不同時，`analyze.sh` 的結果可能有幾個影格的出入（聲音重新取樣的細節不同）。那不算失敗：在報告裡寫出差了多少，把比對改成容許誤差（人聲不同的影格在 1% 以內、對齊的結果仍然符合上表），並更新 `fixtures/README.md` 的說明。差很多才是問題。
-3. **壓縮檔**：確認映像檔裡的工具能解 zip、7z、rar。rar 和 7z 的測試檔需要自己準備（裡面放 `fixtures/` 的字幕檔；準備交接包的環境沒有能產生它們的工具）。解不了 rar 的話提出替代方案。
-4. **真實的外部來源**（需要網路；手動執行，不進自動化測試）：對每個來源查一部固定的片（IMDb `tt1375666`），和 [05-yts.md](05-yts.md)、[07-subtitle-providers.md](07-subtitle-providers.md) 逐項比對。沒有金鑰的來源先跳過並在報告裡列出。請求量壓到最低：每個來源幾個請求就夠。
-   - **回應的形狀**（JSON、HTML）要留下來當測試素材：先把所有金鑰、token 和帶簽章的 query string 的值換成 `PLACEHOLDER`（參數本身留著：測試要證明解析時會把它丟掉），再放進 `reference/providers/` 取代手寫的範例。
-   - **字幕壓縮檔**只用來確認格式（是不是 zip、裡面長什麼樣、用什麼編碼）：每個來源下載一個，最多兩個，放在 `.scratch/`（已列在 `.gitignore`），看完就刪。它們不提交、不當成測試素材（D29）；壓縮檔的測試素材用 `fixtures/archive.zip` 這種自己做的。
-5. **真實的 BitTorrent 下載**：用一個可以合法自由散布的種子（WebTorrent 官方文件裡列的範例種子，例如 Blender 基金會的 *Sintel*；info hash 從官方文件取，不要憑印象寫）。確認在目標環境裡 DHT、tracker、連入埠的實際情況，以及下載、暫停、強制終止後重啟接續。
-   - 這一項用**一支獨立的小腳本**做（例如 `scripts/phase0/real-swarm.mjs`，直接用 WebTorrent，照 `reference/torrent/local-swarm-test.mjs` 的寫法），不經過產品的程式。產品本身永遠不會有「下載任意種子」的入口（D26），也不要為了這個檢查加一個。腳本留在 repo 裡當紀錄，不進映像檔。
-6. **真實電影的對齊**：用 *Sintel* 或 *Tears of Steel*（Blender 基金會的開放電影，有對白、有配樂和音效、有官方字幕）。跑分析；把官方英文字幕分別整體延後、改速率、中間切一段，再跑自動對齊，量出誤差。這是整份規格裡最大的未知數，結果會決定階段 6 要不要調整做法。
-7. **瀏覽器播放**：用 ffmpeg 從上面的開放電影做一個類似 YTS 規格的檔案（H.264 High、AAC，另一個做 5.1 聲道，`moov` 放在檔尾），透過一個支援 Range 的最小端點，在 Chrome、Firefox、Safari 確認能播、能拖動。
+   When the ffmpeg version in the image differs from 6.1.1, the `analyze.sh` results may be off by a few frames (the details of audio resampling differ). That is not a failure: write in the report how large the difference is, change the comparison to allow a tolerance (speech frames differing by under 1%, alignment results still matching the table above), and update the explanation in `fixtures/README.md`. Only a large difference is a problem.
+3. **Archives**: confirm the tools in the image can extract zip, 7z and rar. You need to prepare the rar and 7z test files yourself (put the subtitle files from `fixtures/` in them; the environment that prepared the handover pack had no tools to create them). If rar can't be extracted, propose an alternative.
+4. **Real external sources** (needs network; run by hand, not part of the automated tests): for each source, look up one fixed film (IMDb `tt1375666`) and compare item by item against [05-yts.md](05-yts.md) and [07-subtitle-providers.md](07-subtitle-providers.md). Skip sources you have no key for and list them in the report. Keep requests to a minimum: a few per source is enough.
+   - **Response shapes** (JSON, HTML) are kept as test fixtures: first replace the values of all keys, tokens and signed query strings with `PLACEHOLDER` (keep the parameters themselves: the tests have to prove that parsing drops them), then put them in `reference/providers/` in place of the handwritten examples.
+   - **Subtitle archives** are used only to confirm the format (is it a zip, what's inside, which encoding): download one per source, at most two, put them in `.scratch/` (already in `.gitignore`), and delete them once you've looked. They are not committed and not used as test fixtures (D29); archive test fixtures are home-made ones like `fixtures/archive.zip`.
+5. **Real BitTorrent download**: use a torrent that may be freely and legally distributed (one of the example torrents listed in WebTorrent's official docs, e.g. the Blender Foundation's *Sintel*; take the info hash from the official docs, don't write it from memory). Confirm how DHT, trackers and the incoming port actually behave in the target environment, as well as downloading, pausing, and resuming after a forced kill and restart.
+   - Do this item with **a small standalone script** (e.g. `scripts/phase0/real-swarm.mjs`, using WebTorrent directly, written the way `reference/torrent/local-swarm-test.mjs` is), not through the product's code. The product itself will never have an entry point for "download an arbitrary torrent" (D26), and don't add one for this check. Keep the script in the repo as a record; it does not go into the image.
+6. **Syncing on a real film**: use *Sintel* or *Tears of Steel* (Blender Foundation open movies, with dialogue, music and sound effects, and official subtitles). Run the analysis; take the official English subtitles and separately delay them as a whole, change their rate, and cut out a piece in the middle, then run auto-align and measure the error. This is the biggest unknown in the whole spec, and the results decide whether Phase 6 needs to change its approach.
+7. **Browser playback**: use ffmpeg to make a file from the open movie above that resembles the YTS format (H.264 High, AAC, another with 5.1 channels, `moov` at the end of the file), and through a minimal endpoint that supports Range, confirm it plays and can be seeked in Chrome, Firefox and Safari.
 
-**驗收**：
-- `docker compose up --build` 一次成功，健康檢查通過。
-- 第 2 項的每個測試在映像檔裡通過，數字和文件一致。
-- `docs/reports/phase-0.md` 對第 3 到 7 項各有明確的結論：確認、不符（附上實際情況和建議的規格修改）、或無法確認（附上原因和需要什麼）。
-- 有任何會動搖架構的發現（例如 WebTorrent 在目標機器上載不起來、對齊在真實電影上不可用）要在報告最前面講。
-
----
-
-## 階段 1：帳號與外框
-
-**讀**：01、02（程式碼配置、設定、啟動與關閉、記錄）、03、04（共通規則、登入與帳號、管理裡的使用者、邀請、操作紀錄、即時更新）、11（外框、登入、註冊、重設、個人設定、使用者與邀請、操作紀錄）、12、13（個人偏好）、17。
-
-**做**：
-- **共用的程式碼先到位**：把 `contracts/api.ts` 和 `reference/sync-core/`（`core.ts`、`core.test.ts`）**搬進** `packages/shared`，並從合約寫出 zod schema。是搬（`git mv`），不是複製：之後只有 `packages/shared` 裡的那一份，原本的 `contracts/` 和 `reference/sync-core/` 不再存在。搬的同時要改：
-  - 合約第一行的 import（它原本指到 `../reference/sync-core/core.ts`）
-  - `core.test.ts` 裡讀 `fixtures/` 的相對路徑；測試從 `node:test` 改成 Vitest（機械式的改寫，案例和預期值不動）
-  - `reference/pipeline/align.ts` 的 import，以及階段 0 那支跑參考測試的腳本
-  - 整個 repo 裡提到 `contracts/api.ts` 和 `reference/sync-core/` 的地方：`AGENTS.md`（依據的優先順序、參考程式怎麼用、指令）、`README.md`、`docs/`、各個子資料夾的 README、`db/schema.sql` 的註解。全文搜尋後一次改完，記一則 `docs/changes.md`
-- **`db/schema.sql` 留著，但真相換成遷移。** 階段 1 用 Drizzle 定義 schema 並產生遷移檔，從此資料庫以遷移為準。`db/schema.sql` 繼續當作「這個資料庫應該長什麼樣」的可讀版本：以後改資料表，遷移和它一起改。加一個測試確認兩者等價（把 `db/schema.sql` 建在一個空的資料庫、把遷移跑在另一個，比較兩邊的資料表、欄位、型別、約束和索引）。`db/schema.test.mjs` 的 11 個案例改寫成伺服器的資料庫測試，對著遷移出來的 schema 跑；改寫完之後 `db/` 裡原本那支測試可以刪掉。
-- 資料庫遷移（全部資料表一次建好）、設定與金鑰的存取、第一個管理員（各種情況見 [12-auth.md](12-auth.md)）。三個服務的心跳（`service_heartbeats`，每 10 秒一次，見 [02-architecture.md](02-architecture.md)）：`torrent` 和 `media` 這時仍然沒有功能，但從這個階段起也寫心跳；顯示它們的系統狀態頁在階段 4。
-- 登入、登出、session、邀請、註冊、重設密碼、個人設定（名稱、偏好、改密碼、裝置）。
-- 外框（頂端列、側邊選單、路由、權限守門、找不到頁面、沒有權限、登入後回到原本要去的頁面）、設計 token 與基本元件（按鈕、欄位、狀態標籤、確認框、提示訊息、表格）、SSE 的管道（先只有心跳）、`audit_log` 的寫入、文案檔。
-- 管理頁的「使用者與邀請」和「操作紀錄」在這個階段做，因為沒有它們就沒辦法邀請第二個人。
-
-**驗收**：
-- 空的資料庫啟動後，能用環境變數裡的管理員登入。
-- 管理員建立邀請 → 第二個瀏覽器用連結註冊 → 以成員身分登入。邀請用過、過期、不存在各顯示對應的訊息。
-- 成員打開任何 `/admin` 頁面看到「這一頁只有管理員能看」；直接呼叫 `/api/admin/…` 回 403。
-- 停用帳號後，他已經登入的瀏覽器下一個請求就被登出。
-- 重設密碼的連結能用一次，30 分鐘後或用過之後失效。
-- [12-auth.md](12-auth.md) 檢查清單裡和這個階段有關的項目都有測試。
-- 外框在 400 px、淺色、深色都和原型一致。頂端列的用量指示要到階段 2 才有上限、階段 3 才有用量，通知要到階段 8：這個階段先把位置和樣子做出來（用量顯示「—」，通知是空的），不要省略，免得之後版面要重排。搜尋框送出後到搜尋頁；搜尋頁本身在階段 2 才有內容，這個階段先是一個空狀態。
-- `packages/shared` 裡：對齊核心的 17 個測試通過，合約的型別檢查通過。伺服器的資料庫測試裡：原本 `db/schema.test.mjs` 的 11 個案例對著遷移出來的 schema 通過；「遷移和 `db/schema.sql` 等價」的測試通過。
+**Acceptance**:
+- `docker compose up --build` succeeds on the first try, and the health check passes.
+- Every test in item 2 passes in the image, with numbers matching the docs.
+- `docs/reports/phase-0.md` has a clear conclusion for each of items 3 to 7: confirmed, does not match (with the actual situation and a proposed spec change), or could not confirm (with the reason and what is needed).
+- Any finding that shakes the architecture (e.g. WebTorrent won't load on the target machine, or syncing is unusable on real films) goes at the very top of the report.
 
 ---
 
-## 階段 2：搜尋與電影頁
+## Phase 1: accounts and shell
 
-**讀**：05、04（搜尋、儲存空間、管理裡的設定與測試）、10（用量怎麼算、接受與拒絕、預覽預留、介面上的呈現）、11（搜尋、電影頁、來源設定）、12（對外請求）、13（YTS 的部分、測試連線）、15（假的 YTS）。
+**Read**: 01, 02 (Code layout, Configuration, Startup and shutdown, Logging), 03, 04 (Common rules, Sign-in and accounts, users under Admin, invites, Activity log, Live updates), 11 (Shell, Sign in, Register, Reset, Profile, Users & invites, Activity log), 12, 13 (Personal preferences), 17.
 
-**做**：**共用的對外 HTTP 用戶端**（主機白名單、擋內部位址、轉址、逾時、大小上限、log 去掉 query string，以及開發測試用的 `ALLOW_LOCAL_SOURCES` / `SOURCE_OVERRIDES`；階段 5 的字幕來源會直接沿用它）、YTS 用戶端（可設定的網址、快取、形狀驗證、不跟跨主機轉址）、假的 YTS（給開發和測試用）、搜尋頁（篩選、分頁、每一種狀態）、電影頁（版本表；這個階段「下載」按鈕還沒有作用，但能不能直接播、預覽預留、放不放得下要算出來顯示）、海報代理、來源設定頁的 YTS 卡片和測試連線。「放不放得下」需要用量和上限：這個階段就把容量上限的初始值寫進設定（`STORAGE_LIMIT_GB`，只寫一次）、把 `Usage` 的查詢做出來（這時用量是 0），頂端列的用量指示也接上。
+**Do**:
+- **Shared code first**: **move** `contracts/api.ts` and `reference/sync-core/` (`core.ts`, `core.test.ts`) into `packages/shared`, and write zod schemas from the contract. Move (`git mv`), don't copy: afterwards only the copy in `packages/shared` exists, and the original `contracts/` and `reference/sync-core/` are gone. While moving, change:
+  - The import on the contract's first line (it originally points to `../reference/sync-core/core.ts`)
+  - The relative paths in `core.test.ts` that read `fixtures/`; switch the tests from `node:test` to Vitest (a mechanical rewrite; cases and expected values stay the same)
+  - The import in `reference/pipeline/align.ts`, and the Phase 0 script that runs the reference tests
+  - Every place in the repo that mentions `contracts/api.ts` and `reference/sync-core/`: `AGENTS.md` (Order of authority, How to use the reference code, Commands), `README.md`, `docs/`, the READMEs of each subfolder, the comments in `db/schema.sql`. Search the full text and change them all at once, and record one entry in `docs/changes.md`
+- **Keep `db/schema.sql`, but migrations become the source of truth.** In Phase 1, define the schema with Drizzle and generate migration files; from then on the database follows the migrations. `db/schema.sql` remains the readable version of "what this database should look like": when a table changes later, the migration and it change together. Add a test that confirms the two are equivalent (build `db/schema.sql` in one empty database, run the migrations in another, and compare the tables, columns, types, constraints and indexes on both sides). Rewrite the 11 cases in `db/schema.test.mjs` as server database tests that run against the migrated schema; once rewritten, the original test in `db/` can be deleted.
+- Database migrations (all tables created at once), access to settings and keys, the first administrator (for all the cases see [12-auth.md](12-auth.md)). Heartbeats for the three services (`service_heartbeats`, once every 10 seconds, see [02-architecture.md](02-architecture.md)): `torrent` and `media` still have no features at this point, but they write heartbeats from this phase on; the System status page that shows them comes in Phase 4.
+- Sign-in, sign-out, sessions, invites, registration, password reset, Profile (name, preferences, change password, devices).
+- The shell (top bar, side menu, routing, permission guards, page not found, no permission, returning after sign-in to the page you were headed for), design tokens and basic components (buttons, fields, status tags, confirmation dialogs, toast messages, tables), the SSE pipe (heartbeat only for now), writing to `audit_log`, the copy files.
+- The admin pages "Users & invites" and "Activity log" are done in this phase, because without them there's no way to invite a second person.
 
-**驗收**：
-- 對假的 YTS：搜尋、篩選、排序、分頁、沒有結果、連不上、回應不是 YTS 的形狀，每一種都有測試。
-- 沒有設定網址時，搜尋頁引導管理員去設定。
-- 瀏覽器的網路面板裡沒有任何連到 YTS 或其他外部網域的請求。
-- 設定成會轉址到別的主機的網址時，測試連線回報被轉址而不是成功。
-- 對外用戶端：白名單以外的主機、內部位址、`http://` 都被擋下，包含轉址之後的；`NODE_ENV=production` 時設了測試用的變數，程式拒絕啟動。
--（有真的 YTS 網址時）手動確認真實搜尋和電影頁正常。
-
----
-
-## 階段 3：下載與容量上限
-
-**讀**：06、10、02（服務之間怎麼溝通、啟動與關閉）、03（下載、持有人、交易的邊界、刪除一個下載時發生的事）、04（下載、片庫、儲存空間、即時更新、管理裡的儲存空間）、05（版本、磁力連結）、11（電影頁、下載、片庫、工作區的頁首、儲存空間、儲存空間管理、下載設定）、12（誰能做什麼）、13（下載設定）、15（本機做種）。
-
-**做**：admission（交易與鎖）、`torrent` 程式（主迴圈、排程、暫停、繼續、重試、停滯、失敗的收尾、完成、移除、重啟接續、做種）、電影頁上的「下載」「加入我的片庫」「重試」開始有作用、下載頁（即時進度）、片庫頁（這個階段卡片上只有「影片已下載」這一步是真的）、工作區的外殼（`GET /api/library/:torrentId`、頁首、三個分頁；分頁的內容先是空狀態，之後的階段填進去）、持有人（加入、移除、最後一位的刪除）、儲存空間頁、儲存空間管理頁（上限、全部項目、強制刪除電影、預留和殘留）、下載設定頁、用量指示、`usage` 和 `torrent` 事件、下載完成與失敗的通知（先寫進資料表，鈴鐺的介面在階段 8）、唯一的刪除模組。
-
-**這個階段還沒有 `media` 程式。** 所以：
-
-- 工作區一開啟就自動要求分析的那個呼叫（`POST /api/media/:id/analyze`）先不要接：這個階段每部片的分析狀態都是 `none`，接了會讓它們永遠停在「分析中」。端點和這個呼叫在階段 4 一起做。
-- 下載完成時 `analysis_state` 一律寫成 `none`，狀態直接是「完成」（見 [06-torrent-worker.md](06-torrent-worker.md)）。預覽資產照計畫寫成「等待中」，預留量照算，只是還沒有人去做；階段 4 會接手。
-- 「重新計算用量」、刪除預覽檔、孤兒資料夾留到階段 4；和匯出有關的留到階段 7。
-
-**驗收**：
-- [10-storage.md](10-storage.md)「要測的情況」裡階段 3 的那一組，全部是自動化測試。
-- [06-torrent-worker.md](06-torrent-worker.md)「測試」裡的整合測試全部通過，用本機做種的方式，不連外部。
-- 下載進行中把 `torrent` 容器強制終止再啟動：下載接續，已完成的部分不重抓（正常關閉時）或重新驗證後接續（強制終止時）。
-- 下載進行中重啟 `api` 容器：下載不受影響，頁面重新連上後進度正確。
-- 兩個瀏覽器同時對最後一點空間送出下載：一個成功、一個看到空間不足的說明。
-- 原始碼掃描的測試：只有指定的模組會刪 `/data` 底下的東西；沒有任何刪除是依時間或新舊決定的（定義在 [15-testing.md](15-testing.md) 的「不自動刪除」）。
+**Acceptance**:
+- After starting on an empty database, you can sign in as the administrator from the environment variables.
+- An administrator creates an invite → a second browser registers with the link → signs in as a member. A used, expired or nonexistent invite each shows the matching message.
+- A member opening any `/admin` page sees "Only administrators can see this page."; calling `/api/admin/…` directly returns 403.
+- After an account is disabled, the next request from a browser where it is already signed in signs it out.
+- A password reset link works once, and stops working after 30 minutes or after it's used.
+- Every item in the [12-auth.md](12-auth.md) checklist that relates to this phase has a test.
+- The shell matches the prototype at 400 px, in light and in dark. The top bar's usage indicator only gets a limit in Phase 2 and usage in Phase 3, and notifications come in Phase 8: in this phase build their position and look (usage shows "—", notifications are empty) and don't leave them out, so the layout doesn't need rearranging later. Submitting the search box goes to the Search page; the Search page itself only gets content in Phase 2, so in this phase it is an empty state.
+- In `packages/shared`: the 17 sync core tests pass, and the contract passes type checking. In the server database tests: the 11 cases from the original `db/schema.test.mjs` pass against the migrated schema; the "migrations are equivalent to `db/schema.sql`" test passes.
 
 ---
 
-## 階段 4：影片分析與預覽
+## Phase 2: search and film page
 
-**讀**：08（一部片下載完成之後、分析、預覽資產、工作的共通規矩、對帳、手動重試）、02（佇列、啟動與關閉）、03（影片與衍生檔、刪除一個下載時發生的事）、04（影片、管理）、09（載入、播哪個檔）、10（預覽預留、重新計算用量、確認的文字）、11（下載、儲存空間管理、系統狀態）、13（下載完成後的設定）。
+**Read**: 05, 04 (Search, Storage, settings and tests under Admin), 10 (How usage is counted, Admission and refusal, Preview reservation, How it appears in the interface), 11 (Search, Film page, Sources), 12 (Outbound requests), 13 (the YTS parts, Test connection), 15 (fake YTS).
 
-**做**：`media` 程式與工作佇列、對帳、`tasks`、分析（探測、波形、人聲）、能不能直接播的判定與修正、預覽資產（聲音檔、預覽影片、進度、被刪除時停下來）、事後要求預覽檔、`POST /api/media/:id/analyze` 和工作區開啟時的自動呼叫（階段 3 先沒接的那個）、影片的串流端點（Range）、波形和人聲的端點、系統狀態頁（含手動重試）、下載頁上的「分析中」和預覽檔進度、重新計算用量與它的發現、強制刪除預覽檔和孤兒資料夾。把階段 3 寫死的 `analysis_state = 'none'` 改成依設定。
+**Do**: the **shared outbound HTTP client** (host allowlist, blocking internal addresses, redirects, timeouts, size limits, stripping the query string from logs, plus `ALLOW_LOCAL_SOURCES` / `SOURCE_OVERRIDES` for development and testing; Phase 5's subtitle sources reuse it directly), the YTS client (configurable address, caching, shape validation, not following cross-host redirects), the fake YTS (for development and testing), the Search page (filters, pagination, every state), the film page (the versions table; in this phase the "Download" button does nothing yet, but whether it can play directly, the preview reservation and whether it fits must be computed and shown), the poster proxy, and the YTS card and test connection on the Sources page. "Whether it fits" needs usage and the limit: in this phase, write the initial storage limit into settings (`STORAGE_LIMIT_GB`, written once only), build the `Usage` query (usage is 0 at this point), and hook up the top bar's usage indicator.
 
-**驗收**：
-- `fixtures/clip.mp4` 下載完成後自動分析；`peaks` 和 `speech` 端點回的內容和 `fixtures/data.json` 一致。
-- 自動分析關掉（`media.analyzeAuto`）時：下載完成後不分析；第一次開啟那部片的工作區時自動開始。
-- 用 `fixtures/clip.hevc10.mp4`（HEVC 10-bit、5.1 聲道）：自動產生聲音檔和預覽檔；預覽檔每一格的時間戳和來源相同；用量先是預留值，完成後變成實際值。
-- 預覽檔轉到一半刪除那部片：ffmpeg 被終止，沒有留下任何檔案。
-- 串流端點支援 Range（用 `curl -r` 驗證 206 和正確的位元組），沒登入或不是持有人拿不到。
-- `media` 容器在工作中被重啟：工作重新排入，沒有殘留的 `.part`。
-- 同一件工作被排入兩次（模擬對帳和通知同時觸發）：只做一次。
-- 假的 YTS 把一個 HEVC 的檔案標成 x264（預測能直接播、實際不能）：探測之後補上預覽計畫；空間不夠時記下 `PREVIEW_NO_SPACE` 而不是失敗。
-- 沒有聲音軌的檔案：分析標成失敗（`NO_AUDIO`），預覽影片照樣做出來，`GET /api/library/:torrentId` 照常回應（電影可以進工作區）。
-- [10-storage.md](10-storage.md)「要測的情況」裡階段 4 的那一組。
+**Acceptance**:
+- Against the fake YTS: search, filter, sort, pagination, no results, unreachable, and a response that isn't YTS-shaped each have a test.
+- When no address is set, the Search page leads the administrator to set it.
+- The browser's network panel shows no request to YTS or any other external domain.
+- When the address is set to one that redirects to another host, test connection reports the redirect rather than success.
+- Outbound client: hosts outside the allowlist, internal addresses and `http://` are all blocked, including after redirects; with `NODE_ENV=production`, if a testing variable is set the program refuses to start.
+- (When there is a real YTS address) confirm by hand that real searches and the film page work.
 
 ---
 
-## 階段 5：字幕來源（全部一起）
+## Phase 3: downloads and the storage limit
 
-**讀**：07（整份）、02（佇列）、03（字幕、刪除一個下載時發生的事）、04（字幕）、08（自動對齊、工作的共通規矩、對帳）、09（同步文件的形狀；「加入」的時候就要建立它）、10（小檔案）、11（工作區：字幕）、12（對外請求、上傳與壓縮檔）、13（來源、金鑰、測試連線）、15（假的字幕來源）。
+**Read**: 06, 10, 02 (How the services talk to each other, Startup and shutdown), 03 (Downloads, Holders, Transaction boundaries, What happens when a download is deleted), 04 (Downloads, Library, Storage, Live updates, storage under Admin), 05 (versions, Magnet links), 11 (Film page, Downloads, Library, the workspace header, Storage, Storage management, Download settings), 12 (Who can do what), 13 (Download settings), 15 (local seeding).
 
-**做**：沿用階段 2 的對外 HTTP 用戶端，加上各來源的主機清單和請求排隊（`provider_take_slot`）；來源的介面；`subtitle.search`、`subtitle.resolve`（`api` 處理）和 `subtitle.fetch`、`subtitle.ingest`、`subtitle.rank`（`media` 處理）；**JustSubtitles（先做）**、TMDB 對照、SubDL 備援模式、YIFY Subtitles、射手網（偽）、字幕庫的協助式卡片、上傳（檔案一收到就是一條候選）；解壓縮、編碼、解析、正規化、語言判斷；候選清單、失敗的候選與移除、「加入」（含繁簡轉換、挑檢查點、建立同步文件）、已加入的字幕清單、移除；來源設定頁的其餘卡片與測試、來源狀況。「全部自動對齊並排名」的介面和工作流程在這個階段接好，對齊本身先用對齊核心的 `autoAlign`（下一個階段補上 ffsubsync 那一半）。
+**Do**: admission (transaction and lock), the `torrent` program (main loop, scheduling, pause, resume, retry, stalls, cleanup after failure, completion, removal, resuming after restart, seeding), "Download", "Add to my library" and "Retry" on the film page starting to work, the Downloads page (live progress), the Library page (in this phase, only the "Video downloaded" step on the card is real), the workspace shell (`GET /api/library/:torrentId`, header, three tabs; tab contents are empty states for now, later phases fill them in), holders (adding, removing, deletion by the last one), the Storage page, the Storage management page (limit, all items, force deleting films, reserved and leftovers), the Download settings page, the usage indicator, `usage` and `torrent` events, notifications for downloads finishing and failing (written to the table for now; the bell interface comes in Phase 8), the single deletion module.
 
-**四個來源和上傳要在這個階段一起完成（D5）。** 順序是 JustSubtitles → 上傳 → YIFY → 射手網 → 字幕庫，但階段結束時每一個都要通過驗收，不能留到後面。
+**There is no `media` program yet in this phase.** So:
 
-**驗收**：
-- 每個來源的解析都有用錄下來的回應做的單元測試。
-- 帶 `api_key` 的那筆 JustSubtitles 資料：存進資料庫的網址沒有 query string；log 裡找不到那個字串。
-- 讓任何一個來源失敗（逾時、500、格式不對、額度用完）：其他來源的結果照常出現，失敗的那個顯示原因和重試。
-- JustSubtitles 對不存在的編號回 500 時，顯示成「0 筆」而不是錯誤。
-- 射手網超過額度時自動延後並顯示預計的時間；不會連續重試。
-- `fixtures/` 的每一種檔案（UTF-8、Big5、GB18030、UTF-16、ASS、VTT、zip）都能變成正確的句子清單；語言判斷正確；簡體轉繁體的結果和預期檔相同。
-- [12-auth.md](12-auth.md) 檢查清單裡關於壓縮檔和對外請求的項目都有測試。
-- 字幕庫：程式裡沒有任何對它發出的請求。
-- 上傳一個讀不了的檔案（壞掉的 zip、沒有字幕的 zip、空的 srt）：清單上出現一列失敗的候選和原因，可以移除；沒有留下任何檔案。
-- 兩個程式同時對同一個來源發請求：送出的時間仍然保持間隔（用假的來源記錄收到請求的時間來驗證）。
-- `api` 在查詢途中被重啟：沒有來源永遠停在「查詢中」。
--（有金鑰時）對真的來源手動走一遍：搜尋、下載、加入。這是 D29 允許的第二次手動確認：每個來源下載一兩個檔案就好，確認完把那幾條候選和字幕移除，下載到的檔案不放進 repo。這一次是透過開發中的網站做的，所以金鑰由 Brian 在來源設定頁輸入（不是 `deploy/.env` 裡那三個變數；它們只給階段 0 的腳本用）。
+- Don't hook up the call that automatically asks for analysis when the workspace opens (`POST /api/media/:id/analyze`) yet: in this phase every film's analysis state is `none`, and hooking it up would leave them stuck at "Analyzing" forever. The endpoint and this call are done together in Phase 4.
+- When a download finishes, `analysis_state` is always written as `none`, and the status goes straight to "Done" (see [06-torrent-worker.md](06-torrent-worker.md)). Preview assets are written as "Waiting" as planned, and the reservation is counted as usual; nobody does the work yet, and Phase 4 takes over.
+- "Recount usage", deleting preview files and orphan folders wait until Phase 4; anything related to export waits until Phase 7.
+
+**Acceptance**:
+- The Phase 3 group in [10-storage.md](10-storage.md) "Cases to test" is all automated tests.
+- All the integration tests in [06-torrent-worker.md](06-torrent-worker.md) "Tests" pass, using local seeding, without connecting outside.
+- Force-kill the `torrent` container during a download and start it again: the download resumes, and finished parts aren't fetched again (on a normal shutdown) or are re-verified and then resumed (on a forced kill).
+- Restart the `api` container during a download: the download is unaffected, and progress is correct once the page reconnects.
+- Two browsers submit a download for the last bit of space at the same time: one succeeds, the other sees an explanation that there isn't enough space.
+- Source scanning test: only the designated module deletes anything under `/data`; no deletion is decided by time or age (defined in [15-testing.md](15-testing.md) under "No automatic deletion").
 
 ---
 
-## 階段 6：同步工作台
+## Phase 4: video analysis and preview
 
-**讀**：09（整份）、08（自動對齊）、03（已加入的字幕、交易的邊界）、04（字幕的文件、對齊、確認）、11（工作區：同步）、15（瀏覽器測試的注意事項）。
+**Read**: 08 (After a film finishes downloading, analysis, preview assets, Common rules for jobs, Reconciliation, Manual retry), 02 (Queues, Startup and shutdown), 03 (Videos and derived files, What happens when a download is deleted), 04 (Videos, Admin), 09 (Loading, Which file to play), 10 (Preview reservation, Recounting usage, Confirmation wording), 11 (Downloads, Storage management, System status), 13 (settings for after a download finishes).
 
-**做**：工作台的全部功能（對齊核心在階段 1 已經搬進 `packages/shared`）；自動儲存與版本衝突；伺服器端的自動對齊（兩種方法、挑選、一致性、結果經由 `tasks` 回到 `api`）；確認；對照另一條字幕；只有聲音的模式；字幕清單的虛擬化；候選排名改用完整的對齊。
+**Do**: the `media` program and the job queue, reconciliation, `tasks`, analysis (probe, waveform, speech), deciding and fixing whether a file can play directly, preview assets (audio file, preview video, progress, stopping when deleted), requesting the preview file later, `POST /api/media/:id/analyze` and the automatic call when a workspace opens (the one Phase 3 left unhooked), the video streaming endpoint (Range), the waveform and speech endpoints, the System status page (including manual retry), "Analyzing" and preview file progress on the Downloads page, recounting usage and what it finds, force deleting preview files and orphan folders. Change Phase 3's hard-coded `analysis_state = 'none'` to follow the settings.
 
-**驗收**：
-- [09-sync-workbench.md](09-sync-workbench.md)「驗收」裡的每一項都是 Playwright 測試。
-- 對齊核心的 17 個測試在 `packages/shared` 裡通過。
-- 伺服器端自動對齊對三份弄錯的字幕的結果和 [08-media-pipeline.md](08-media-pipeline.md) 的表格一致。
-- 排名正在跑三十條候選時按「自動對齊」：幾秒內就有結果，不用等排名跑完。
-- 確認之後只重新標記一個檢查點：狀態仍然是已確認；改了位移：回到草稿。
-- 兩個瀏覽器同時改同一條字幕：後存的那個看到衝突的說明，兩種選擇都正確。
-- 重新整理頁面後，同步文件、檢查點的狀態都還在。
-- 用一份一千句以上的字幕（可以把 `fixtures` 的字幕重複產生）：清單捲動順暢，時間軸在全片視野下拖動順暢。
-- 階段 0 用真實電影量到的結果如果顯示需要調整（門檻、搜尋範圍、要不要兩種方法都用），在這個階段處理，並更新文件。
-
----
-
-## 階段 7：匯出
-
-**讀**：08（封裝、工作的共通規矩、對帳）、02（佇列）、03（匯出、刪除一個下載時發生的事）、10（匯出與容量、確認的文字）、04（匯出）、11（工作區：匯出、儲存空間）。
-
-**做**：匯出分頁、建立匯出（驗證、admission、產生最終字幕）、封裝工作（進度、取消、失敗的兩次嘗試與清理、完成後檢查）、下載端點（Range、檔名）、刪除（排隊中、進行中、完成、失敗各一種做法）、`export` 事件、匯出完成與失敗的通知、管理頁強制刪除匯出檔、儲存空間頁上自己的匯出檔。
-
-**驗收**：
-- 匯出 `fixtures/clip.mp4` 加兩條已確認的字幕：輸出檔的影像和聲音封包和原檔完全相同；兩條字幕軌的語言、標題、預設軌正確；字幕的時間等於同步文件算出來的時間（加上封裝時所有軌共同的位移）。
-- 匯出之後修改或刪除字幕，已經匯出的檔案不變。
-- 空間不夠時不能開始，訊息有數字。
-- 封裝到一半刪除：ffmpeg 被終止，沒有留下檔案，預留釋出。
-- 下載到一半中斷後續傳，最後的檔案和伺服器上的相同。
-- 電影被刪除後，匯出檔還在、還能下載。
-- 沒有聲音軌的來源也能匯出。
-- [10-storage.md](10-storage.md)「要測的情況」裡階段 7 的那一組。
+**Acceptance**:
+- `fixtures/clip.mp4` is analyzed automatically once downloaded; what the `peaks` and `speech` endpoints return matches `fixtures/data.json`.
+- With automatic analysis turned off (`media.analyzeAuto`): no analysis after a download finishes; it starts automatically the first time that film's workspace is opened.
+- With `fixtures/clip.hevc10.mp4` (HEVC 10-bit, 5.1 channels): the audio file and preview file are produced automatically; every frame's timestamp in the preview file equals the source's; usage is the reserved amount at first and becomes the actual amount when done.
+- Delete the film halfway through converting the preview file: ffmpeg is terminated, and no files are left behind.
+- The streaming endpoint supports Range (verify 206 and the right bytes with `curl -r`); someone not signed in or not a holder can't get it.
+- The `media` container is restarted in the middle of a job: the job is queued again, and no `.part` is left behind.
+- The same job is queued twice (simulating reconciliation and a notification triggering at the same time): it is done only once.
+- The fake YTS labels an HEVC file as x264 (predicted to play directly, actually can't): after probing, a preview plan is added; when there isn't enough space, `PREVIEW_NO_SPACE` is recorded instead of failing.
+- A file with no audio track: analysis is marked as failed (`NO_AUDIO`), the preview video is still made, and `GET /api/library/:torrentId` responds as usual (the film can enter the workspace).
+- The Phase 4 group in [10-storage.md](10-storage.md) "Cases to test".
 
 ---
 
-## 階段 8：管理與通知
+## Phase 5: subtitle sources (all at once)
 
-**讀**：11（管理頁、外框的通知）、04（管理、通知）。
+**Read**: 07 (all of it), 02 (Queues), 03 (Subtitles, What happens when a download is deleted), 04 (Subtitles), 08 (Auto-align, Common rules for jobs, Reconciliation), 09 (the shape of the sync doc; it is created at "add" time), 10 (Small files), 11 (Workspace: Subtitles), 12 (Outbound requests, Uploads and archives), 13 (sources, Keys, Test connection), 15 (fake subtitle source).
 
-**做**：總覽頁（含「需要處理」的每一種來源）、通知的介面（鈴鐺、未讀數、點了去哪裡；前面的階段已經把通知寫進資料表，這裡補齊還沒產生的種類，六種都要有）、管理員強制刪除後通知受影響的人、移除帳號後沒有持有人的項目、各頁還沒做的空狀態和錯誤狀態。把 `prototype/platform/e2e.cjs` 的 72 項檢查對一遍，確認每一項在正式版都有對應的行為和測試（不適用的那一項見 [11-pages.md](11-pages.md)）。
+**Do**: reuse the outbound HTTP client from Phase 2, adding each source's host list and request queuing (`provider_take_slot`); the source interface; `subtitle.search`, `subtitle.resolve` (handled by `api`) and `subtitle.fetch`, `subtitle.ingest`, `subtitle.rank` (handled by `media`); **JustSubtitles (first)**, TMDB lookup, SubDL fallback mode, YIFY Subtitles, Assrt (Shooter), the assisted card for Zimuku, upload (a file becomes a candidate as soon as it's received); extraction, encoding, parsing, normalization, language detection; the candidate list, failed candidates and removal, "Add" (including Traditional/Simplified conversion, picking checkpoints, creating the sync doc), the list of added subtitles, removal; the remaining cards and tests on the Sources page, source status. The interface and workflow for "Auto-align and rank them all" are hooked up in this phase; the alignment itself uses the sync core's `autoAlign` for now (the next phase adds the ffsubsync half).
 
-**驗收**：
-- 總覽頁的每一種「需要處理」都能用測試製造出來並顯示。
-- 每一種通知都能觸發、顯示、點了到正確的地方；對象不存在時去片庫，匯出的通知去儲存空間頁。
-- 原型的每一頁在正式版都有，而且「原型裡是假的」那些東西（[11-pages.md](11-pages.md)）都沒有帶進來。
+**The four sources and upload must all be finished together in this phase (D5).** The order is JustSubtitles → upload → YIFY → Assrt → Zimuku, but by the end of the phase every one must pass acceptance; none can be left for later.
 
----
-
-## 階段 9：上線準備
-
-**讀**：12（上線前的檢查清單）、15（離線的完整流程、一定要有的測試）、16（還沒驗證的每一項，逐項寫出現在的結論）、02（設定、啟動與關閉、對外連線）。
-
-**做**：
-- 完整流程的端對端測試（從搜尋到下載 MKV），用假的 YTS、本機做種、錄下來的來源回應，不需要網路。
-- [12-auth.md](12-auth.md) 的檢查清單全部通過。
-- 部署文件 `docs/deploy.md`：需求、`.env` 的每一項、怎麼開埠、HTTPS 的兩種做法、怎麼更新、**怎麼備份**（資料庫的 dump 加上 `/data`；只備份其中一個會對不起來）、怎麼把整個站搬到另一台機器。
-- 給使用者的說明 `docs/guide.md`（繁體中文）：五分鐘走完一次流程。
-- 在目標機器上實際部署一次。你自己確認的範圍：五個容器都正常、健康檢查通過、管理員能登入、設定頁能存、（有 YTS 網址時）搜尋和電影頁看得到資料、連入埠的狀況。**不要為了驗收去下載 YTS 上的電影**（`AGENTS.md` 的規則 5）；完整流程在這台機器上用離線的測試設定跑一次（假的 YTS、本機做種）來確認效能和磁碟，真的走一遍是下面 Brian 的驗收。
-- 無障礙的最後檢查：只用鍵盤走完主流程；用螢幕閱讀器走同步工作台的主要步驟。
-- 相依套件的安全檢查。
-
-**驗收**：Brian 在他的機器上照 `docs/deploy.md` 從零裝起來，邀請一個人，兩個人各自完成一次從搜尋到拿到 MKV 的流程。
+**Acceptance**:
+- Each source's parsing has unit tests built on recorded responses.
+- The JustSubtitles entry that carries `api_key`: the URL stored in the database has no query string; the string can't be found in the logs.
+- Make any one source fail (timeout, 500, wrong format, quota used up): the other sources' results appear as usual, and the failed one shows the reason and a retry.
+- When JustSubtitles returns 500 for a nonexistent ID, it shows as "0 results" rather than an error.
+- When Assrt is over quota it postpones automatically and shows the expected time; it does not retry back to back.
+- Every kind of file in `fixtures/` (UTF-8, Big5, GB18030, UTF-16, ASS, VTT, zip) turns into the correct list of lines; language detection is correct; the Simplified-to-Traditional result matches the expected file.
+- Every item about archives and outbound requests in the [12-auth.md](12-auth.md) checklist has a test.
+- Zimuku: the code makes no request to it at all.
+- Upload an unreadable file (a broken zip, a zip with no subtitles, an empty srt): a failed candidate row with the reason appears in the list and can be removed; no files are left behind.
+- Two programs send requests to the same source at the same time: the requests still go out spaced apart (verified by having the fake source record the time it receives each request).
+- `api` is restarted in the middle of a lookup: no source stays at "Searching…" forever.
+- (When there are keys) go through the real sources by hand once: search, download, add. This is the second manual check D29 allows: download just one or two files per source, remove those candidates and subtitles once confirmed, and don't put the downloaded files in the repo. This time it's done through the site under development, so Brian enters the keys on the Sources page (not the three variables in `deploy/.env`; those are only for the Phase 0 scripts).
 
 ---
 
-## 以後再說
+## Phase 6: sync workbench
 
-不在這十個階段裡，等 Brian 提出再做：
+**Read**: 09 (all of it), 08 (Auto-align), 03 (added subtitles, Transaction boundaries), 04 (subtitle docs, syncing, confirming), 11 (Workspace: Sync), 15 (Notes on browser tests).
 
-- 保留 ASS 樣式（D34；做法在 [09-sync-workbench.md](09-sync-workbench.md)）
-- 邊下載邊播放
-- 瀏覽器能播 HEVC 時直接用原檔預覽
-- 自動對齊的搜尋範圍可以由使用者放大
-- 隨種子附帶的字幕檔當成一個來源
-- 用 `mkvpropedit` 寫入 `zh-TW` / `zh-CN` 的語言標籤
-- 把兩條字幕合併成一條雙語字幕軌
-- 字幕清理的小工具（一鍵移除聽障標記、廣告行）
+**Do**: every feature of the workbench (the sync core was already moved into `packages/shared` in Phase 1); autosave and version conflicts; server-side auto-align (two methods, picking, consistency, results returning to `api` through `tasks`); confirming; showing other subtitles alongside; audio-only mode; virtualization of the subtitle lines; candidate ranking switching to full alignment.
+
+**Acceptance**:
+- Every item in [09-sync-workbench.md](09-sync-workbench.md) "Acceptance" is a Playwright test.
+- The 17 sync core tests pass in `packages/shared`.
+- Server-side auto-align on the three wrong subtitles matches the table in [08-media-pipeline.md](08-media-pipeline.md).
+- Pressing "Auto-align" while ranking is running on thirty candidates: there is a result within a few seconds, without waiting for the ranking to finish.
+- After confirming, re-marking only one checkpoint: the status stays confirmed; changing the offset: it goes back to draft.
+- Two browsers change the same subtitles at the same time: the one that saves later sees an explanation of the conflict, and both choices work correctly.
+- After reloading the page, the sync doc and the checkpoints' states are still there.
+- With subtitles of more than a thousand lines (you can generate them by repeating the subtitles in `fixtures`): the list scrolls smoothly, and the timeline drags smoothly in whole-film view.
+- If what Phase 0 measured on real films shows that changes are needed (thresholds, search range, whether to use both methods), handle them in this phase and update the docs.
+
+---
+
+## Phase 7: export
+
+**Read**: 08 (Packing, Common rules for jobs, Reconciliation), 02 (Queues), 03 (Exports, What happens when a download is deleted), 10 (exports and storage, Confirmation wording), 04 (Export), 11 (Workspace: Export, Storage).
+
+**Do**: the Export tab, creating an export (validation, admission, producing the final subtitles), the packing job (progress, cancel, two failed attempts and cleanup, checking after completion), the download endpoint (Range, file name), deletion (one approach each for queued, in progress, done and failed), the `export` event, notifications for exports finishing and failing, force deleting exports from the admin pages, your own exports on the Storage page.
+
+**Acceptance**:
+- Export `fixtures/clip.mp4` with two confirmed subtitles: the output's video and audio packets are exactly the same as the original file's; the language, title and default track of the two subtitle tracks are correct; the subtitle times equal the times computed from the sync doc (plus the offset shared by all tracks when packing).
+- Changing or deleting the subtitles after export leaves the exported file unchanged.
+- When there isn't enough space it can't start, and the message has numbers.
+- Delete halfway through packing: ffmpeg is terminated, no file is left behind, and the reservation is freed.
+- Resume a download after it's interrupted halfway; the final file is identical to the one on the server.
+- After the film is deleted, the export is still there and can still be downloaded.
+- A source with no audio track can still be exported.
+- The Phase 7 group in [10-storage.md](10-storage.md) "Cases to test".
+
+---
+
+## Phase 8: admin and notifications
+
+**Read**: 11 (Admin pages, notifications in the shell), 04 (Admin, notifications).
+
+**Do**: the Overview page (including every kind of "Needs attention" source), the notification interface (bell, unread count, where clicking goes; earlier phases already write notifications to the table, so here fill in the kinds not yet produced; all six must exist), notifying the people affected after an administrator force deletes, items left with no holder after an account is removed, empty and error states not yet done on each page. Go through the 72 checks in `prototype/platform/e2e.cjs` and confirm each one has matching behavior and a test in production (for the one that doesn't apply, see [11-pages.md](11-pages.md)).
+
+**Acceptance**:
+- Every kind of "Needs attention" on the Overview page can be produced by a test and is displayed.
+- Every kind of notification can be triggered, is displayed, and goes to the right place when clicked; when the target doesn't exist it goes to the Library, and export notifications go to the Storage page.
+- Every page of the prototype exists in production, and none of the things that were "fake in the prototype" ([11-pages.md](11-pages.md)) came along.
+
+---
+
+## Phase 9: launch preparation
+
+**Read**: 12 (Pre-launch checklist), 15 (Offline end-to-end flow, Tests that must exist), 16 (every item under Not yet verified; write the current conclusion for each), 02 (Configuration, Startup and shutdown, Outbound connections).
+
+**Do**:
+- An end-to-end test of the full flow (from search to downloading the MKV), using the fake YTS, local seeding and recorded source responses, with no network needed.
+- The [12-auth.md](12-auth.md) checklist all passes.
+- Deployment docs `docs/deploy.md`: requirements, every item in `.env`, how to open the port, the two ways to do HTTPS, how to update, **how to back up** (a database dump plus `/data`; backing up only one of them won't line up), how to move the whole site to another machine.
+- A user guide `docs/guide.md` (in Traditional Chinese): going through the flow once in five minutes.
+- Actually deploy once on the target machine. What you confirm yourself: all five containers are fine, the health check passes, the administrator can sign in, the settings pages can save, (when there is a YTS address) search and the film page show data, and the state of the incoming port. **Don't download films from YTS for acceptance** (rule 5 in `AGENTS.md`); run the full flow once on this machine with the offline test setup (fake YTS, local seeding) to confirm performance and disk; going through it for real is Brian's acceptance below.
+- A final accessibility check: go through the main flow with the keyboard only; go through the main steps of the sync workbench with a screen reader.
+- A security check of dependencies.
+
+**Acceptance**: Brian installs it from scratch on his machine following `docs/deploy.md`, invites one person, and the two of them each complete the flow from search to getting an MKV once.
+
+---
+
+## Later
+
+Not in these ten phases; done when Brian asks for them:
+
+- Keeping ASS styles (D34; how to do it is in [09-sync-workbench.md](09-sync-workbench.md))
+- Playing while downloading
+- Previewing with the original file directly when the browser can play HEVC
+- Letting users widen the auto-align search range
+- Subtitle files that come with the torrent as a source
+- Writing `zh-TW` / `zh-CN` language tags with `mkvpropedit`
+- Merging two subtitles into one bilingual subtitle track
+- Small subtitle clean-up tools (one-click removal of hearing-impaired markers and ad lines)

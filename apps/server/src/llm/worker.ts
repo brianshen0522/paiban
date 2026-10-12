@@ -16,7 +16,7 @@ import { LlmError } from './providers.js';
 import { Answer, chunks, type Film, lineText, question, readAnswer } from './translate.js';
 
 /**
- * Runs translations in the api, the only service with the keys (docs/18-llm.md, "進行中").
+ * Runs translations in the api, the only service with the keys (docs/18-llm.md, "In progress").
  * Chunks go one after another; each answered chunk is saved, so a failure or a restart carries on
  * from the next one. Nothing is written under /data until the last chunk is in; then the new
  * subtitle is written the way an added one is (a work folder renamed into place).

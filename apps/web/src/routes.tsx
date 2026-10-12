@@ -18,7 +18,7 @@ import { SearchPage } from './pages/SearchPage';
 import { ForbiddenPage, NotFoundPage } from './pages/StatusPages';
 import { StoragePage } from './pages/StoragePage';
 
-/** Signed-in area: not signed in goes to /login and comes back afterwards (docs/11-pages.md, "路徑"). */
+/** Signed-in area: not signed in goes to /login and comes back afterwards (docs/11-pages.md, "Routes"). */
 function RequireAuth() {
   const me = useMe();
   const location = useLocation();

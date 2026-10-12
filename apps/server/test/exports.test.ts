@@ -10,7 +10,7 @@ import { film, fixture, idleEngine, subtitle } from './export-helpers.js';
 import { call, createUser, GB, login, setLimit, type TestApp, testApp, testDb } from './helpers.js';
 
 /**
- * Exports through the API (docs/04-api.md, "匯出"; docs/10-storage.md, phase 7). No media service
+ * Exports through the API (docs/04-api.md, "Export"; docs/10-storage.md, phase 7). No media service
  * here, so every export stays queued unless a test moves it; the mux itself is in exports-mux.test.ts.
  */
 const exists = (p: string) =>

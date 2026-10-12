@@ -5,7 +5,7 @@ import { one } from '../../db/pool.js';
 import { OutboundError, type OutboundPolicy, type OutboundResponse, outboundFetch } from '../../net/outbound.js';
 
 /**
- * What every subtitle source shares (docs/07-subtitle-providers.md, "共通規則"): the shared
+ * What every subtitle source shares (docs/07-subtitle-providers.md, "Common rules"): the shared
  * outbound client with a per-source host list, request pacing through provider_take_slot, the
  * time and size limits, and failures as codes. Sources never see the database beyond pacing and
  * the film; keys come in through `secret`.
@@ -99,7 +99,7 @@ export async function takeSlot(env: ProviderEnv, key: ProviderKey): Promise<void
   if (wait > 0) await (env.sleep ?? defaultSleep)(wait);
 }
 
-/** 30900 from 射手網: nobody sends to it for the next 60 s (docs/07, "限制"). */
+/** 30900 from Assrt: nobody sends to it for the next 60 s (docs/07, "Limits"). */
 export async function holdSource(q: Queryable, key: ProviderKey, seconds: number): Promise<Date> {
   const r = await one<{ at: Date }>(
     q,
@@ -161,7 +161,7 @@ export function pathOnly(raw: string): string {
   }
 }
 
-/** Which of our guesses a search for these languages takes (docs/07, "語言"). Traditional takes every Chinese. */
+/** Which of our guesses a search for these languages takes (docs/07, "Languages"). Traditional takes every Chinese. */
 export function wanted(languages: readonly Lang[], guess: DetectedLang): boolean {
   if (guess === 'en') return languages.includes('en');
   if (guess === 'zh-Hant') return languages.includes('zh-Hant');
@@ -169,7 +169,7 @@ export function wanted(languages: readonly Lang[], guess: DetectedLang): boolean
   return false;
 }
 
-/** The source test's answer and its timing (docs/13-settings.md, "測試連線"). */
+/** The source test's answer and its timing (docs/13-settings.md, "Test connection"). */
 export function check(
   started: number,
   ok: boolean,

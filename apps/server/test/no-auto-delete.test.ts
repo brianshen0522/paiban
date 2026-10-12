@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * AGENTS.md rule 1 and docs/15-testing.md, "不自動刪除": only storage/remove.ts deletes under /data
+ * AGENTS.md rule 1 and docs/15-testing.md, "No automatic deletion": only storage/remove.ts deletes under /data
  * (WebTorrent's destroyStore included), and no deletion is decided by time or age.
  */
 const SRC = fileURLToPath(new URL('../src/', import.meta.url));

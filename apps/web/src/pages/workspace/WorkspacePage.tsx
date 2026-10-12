@@ -16,7 +16,7 @@ import { SyncTab } from './SyncTab';
 export type Tab = 'subtitles' | 'sync' | 'export';
 const TABS: Tab[] = ['subtitles', 'sync', 'export'];
 
-/** docs/11-pages.md, "工作區": one film's subtitles, sync and export. */
+/** docs/11-pages.md, "Workspace": one film's subtitles, sync and export. */
 export function WorkspacePage({ tab }: { tab: Tab }) {
   const { torrentId = '' } = useParams();
   const ws = useWorkspace(torrentId);

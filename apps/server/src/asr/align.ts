@@ -72,7 +72,7 @@ export const LLM_BUDGET_MS = 45_000;
 
 /**
  * Pairs through the language model for a subtitle in another language than the one spoken
- * (docs/08, "語言模型"). Runs in the api, the only service that holds keys; the model is whichever
+ * (docs/08, "Language model"). Runs in the api, the only service that holds keys; the model is whichever
  * LLM profile the pool picks (docs/18-llm.md). Null when there is nothing to ask: no recognition,
  * the same language (the media service pairs by text), or no profile set up. A failure is
  * reported in `llmError` and the alignment goes on without pairs.

@@ -1,5 +1,5 @@
 /**
- * Which queued downloads start now (docs/06-torrent-worker.md, "排程"). Candidates come oldest
+ * Which queued downloads start now (docs/06-torrent-worker.md, "Scheduling"). Candidates come oldest
  * first. A download whose requester is gone, or no longer holds it, only counts toward the
  * site-wide limit.
  */

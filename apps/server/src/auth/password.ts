@@ -1,6 +1,6 @@
 import { hash, verify } from '@node-rs/argon2';
 
-/** argon2id with the library's defaults, stored as a PHC string (docs/12-auth.md, "密碼"). */
+/** argon2id with the library's defaults, stored as a PHC string (docs/12-auth.md, "Passwords"). */
 export function hashPassword(password: string): Promise<string> {
   return hash(password);
 }

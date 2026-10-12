@@ -1,7 +1,7 @@
 import { createContext, type ReactNode, useCallback, useContext, useMemo, useState } from 'react';
 
 /**
- * Bottom-right confirmations of something just done (docs/11-pages.md, "外框"): at most three,
+ * Bottom-right confirmations of something just done (docs/11-pages.md, "Shell"): at most three,
  * about five seconds each, optionally one action. Errors and decisions stay in the page.
  */
 type Toast = { id: number; text: string; action?: { label: string; run: () => void } };

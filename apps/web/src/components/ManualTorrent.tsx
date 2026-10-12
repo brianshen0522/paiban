@@ -9,7 +9,7 @@ import { keys } from '../lib/queries';
 import { Modal } from './Modal';
 
 /**
- * Adding a torrent by hand (Brian, 2026-10-09; D26 changed; docs/11-pages.md, "手動加入種子"):
+ * Adding a torrent by hand (Brian, 2026-10-09; D26 changed; docs/11-pages.md, "Add a torrent by hand"):
  * a magnet link or a .torrent file → what will be downloaded (the largest video only) → which
  * film it is, picked on TMDB → start. Each step slides in; nothing is downloaded before "start".
  */

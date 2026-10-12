@@ -12,7 +12,7 @@ export function filmTitle(m: { title: string; titleZh: string | null }): { main:
 const GB = 1024 ** 3;
 const MB = 1024 ** 2;
 
-/** docs/17-ui.md, "數字怎麼寫": base 1024; ≥ 1 GB one decimal (".0" dropped), else MB to the ten, under 10 MB whole MB. */
+/** docs/17-ui.md, "How to write numbers": base 1024; ≥ 1 GB one decimal (".0" dropped), else MB to the ten, under 10 MB whole MB. */
 export function bytes(n: number): string {
   if (n >= GB) {
     const v = Math.round((n / GB) * 10) / 10;
@@ -59,7 +59,7 @@ export function dateTime(iso: string): string {
 /** info hash: first 8 + … + last 4. */
 export const shortHash = (h: string) => `${h.slice(0, 8)}…${h.slice(-4)}`;
 
-/** A stable dark hue per title for the placeholder poster (docs/17-ui.md, "佔位海報的底色"). */
+/** A stable dark hue per title for the placeholder poster (docs/17-ui.md, "placeholder poster color"). */
 export function posterColor(title: string): string {
   let h = 0;
   for (const ch of title) h = (h * 31 + (ch.codePointAt(0) ?? 0)) % 360;

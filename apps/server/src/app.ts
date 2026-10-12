@@ -50,7 +50,7 @@ export function buildApp(deps: Deps): FastifyInstance {
     bodyLimit: 1024 * 1024,
   });
   app.register(cookie);
-  // Subtitle uploads only (docs/07, "上傳"): one file, 20 MB.
+  // Subtitle uploads only (docs/07, "Upload"): one file, 20 MB.
   app.register(multipart, { limits: { fileSize: UPLOAD_MAX_BYTES, files: 1, fields: 5, parts: 6 } });
   // A write without a body may still say application/json (docs/04-api.md: no Content-Type is
   // required then); treat an empty body as no body instead of failing.
@@ -64,7 +64,7 @@ export function buildApp(deps: Deps): FastifyInstance {
     }
   });
   app.decorateRequest('user', null);
-  // Every route as registered, so a test can walk all of them (docs/15-testing.md, "權限").
+  // Every route as registered, so a test can walk all of them (docs/15-testing.md, "permissions").
   const table: { method: string; url: string }[] = [];
   app.decorate('routeTable', table);
   app.addHook('onRoute', (r) => {
@@ -73,7 +73,7 @@ export function buildApp(deps: Deps): FastifyInstance {
 
   const origin = new URL(deps.config.publicUrl).origin;
   app.addHook('onRequest', async (req) => {
-    // Cross-site request protection (docs/12-auth.md, "防跨站請求").
+    // Cross-site request protection (docs/12-auth.md, "Cross-site request protection").
     if (MUTATING.has(req.method) && req.url.startsWith('/api/')) {
       if (req.headers['x-requested-with'] !== 'paiban') throw new ApiError('FORBIDDEN', 'missing X-Requested-With');
       // Same-origin: the configured address, or the very host the request was sent to. A cross-site

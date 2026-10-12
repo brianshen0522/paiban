@@ -23,7 +23,7 @@ prove that the parser drops it. The recording script does this before writing to
 | `yts.movie_details.sample.json` | YTS `movie_details.json?movie_id=1606`: the same movie object under `data.movie` | **Recorded** |
 | `yts.list_movies.empty.sample.json` | A search with no result | **Recorded**: `data` has no `movies` key at all |
 | `tmdb.find.sample.json` | TMDB `GET /3/find/{imdb id}?external_source=imdb_id&language=zh-TW` | Hand-written: no TMDB key yet |
-| `assrt.search.sample.json`, `assrt.detail.sample.json` | 射手網(偽) API | Hand-written: no token yet. `langlist` key names still unconfirmed |
+| `assrt.search.sample.json`, `assrt.detail.sample.json` | Assrt (Shooter) API | Hand-written: no token yet. `langlist` key names still unconfirmed |
 
 `justsubtitles.subtitles.sample.json` contains `url`s with a query string (`?api_key=PLACEHOLDER`).
 Real responses carry somebody else's key there. The parser must drop the query string before the

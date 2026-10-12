@@ -15,7 +15,7 @@ import {
 import { parseSrt } from './text.js';
 
 /**
- * Automatic alignment (docs/08-media-pipeline.md, "自動對齊"), the same computation for the
+ * Automatic alignment (docs/08-media-pipeline.md, "Auto-align"), the same computation for the
  * workbench's button (`align` tasks) and for ranking candidates. A port of
  * reference/pipeline/align.ts split in two:
  *
@@ -38,7 +38,7 @@ const tidy = (segments: SyncCore.Segment[]): SyncCore.Segment[] =>
  * The answer for one cue list. `extra` are candidates from other engines (ffsubsync, or anything
  * added later); the core's own search is always added. `before` is the document whose score the
  * result is compared with (the identity for a candidate that was never touched). `heard` are the
- * pairs speech recognition found (docs/08, "語音辨識"): they add their own candidate and referee
+ * pairs speech recognition found (docs/08, "Speech recognition"): they add their own candidate and referee
  * the choice; without them this is pickAlignment over the other engines, as before.
  */
 export function computeAlignment(
@@ -85,7 +85,7 @@ const AS_REFERENCE: Record<string, AlignResult['method']> = {
 };
 
 /**
- * Aligning to another subtitle already aligned (docs/08, "依另一條字幕對齊"). The reference's lines
+ * Aligning to another subtitle already aligned (docs/08, "Align by other subtitles"). The reference's lines
  * stand in for the film: their spans are the speech track the core searches and scores against,
  * their starts are where sentences begin (the timing referee when nothing pairs), and their words
  * pair with this subtitle's by text or through the language model (`pairs`). Scores are then

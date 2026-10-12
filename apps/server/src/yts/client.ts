@@ -144,7 +144,7 @@ const SORT: Record<NonNullable<SearchParams['sort']>, string> = {
   seeds: 'seeds',
 };
 
-/** At most four requests to YTS at a time (docs/05-yts.md, "請求的規矩"). */
+/** At most four requests to YTS at a time (docs/05-yts.md, "Request etiquette"). */
 let inFlight = 0;
 const waiting: (() => void)[] = [];
 async function slot<T>(fn: () => Promise<T>): Promise<T> {

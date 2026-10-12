@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_PARAMS, LlmProfileDialog, profileBody } from './LlmProfileDialog';
 
-/** docs/18-llm.md, "設定檔": a key left empty stays, "clear" sends null, typing replaces it. */
+/** docs/18-llm.md, "Profiles": a key left empty stays, "clear" sends null, typing replaces it. */
 const PROFILE: LlmProfile = {
   id: '11111111-1111-4111-8111-111111111111',
   name: '本機',

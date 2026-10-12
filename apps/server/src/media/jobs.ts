@@ -91,7 +91,7 @@ export async function probeJob(d: JobDeps, row: MediaRow): Promise<void> {
     }
   }
   if (!info?.videoCodec) {
-    // Unreadable: the file is probably broken. Not retried automatically (docs/08, "特殊情況").
+    // Unreadable: the file is probably broken. Not retried automatically (docs/08, "special cases").
     await pool.query(
       `update media_files set probe_state = 'failed', error = coalesce(error, '{}'::jsonb) || '{"analysis": "PROBE_FAILED"}'::jsonb,
               analysis_state = case when analysis_state in ('pending', 'running') then 'failed' else analysis_state end,
@@ -147,7 +147,7 @@ export async function probeJob(d: JobDeps, row: MediaRow): Promise<void> {
       try {
         await admit(c, d.disk, config.storageReserveBytes, { bytes: extra, previewBytes: extra });
       } catch {
-        // Not enough room: give up the preview video, keep the small audio file (docs/08, "探測").
+        // Not enough room: give up the preview video, keep the small audio file (docs/08, "Probe").
         proxy = 'none';
         errors.proxy = 'PREVIEW_NO_SPACE';
       }
@@ -197,7 +197,7 @@ export async function probeJob(d: JobDeps, row: MediaRow): Promise<void> {
   }
 }
 
-/** Waveform and speech (docs/08, "波形", "人聲偵測", "給瀏覽器的人聲資料"). */
+/** Waveform and speech (docs/08, "Waveform", "Speech detection", "Speech data for the browser"). */
 export async function analysisJob(
   d: JobDeps,
   row: MediaRow,
@@ -241,7 +241,7 @@ export async function analysisJob(
       failedPart = 'PEAKS_FAILED';
     }
 
-    // Speech: ffsubsync on a symlink in the work folder, so its cache lands there (docs/08, "人聲偵測").
+    // Speech: ffsubsync on a symlink in the work folder, so its cache lands there (docs/08, "Speech detection").
     if (!failedPart) {
       const link = join(work, `ref${extname(src)}`);
       await symlink(src, link).catch(() => undefined);
@@ -268,7 +268,7 @@ export async function analysisJob(
     for (const f of files) await rename(join(work, f), join(out, f));
     let bytes = 0;
     for (const f of [...files, 'probe.json']) bytes += (await stat(join(out, f)).catch(() => ({ size: 0 }))).size;
-    // Recognition follows when it is switched on and there is something to hear (docs/08, "語音辨識").
+    // Recognition follows when it is switched on and there is something to hear (docs/08, "Speech recognition").
     const asr = (await readSettings(pool)).align.asr && !!row.audio_codec;
     const fin = await pool.query(
       `update media_files mf set analysis_state = 'ready', analysis_bytes = $2, error = mf.error - 'analysis',
@@ -308,7 +308,7 @@ const AsrOutput = z.object({
 });
 
 /**
- * Speech recognition (docs/08, "語音辨識"): Whisper on a few evenly spread windows of the film,
+ * Speech recognition (docs/08, "Speech recognition"): Whisper on a few evenly spread windows of the film,
  * never the whole film. The result, asr.json, is what auto-align pairs subtitle lines with. A
  * failure only means auto-align works without it; it is not retried by itself.
  */
@@ -647,7 +647,7 @@ async function assetJob(
 /**
  * First failure: back to pending, the task to queued with one attempt counted; the next
  * reconciliation runs it again. Second failure: failed, and its reservation is released
- * (docs/08, "失敗的工作自動再試一次").
+ * (docs/08, "a failed job is retried once automatically").
  */
 async function failAttempt(
   d: JobDeps,
@@ -691,7 +691,7 @@ async function failAttempt(
 
 /**
  * Walks the disk, corrects the measured sizes, and reports orphans and missing files
- * (docs/10-storage.md, "重新計算用量"). It updates numbers and reports; it deletes nothing.
+ * (docs/10-storage.md, "Recounting usage"). It updates numbers and reports; it deletes nothing.
  */
 export async function rescanJob(d: JobDeps, taskId: string): Promise<void> {
   const { pool, config } = d;

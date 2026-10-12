@@ -1,530 +1,530 @@
-# 11 頁面與流程
+# 11 Pages and flows
 
-**原型是這份文件的另一半。** `prototype/platform/index.html` 用瀏覽器打開就能操作：每一頁、每一種狀態、每一句文案都在裡面。這份文件說明每一頁的資料從哪來、有哪些狀態、哪些地方原型是假的、正式版和原型哪裡不同。
+**The prototype is the other half of this document.** Open `prototype/platform/index.html` in a browser and you can use it: every page, every state and every line of copy is in there. This document explains where each page's data comes from, which states it has, which parts of the prototype are fake, and where production differs from the prototype.
 
-- 畫面：`prototype/platform/screenshots/`（編號對應下表）
-- 文案與版面的原始碼：`prototype/platform/src/app2.js`（一般頁面）、`app3.js`（管理頁）、`app4.js`（動作與提示訊息）、`app.css`
-- 原型的自動化檢查：`prototype/platform/e2e.cjs`，72 項。它們描述的行為正式版都要有；其中綁著示範資料或原型才有的開關的那幾項，要換個方式做，列在這份文件最後的「原型的檢查怎麼搬」
+- Screens: `prototype/platform/screenshots/` (numbers match the table below)
+- Source for the copy and layout: `prototype/platform/src/app2.js` (regular pages), `app3.js` (admin pages), `app4.js` (actions and toasts), `app.css`
+- The prototype's automated checks: `prototype/platform/e2e.cjs`, 72 of them. Production must have every behavior they describe; the few that are tied to demo data or to switches only the prototype has need a different approach, listed at the end of this document in "Carrying over the prototype's checks"
 
-原型用的是公有領域的老片當示範資料，搜尋、下載、字幕搜尋、匯出都是模擬的（下載進度是加速 10 倍的動畫）。同步分頁是真的可以操作的。
+The prototype uses old public-domain films as demo data; search, downloads, subtitle search and export are all simulated (download progress is an animation sped up 10 times). The Sync tab really works.
 
-幾個讀這份文件時要知道的事：
+A few things to know while reading this document:
 
-- **這份文件引用的句子，沒有特別註明的都來自原型。** 標了「（新）」的是原型沒有、正式版要加的句子，不用到原型裡去找。
-- **原型裡的大小是示範用的整數**（1.9 GB、300 MB）。正式版從位元組算出來，依 [17-ui.md](17-ui.md) 的規則顯示，數字不會和截圖一模一樣。
-- **原型的個人偏好沒有接上行為**：改了語言、畫質、第二語言的偏好，其他頁面不會跟著變。正式版要接上（[13-settings.md](13-settings.md) 的「個人偏好」）。
-- 兩邊有出入時以這份文件為準。
+- **Sentences quoted in this document come from the prototype unless marked otherwise.** Sentences marked "(new)" are not in the prototype and must be added in production; don't look for them in the prototype.
+- **Sizes in the prototype are round numbers for the demo** (1.9 GB, 300 MB). Production computes them from bytes and displays them by the rules in [17-ui.md](17-ui.md), so the numbers won't match the screenshots exactly.
+- **The prototype's personal preferences aren't wired to any behavior**: changing the language, quality or second-language preference doesn't change other pages. Production must wire them up ("Personal preferences" in [13-settings.md](13-settings.md)).
+- Where the two disagree, this document wins.
 
-## 路徑
+## Routes
 
-| 路徑 | 頁面 | 誰 | 截圖 |
+| Route | Page | Who | Screenshot |
 | --- | --- | --- | --- |
-| `/login` | 登入 | 未登入 | 01 |
-| `/invite/:code?` | 用邀請碼註冊 | 未登入 | 24 |
-| `/reset/:token` | 重設密碼 | 未登入 | 原型沒有 |
-| `/search` | 搜尋（登入後的首頁） | 所有人 | 02、18、32 |
-| `/movies/:ytsId` | 電影頁 | 所有人 | 03、04 |
-| `/downloads` | 下載 | 所有人 | 05、34 |
-| `/library` | 片庫 | 所有人 | 06、25、30 |
-| `/library/:torrentId/subtitles` | 工作區：字幕 | 持有人 | 07、08、31 |
-| `/library/:torrentId/sync/:subtitleId?` | 工作區：同步 | 持有人 | 09 |
-| `/library/:torrentId/export` | 工作區：匯出 | 持有人 | 10、11 |
-| `/storage` | 儲存空間 | 所有人 | 12 |
-| `/profile` | 個人設定 | 所有人 | 13 |
-| `/admin` | 總覽 | 管理員 | 14 |
-| `/admin/users` | 使用者與邀請 | 管理員 | 15 |
-| `/admin/storage` | 儲存空間管理 | 管理員 | 16、33 |
-| `/admin/sources` | 來源設定 | 管理員 | 17 |
-| `/admin/downloads` | 下載設定 | 管理員 | 19 |
-| `/admin/system` | 系統狀態 | 管理員 | 20 |
-| `/admin/audit` | 操作紀錄 | 管理員 | 21 |
+| `/login` | Sign in | Signed out | 01 |
+| `/invite/:code?` | Register with an invite code | Signed out | 24 |
+| `/reset/:token` | Reset password | Signed out | Not in the prototype |
+| `/search` | Search (home page after sign-in) | Everyone | 02, 18, 32 |
+| `/movies/:ytsId` | Film page | Everyone | 03, 04 |
+| `/downloads` | Downloads | Everyone | 05, 34 |
+| `/library` | Library | Everyone | 06, 25, 30 |
+| `/library/:torrentId/subtitles` | Workspace: Subtitles | Holders | 07, 08, 31 |
+| `/library/:torrentId/sync/:subtitleId?` | Workspace: Sync | Holders | 09 |
+| `/library/:torrentId/export` | Workspace: Export | Holders | 10, 11 |
+| `/storage` | Storage | Everyone | 12 |
+| `/profile` | Profile | Everyone | 13 |
+| `/admin` | Overview | Administrators | 14 |
+| `/admin/users` | Users & invites | Administrators | 15 |
+| `/admin/storage` | Storage management | Administrators | 16, 33 |
+| `/admin/sources` | Sources | Administrators | 17 |
+| `/admin/downloads` | Download settings | Administrators | 19 |
+| `/admin/system` | System status | Administrators | 20 |
+| `/admin/audit` | Activity log | Administrators | 21 |
 
-沒登入時進任何頁面都導到 `/login`，登入後回到原本要去的地方（原型一律回搜尋頁；「回到原本的地方」是正式版要加的）。成員進 `/admin/…` 看到「這一頁只有管理員能看。」不存在的路徑、或不是持有人的工作區（管理員也一樣），看到「找不到這個頁面。它可能已經被刪除。」
+When not signed in, every page redirects to `/login`, and after signing in you return to where you were going (the prototype always returns to Search; "returning to where you were" is added in production). A member opening `/admin/…` sees "Only administrators can see this page." A route that doesn't exist, or the workspace of a film you don't hold (administrators included), shows "This page doesn't exist. It may have been deleted."
 
-## 外框
+## Shell
 
-登入後每一頁共用（截圖 22、23）。
+Shared by every page after sign-in (screenshots 22, 23).
 
-- **頂端列**：品牌（點了回搜尋）、全站搜尋框、用量指示、通知、帳號選單。
-- **側邊選單**：搜尋、下載、片庫、儲存空間、個人設定；管理員多一組「管理」。「下載」旁邊的數字是自己排隊中、下載中、已暫停的數量。（原型把分析中的也算進去；正式版分析中的片已經在片庫裡，不算。）
-- **用量指示**：規則在 [10-storage.md](10-storage.md)。
-- **通知**：按鈕上顯示未讀數。點開是最近幾則，未讀的有標示，點一則就前往相關頁面並標成已讀。「全部標為已讀」。對象已經不存在時（電影被刪了）改去片庫；匯出的通知改去儲存空間頁（見這份文件的「通知」）。
-- **外觀按鈕**：頂端列右側、「通知」左邊的一個圖示按鈕，每按一次換下一種外觀（見 [17-ui.md](17-ui.md)）。
-- **介面語言按鈕**（Brian，2026-10-08）：外觀按鈕左邊的圓鈕，寫著要換成的那個語言（繁體中文時寫「EN」，English 時寫「中」），按一下就換，並存進帳號的偏好（`prefs.locale`）。登入、註冊、重設密碼頁右上角也有，和外觀按鈕放在一起；那裡還沒登入，只記在這個瀏覽器。
-- **帳號選單**：名字和角色、個人設定、登出。
-- **提示訊息**（toast）：右下角，最多同時 3 則，約 5 秒消失，可以帶一個動作按鈕（「查看下載」「開啟」「前往匯出」）。只用來**確認剛完成的動作**；錯誤和需要使用者決定的事放在頁面裡，不用 toast。原型有幾處為了省事用 toast 顯示拒絕或驗證錯誤，正式版要改放進頁面，見下表。
-- 手機寬度時側邊選單收成頂端的橫列（見截圖 32 到 34）。
-- Esc 關閉彈出的選單和確認框。
+- **Top bar**: brand (click to return to Search), site-wide search box, usage indicator, notifications, account menu.
+- **Side menu**: Search, Downloads, Library, Storage, Profile; administrators get an extra "Admin" group. The number next to "Downloads" counts your own queued, downloading and paused downloads. (The prototype also counts analyzing ones; in production a film being analyzed is already in the library, so it doesn't count.)
+- **Usage indicator**: rules are in [10-storage.md](10-storage.md).
+- **Notifications**: the button shows the unread count. Opening it shows the latest few, with unread ones marked; clicking one goes to the related page and marks it read. "Mark all as read". When the target no longer exists (the film was deleted), it goes to the Library instead; export notifications go to the Storage page instead (see "Notifications" in this document).
+- **Appearance button**: an icon button on the right of the top bar, left of "Notifications"; each press switches to the next appearance (see [17-ui.md](17-ui.md)).
+- **Interface language button** (Brian, 2026-10-08): a round button left of the appearance button, showing the language it switches to ("EN" when in 繁體中文, "中" when in English). One press switches, and it is saved in the account's preferences (`prefs.locale`). The sign-in, registration and reset-password pages also have it in the top right corner, next to the appearance button; there nobody is signed in yet, so it is only remembered in this browser.
+- **Account menu**: name and role, Profile, Sign out.
+- **Toasts**: bottom right, at most 3 at a time, disappearing after about 5 seconds, optionally with one action button ("View downloads", "Open", "Go to Export"). They are only for **confirming an action that just finished**; errors and things the user has to decide go on the page, not in a toast. In a few places the prototype takes the shortcut of showing a refusal or validation error as a toast; production moves those onto the page, see the table below.
+- At phone width the side menu collapses into a row at the top (see screenshots 32 to 34).
+- Esc closes pop-up menus and confirmation dialogs.
 
-**確認框的樣式**（Brian，2026-10-06 改）：破壞性的動作不用瀏覽器的對話框。按下「移除」後，畫面中央出現一個小對話框（`<dialog>`，背景變暗），上緣一條紅色，裡面是一段說明加兩個按鈕（灰色的「先不要」在左、紅色的確認在右）。原本是在同一個位置展開，會把那張卡片或那一列撐長，所以改掉。焦點一開始在「先不要」，按 Enter 不會誤刪；Esc 或點對話框外面就取消；關掉後焦點回到原本的按鈕。確認中兩個按鈕都停用。說明要講清楚後果，見各頁。
+**Confirmation dialog style** (Brian, changed 2026-10-06): destructive actions don't use the browser's dialogs. After pressing "Remove", a small dialog appears in the center of the screen (`<dialog>`, with the background dimmed), with a red strip along the top, holding an explanation and two buttons (a gray "Not now" on the left, the red confirm button on the right). It used to expand in place, which stretched that card or row, so it was changed. Focus starts on "Not now", so pressing Enter can't delete by accident; Esc or clicking outside the dialog cancels; after it closes, focus returns to the original button. Both buttons are disabled while confirming. The explanation must spell out the consequences; see each page.
 
-**原型用 toast、正式版要放進頁面的訊息**：
+**Messages the prototype shows as toasts and production puts on the page**:
 
-| 原型的 toast | 正式版放在哪裡 |
+| Prototype toast | Where it goes in production |
 | --- | --- |
-| 空間不足，不能匯出。 | 匯出分頁的空間說明本來就會變成紅色；「開始匯出」直接停用，不用等按下去 |
-| 空間不足，無法重試。先到儲存空間刪除不需要的檔案。 | 下載頁那一列下方展開說明（需要多少、剩多少、差多少）和「前往儲存空間」，做法和電影頁被擋下時相同 |
-| 不支援這種檔案。請上傳 .srt、.ass、.vtt，或 .zip、.rar、.7z 壓縮檔。 | 上傳區下方的錯誤訊息 |
-| 讀不到這個檔案，請再試一次。 | 上傳本身失敗（網路）時在上傳區下方；檔案收到了但讀不了，是候選清單裡一列失敗的候選（見「字幕」） |
-| 顯示名稱要 1 到 20 個字。 | 顯示名稱欄位下方 |
-| 請填以 https:// 開頭的完整網址。 | 那個網址欄位下方，用 [13-settings.md](13-settings.md) 的完整句子 |
-| 至少要選一種語言。/ 至少要保留一種語言。 | 語言切換鈕下方 |
-| 至少要選一條已確認的字幕。還沒有的話，先去同步。 | 字幕軌清單下方 |
-| 還沒有已確認的字幕。先到「同步」確認一條。（按了停用的「開始匯出」） | 不需要：按鈕是真的停用，原因已經寫在字幕軌的區塊裡 |
-| 所有自動來源都被停用了。 | 「搜尋所有來源」按鈕旁邊，按鈕停用 |
+| "Not enough space to export." | The space note on the Export tab already turns red; "Start export" is simply disabled instead of waiting for a press |
+| "Not enough space to retry. Delete files you don't need in Storage first." | An explanation expanded under that row on the Downloads page (how much is needed, how much is left, how much is short) with "Go to Storage", the same as when the film page is blocked |
+| "This file type isn't supported. Upload .srt, .ass or .vtt, or a .zip, .rar or .7z archive." | Error message under the upload area |
+| "Couldn't read this file. Try again." | When the upload itself fails (network), under the upload area; when the file arrived but can't be read, it is a failed candidate row in the candidate list (see "Subtitles") |
+| "The display name must be 1 to 20 characters." | Under the display name field |
+| "Enter a full address starting with https://." | Under that address field, using the full sentence from [13-settings.md](13-settings.md) |
+| "Pick at least one language." / "Keep at least one language." | Under the language toggle buttons |
+| "Pick at least one confirmed subtitle. If there aren't any, sync first." | Under the subtitle track list |
+| "No confirmed subtitles yet. Confirm one in 'Sync' first." (on pressing the disabled "Start export") | Not needed: the button really is disabled, and the reason is already written in the subtitle track section |
+| "All automatic sources are disabled." | Next to the "Search all sources" button, which is disabled |
 
-「已複製。」和複製失敗時的「這裡不能自動複製，請手動選取那段文字。」照原型用提示訊息，不用搬。
+"Copied." and, when copying fails, "Can't copy automatically here. Select the text by hand." stay toasts as in the prototype; no need to move them.
 
-## 登入（01）
+## Sign in (01)
 
-帳號、密碼、登入按鈕。下面兩行：「拿到邀請連結了？用邀請碼註冊」「忘記密碼請找管理員，他可以產生一次性的重設連結。」
+Username, password, sign-in button. Two lines below: "Got an invite link? Register with the invite code" and "Forgot your password? Ask an administrator for a one-time reset link."
 
-錯誤訊息只有一行，位置在密碼欄位和登入按鈕之間（`role="alert"`）。
+There is a single line of error message, between the password field and the sign-in button (`role="alert"`).
 
-| 狀況 | 訊息 |
+| Situation | Message |
 | --- | --- |
-| 沒填帳號 | 請輸入帳號。 |
-| 沒填密碼 | 請輸入密碼。 |
-| 帳密不對 | 帳號或密碼不正確。 |
-| 帳號停用 | 這個帳號已被停用，請聯絡管理員。 |
-| 嘗試太多次 | 嘗試太多次，請 n 分鐘後再試。（新） |
+| No username | Enter your username. |
+| No password | Enter your password. |
+| Wrong credentials | Wrong username or password. |
+| Account disabled | This account has been disabled. Contact an administrator. |
+| Too many attempts | Too many attempts. Try again in n minutes. (new) |
 
-原型下方的「原型捷徑」區塊不要做。登入、註冊、重設密碼頁的右上角有外觀按鈕（還沒登入也能換）。
+Don't build the "Prototype shortcuts" block at the bottom of the prototype. The sign-in, registration and reset-password pages have the appearance button in the top right corner (it can be switched before signing in).
 
-## 用邀請碼註冊（24）
+## Register with an invite code (24)
 
-欄位：邀請碼（從連結帶入）、顯示名稱、帳號、密碼、再輸入一次密碼。每個欄位下方有說明，出錯時換成錯誤訊息，焦點移到第一個出錯的欄位。
+Fields: invite code (filled in from the link), display name, username, password, password again. Each field has a help line underneath, replaced by the error message when there is an error, and focus moves to the first field with an error.
 
-| 欄位 | 規則 | 錯誤訊息 |
+| Field | Rule | Error message |
 | --- | --- | --- |
-| 邀請碼 | 存在、沒過期、沒用過 | 找不到這個邀請碼，請確認有沒有打錯。/ 這個邀請碼已經過期，請管理員再給你一個新的。/ 這個邀請碼已經用過了。 |
-| 顯示名稱 | 1 到 20 個字 | 請填顯示名稱。/ 顯示名稱最多 20 個字。 |
-| 帳號 | 英文、數字、底線，3 到 32 個字；不分大小寫；不能重複 | 帳號要是英文、數字或底線，至少 3 個字。/ 帳號最多 32 個字。（新；原型沒有上限）/ 這個帳號已經有人用了。 |
-| 密碼 | 至少 8 個字 | 密碼至少要 8 個字。 |
-| 再輸入一次 | 和密碼相同 | 兩次輸入的密碼不一樣。 |
+| Invite code | Exists, not expired, not used | Can't find this invite code. Check for typos. / This invite code has expired. Ask an administrator for a new one. / This invite code has already been used. |
+| Display name | 1 to 20 characters | Enter a display name. / The display name can be at most 20 characters. |
+| Username | Letters, digits, underscores, 3 to 32 characters; case-insensitive; must be unique | The username must be letters, digits or underscores, at least 3 characters. / The username can be at most 32 characters. (new; the prototype has no upper limit) / This username is taken. |
+| Password | At least 8 characters | The password must be at least 8 characters. |
+| Password again | Same as the password | The passwords don't match. |
 
-成功後直接登入，到搜尋頁，提示「歡迎，〈名字〉。先搜尋一部電影試試。」
+On success you are signed in directly and taken to Search, with the toast "Welcome, 〈name〉. Try searching for a film first."
 
-## 重設密碼
+## Reset password
 
-原型沒有這一頁，下面的句子都是新的。版面和註冊頁相同：顯示帳號名稱（唯讀）、新密碼、再輸入一次。密碼的規則和訊息同註冊頁（「密碼至少要 8 個字。」「兩次輸入的密碼不一樣。」）。連結無效或過期時顯示「這個連結已經失效，請管理員再產生一次。」成功後到登入頁，提示「密碼已經重設，請用新密碼登入。」
+The prototype doesn't have this page; all the sentences below are new. The layout is the same as the registration page: the username (read-only), new password, and the new password again. Password rules and messages are the same as on the registration page ("The password must be at least 8 characters." "The passwords don't match."). When the link is invalid or expired it shows "This link no longer works. Ask an administrator for a new one." On success it goes to the sign-in page with the toast "Your password has been reset. Sign in with the new one."
 
-## 搜尋（02、18、32）
+## Search (02, 18, 32)
 
-資料：`GET /api/yts/movies`。
+Data: `GET /api/yts/movies`.
 
-- 搜尋框打字時，下面列出 TMDB 上符合的電影（中文片名也找得到），點了直接打開 YTS 上的同一部片；細節在 [05-yts.md](05-yts.md) 的「用中文片名找片」。清單是 ARIA 的 combobox：方向鍵上下選、Enter 打開選到的、Esc 關掉；沒有選的時候 Enter 照舊搜尋。清單下面一行說「按 Enter 直接用「…」搜尋 YTS（只認得英文片名）」。
-- 搜尋框和四個篩選：畫質（全部、720p、1080p、2160p）、類型、評分（不限、6、7、8 分以上）、排序（最新上架、評分、年份、做種數）。
-- 搜尋框裡的提示文字：頂端列是「搜尋電影，例如 charade」；搜尋頁的那一個，原型寫「片名或年份，例如 charade、大都會、1963」，正式版拿掉中文片名的例子：「片名或年份，例如 charade、1963」（新）。
-- 沒有關鍵字時標題是「最新上架」，有的話是「「charade」的結果」，旁邊是筆數。
-- 每張卡片：海報、片名（有 TMDB 的中文片名時中文在上、英文片名放在第二行）、年份、評分（前面寫來源「TMDB」或「IMDb」）、有哪些畫質、自己的狀態（「已在片庫」「下載中」）。篩選和排序的「評分」是 YTS 的 IMDb 評分：YTS 只能用它篩選，TMDB 的評分沒辦法拿來篩整個片庫。
-- 頁首的說明：原型寫「片名來自 YTS，以英文為主；中文片名和年份也找得到。」原型的示範資料自帶中文片名，所以搜得到；真的 YTS 只認英文片名。**正式版不做中文片名搜尋**，這句改成「片名來自 YTS，請用英文片名或年份搜尋。」（新）原型自動化檢查裡「用中文片名搜尋」那一項因此不適用。
-- 卡片上的中文片名只有在設定了 TMDB 金鑰、而且有人替那部片搜尋過字幕之後才有：查 TMDB 是字幕搜尋的一部分（[07-subtitle-providers.md](07-subtitle-providers.md)），查到的中文片名存在那部電影的紀錄裡。沒有就不顯示那一行。
+- While typing in the search box, matching films on TMDB are listed underneath (Chinese titles can be found too); clicking one opens the same film on YTS directly. Details are in "Finding films by Chinese title (Brian, 2026-10-06)" in [05-yts.md](05-yts.md). The list is an ARIA combobox: up and down arrow keys select, Enter opens the selected one, Esc closes it; with nothing selected, Enter searches as before. The line under the list says "Press Enter to search YTS for "…" (English titles only)".
+- The search box and four filters: quality (All, 720p, 1080p, 2160p), genre, rating (Any, 6, 7, 8 and up), sort (Recently added, Rating, Year, Seeds).
+- Placeholder text in the search boxes: the top bar's is "Search films, e.g. charade"; for the one on the Search page the prototype says "Title or year, e.g. charade, 大都會 (Metropolis), 1963", and production drops the Chinese-title example: "Title or year, e.g. charade, 1963" (new).
+- Without a keyword the heading is "Recently added"; with one it is "Results for "charade"", with the count next to it.
+- Each card: poster, title (when TMDB has a Chinese title, the Chinese is on top and the English title on a second line), year, rating (preceded by its source, "TMDB" or "IMDb"), available qualities, and your own status ("In Library", "Downloading"). The "Rating" used for filtering and sorting is YTS's IMDb rating: YTS can only filter by that, and TMDB ratings can't be used to filter the whole catalog.
+- The page header's note: the prototype says "Titles come from YTS, mostly in English; Chinese titles and years work too." The prototype's demo data carries its own Chinese titles, so they are searchable; the real YTS only knows English titles. **Production doesn't do Chinese-title search**, so this sentence becomes "Titles come from YTS. Search by English title or year." (new) The "search by Chinese title" item in the prototype's automated checks therefore doesn't apply.
+- The Chinese title on a card only appears once a TMDB key is set and someone has searched subtitles for that film: looking up TMDB is part of the subtitle search ([07-subtitle-providers.md](07-subtitle-providers.md)), and the Chinese title found is stored in that film's record. Without it that line isn't shown.
 
-| 狀態 | 畫面 |
+| State | Screen |
 | --- | --- |
-| 載入中 | 六張灰色的佔位卡片 |
-| 沒有結果 | 有關鍵字：「找不到「…」。」沒有關鍵字（只用了篩選）：「找不到符合條件的電影。」兩者後面都接「YTS 的片名是英文。試試英文片名、年份，或放寬篩選條件。」和「清除搜尋與篩選」 |
-| YTS 連不上（18） | 紅色的說明：「連不上 YTS。它的網域常常更換，可能又換了。」管理員看到「到「來源設定」更新網址後再試。」和前往的按鈕；成員看到「請管理員到「來源設定」更新網址。」都有「再試一次」 |
-| YTS 的回應看不懂（`YTS_BAD_RESPONSE`） | 同上的版面，第一句換成「這個網址回的不是 YTS 的資料，它可能已經不是 YTS 了。」（新） |
-| 還沒設定 YTS 網址（`YTS_NOT_CONFIGURED`） | 原型沒有，句子是新的。管理員：「還沒有設定 YTS 的網址。」加前往來源設定的按鈕；成員：「管理員還沒有完成設定。」 |
+| Loading | Six gray placeholder cards |
+| No results | With a keyword: "Nothing found for "…"." Without a keyword (filters only): "No films match these filters." Both are followed by "YTS titles are in English. Try the English title, the year, or fewer filters." and "Clear search and filters" |
+| Can't reach YTS (18) | A red explanation: "Can't reach YTS. Its domain changes often and may have changed again." Administrators see "Update the address in Sources, then try again." and a button to go there; members see "Ask an administrator to update the address in Sources." Both get "Try again" |
+| YTS's reply can't be understood (`YTS_BAD_RESPONSE`) | Same layout as above, with the first sentence replaced by "This address doesn't return YTS data. It may not be YTS anymore." (new) |
+| YTS address not set yet (`YTS_NOT_CONFIGURED`) | Not in the prototype; the sentences are new. Administrators: "The YTS address is not set yet." plus a button to go to Sources; members: "An administrator hasn't finished setting things up." |
 
-**分頁**：原型只有 14 部片，沒有分頁。正式版每頁 24 部，底部放「上一頁 / 下一頁」和「第 n 頁，共 m 部」。
+**Pagination**: the prototype only has 14 films and no pagination. Production shows 24 films per page, with "Previous / Next" and "Page n of m films" at the bottom.
 
-## 電影頁（03、04）
+## Film page (03, 04)
 
-資料：`GET /api/yts/movies/:ytsId`。
+Data: `GET /api/yts/movies/:ytsId`.
 
-上半：海報、片名（中文在上）、英文片名、年份、片長、類型、評分（標來源）、簡介（TMDB 的中文簡介，沒有時用 YTS 的英文）、「在 TMDB 查看」（新分頁）；一行容量（已用、上限、還能放多少）加色條。
+Top half: poster, title (Chinese on top), English title, year, runtime, genre, rating (with its source), synopsis (TMDB's Chinese synopsis, or YTS's English one when there isn't one), "View on TMDB" (new tab); one line of storage (used, limit, how much more fits) plus a color bar.
 
-下半是版本表，一列一個版本：畫質與來源、info hash 的頭尾（等寬字型）、編碼與位元深度、聲道、大小、做種數/下載數、同步時的預覽（「可直接預覽」或「需要轉預覽檔」）、狀態與動作。
+The bottom half is the version table, one row per version: quality and source, the start and end of the info hash (monospace), codec and bit depth, audio channels, size, seeds/peers, preview while syncing ("Plays in the browser" or "Needs a preview file"), status and actions.
 
-最右邊那一格依情況：
+The rightmost cell depends on the situation:
 
-| 情況 | 顯示 |
+| Situation | Shows |
 | --- | --- |
-| 沒有人下載過 | 「下載」 |
-| 沒有人下載過，做種數是 0 | 「目前沒有人做種」加「仍要下載」 |
-| 自己有，已完成 | 「已在片庫」加「開啟」 |
-| 自己有，進行中 | 「下載中 43%」「排隊中」「已暫停」加「查看」（到下載頁） |
-| 自己有，下載完成、還在分析 | 「分析中」加「開啟」。原型這裡是「查看」；正式版這時已經可以進工作區（見「片庫」） |
-| 自己有，失敗 | 「下載失敗」加「重試」 |
-| 別人有，自己沒有 | 「〈名字〉已下載」或「〈名字〉：下載中 43%」加「加入我的片庫」 |
-| 別人有，但失敗了 | 「〈名字〉：下載失敗」加「加入我的片庫」。原型這一格只有「下載失敗」、沒有按鈕；正式版讓人可以加入，加入之後他就是持有人，可以自己按重試 |
-| 這個版本正在被刪除（`TORRENT_STATE`） | 按下載時在那一列下方說明：「這個版本正在刪除中，請稍後再試。」（新） |
+| Nobody has downloaded it | "Download" |
+| Nobody has downloaded it, and seeds are 0 | "Nobody is seeding right now" plus "Download anyway" |
+| You have it, finished | "In Library" plus "Open" |
+| You have it, in progress | "Downloading 43%", "Queued", "Paused" plus "View" (to the Downloads page) |
+| You have it, download finished, still analyzing | "Analyzing" plus "Open". The prototype has "View" here; in production you can already enter the workspace at this point (see "Library") |
+| You have it, failed | "Download failed" plus "Retry" |
+| Someone else has it, you don't | "〈name〉 has it" or "〈name〉: downloading 43%" plus "Add to my library" |
+| Someone else has it, but it failed | "〈name〉: download failed" plus "Add to my library". In the prototype this cell only says "Download failed", with no button; production lets people add it, and once added they are a holder and can press Retry themselves |
+| This version is being deleted (`TORRENT_STATE`) | When Download is pressed, an explanation under that row: "This version is being deleted. Try again in a moment." (new) |
 
-- 按「下載」成功：提示「開始下載 …」或「… 已排入下載，前面還有其他下載。」帶「查看下載」。
-- 空間不足（04）：那一列下方展開紅色的說明（需求、預覽檔、剩餘、差額）和「前往儲存空間」「知道了」。
-- 「加入我的片庫」：提示「已加入你的片庫，不佔額外空間。」
-- 表格下方的說明：「已經有人下載過的版本可以直接加入你的片庫，不會多佔空間。x265 和 2160p 的版本瀏覽器不一定能播，下載後會另外轉一份預覽檔，只用來對字幕。」
-- 使用者偏好的畫質那一列做個標記（原型沒有畫出來）。
+- Pressing "Download" succeeds: toast "Started downloading …." or "… is queued behind other downloads." with "View downloads".
+- Not enough space (04): a red explanation expands under that row (needed, preview file, remaining, shortfall) with "Go to Storage" and "Got it".
+- "Add to my library": toast "Added to your library. It takes no extra space."
+- Note under the table: "A version someone has already downloaded can be added to your library without taking more space. Browsers can't always play x265 and 2160p versions; after downloading, a separate preview file is made just for syncing subtitles."
+- Mark the row with the user's preferred quality (the prototype doesn't draw this).
 
-YTS 連不上而這部片有先前存下來的資料時（`MovieDetail.stale`）照常顯示，頂端加一行「YTS 目前連不上，這是 〈時間〉 存下來的資料。」（新；時間來自 `fetchedAt`）做種數是那個時候的數字。
+When YTS can't be reached but data saved earlier exists for this film (`MovieDetail.stale`), the page shows as usual, with a line at the top: "Can't reach YTS right now. This is the data saved 〈time〉." (new; the time comes from `fetchedAt`). Seeds are the numbers from that time.
 
-## 手動加入種子（新；Brian，2026-10-09；D26）
+## Add a torrent by hand (new; Brian, 2026-10-09; D26)
 
-YTS 找不到的片，用磁力連結或 .torrent 檔加入。入口：
+Films YTS can't find are added with a magnet link or a .torrent file. Entry points:
 
-- 搜尋頁標題右邊的「＋ 手動加入種子」。
-- 搜尋沒有結果時，空狀態下面一行「YTS 找不到這部片？可以貼磁力連結或上傳 .torrent 檔。」和按鈕。
-- 搜尋框的 TMDB 建議裡，選了 YTS 沒有的片時，清單底下那一行變成「YTS 沒有《大國民》：手動加入種子」，按了打開視窗，電影已經選好。
+- "＋ Add a torrent by hand" to the right of the Search page heading.
+- When a search has no results, a line under the empty state, "Can't find the film on YTS? Paste a magnet link or upload a .torrent file.", and the button.
+- In the search box's TMDB suggestions, when a film YTS doesn't have is selected, the line at the bottom of the list becomes "YTS doesn't have 大國民 (Citizen Kane): add a torrent by hand"; pressing it opens the window with the film already selected.
 
-一個浮動視窗，四個步驟，每一步從右邊滑進來（減少動態效果時不動）：
+A floating window with four steps, each sliding in from the right (no motion when reduced motion is on):
 
-1. **來源**：說明「貼上磁力連結或上傳 .torrent 檔。只會下載裡面最大的影片檔，其他檔案不下載、不佔空間。」兩個分頁「磁力連結」「.torrent 檔」（滑動的底色；左右方向鍵切換）。磁力連結是等寬字的多行輸入框，Enter 送出；.torrent 是拖放區（拖進來時邊框變成主色、放大一點、圖示上下跳，寫「放開就讀取」；選好後變綠，寫「已選擇 …」），也可以按「選擇檔案」。按鈕「取消」「讀取種子」（沒填時停用）。錯誤在按鈕上面，紅底，出現時左右晃一下：`TORRENT_INVALID` 依原因（不是磁力連結、不是能用的 .torrent、沒有影片檔、路徑不安全、2 分鐘內拿不到種子資訊）、`RATE_LIMITED`、`UPLOAD_TOO_LARGE`。
-2. **等種子資訊**（只有磁力連結，而且網站上沒有這個種子時）：一個中心在跳、三個點繞著轉的動畫，「正在向其他使用者取得種子資訊…」「通常幾秒鐘，最久等 2 分鐘。這時還不會下載任何東西。」和已經等了幾秒。按鈕「換一個種子」回到第一步。每 1.5 秒問一次 `GET /api/torrents/inspect/:id`。
-3. **確認**：上面一張卡片是「會下載的檔案」：檔名（等寬字）、大小、「種子裡其他 3 個檔案不下載。」（有字幕檔時多一行綠字「另附 2 個字幕檔，會一起下載並加成這部片的字幕。」），以及從名稱推測的畫質、來源、編碼、10-bit 的小標籤。下面：
-   - 種子已經在網站上：「這個種子已經在網站上：〈片名〉· 年份」。自己已經有的說「它已經在你的片庫或下載清單裡。」加「前往下載頁」；沒有的說加入不佔空間、共用字幕，按鈕「加入我的片庫」（`POST /api/torrents/:id/hold`）。
-   - 否則「這是哪一部電影？」：搜尋框（預設是從種子名稱讀出的片名），說明「從 TMDB 選一部。片名、海報和簡介都從那裡來，找字幕時也會用到。」下面是 TMDB 的結果卡片（海報、中文片名、原文片名 · 年份），一張一張往上浮出來。選了之後變成一張主色框的卡片（彈一下），旁邊「換一部」。沒有 TMDB 金鑰時說明要管理員設定。
-   - 按鈕「換一個種子」「開始下載」（還沒選電影時停用）。空間不足的說法：「空間不足：這個影片和預覽檔約 …，目前只剩 …，還差 …。」
-4. **完成**：綠色圓圈和勾自己畫出來，「已開始下載」（加入的是「已加入你的片庫」）、片名 · 版本、「可以在下載頁看進度，下載完成後會出現在片庫。」按鈕「關閉」「前往下載頁」。
+1. **Source**: the note "Paste a magnet link or upload a .torrent file. Only its largest video file is downloaded; the other files aren't, and take no space." Two tabs, "Magnet link" and ".torrent file" (sliding background; left and right arrow keys switch). The magnet link is a monospace multi-line input, and Enter submits; the .torrent tab is a drop zone (while dragging over it the border turns the primary color, it grows slightly, the icon bounces up and down, and it says "Release to read it"; once chosen it turns green and says "Chosen: …"), and "Choose a file" works too. Buttons "Cancel" and "Read torrent" (disabled while empty). Errors appear above the buttons on a red background, shaking left and right once when they appear: `TORRENT_INVALID` by reason (not a magnet link, not a usable .torrent, no video file, unsafe path, no torrent info within 2 minutes), `RATE_LIMITED`, `UPLOAD_TOO_LARGE`.
+2. **Waiting for torrent info** (only for magnet links, and only when the site doesn't have this torrent yet): an animation with a bouncing center and three dots circling it, "Getting the torrent details from other peers…", "Usually a few seconds, at most 2 minutes. Nothing is downloaded yet." and how many seconds it has waited. The "Use another torrent" button goes back to step 1. It polls `GET /api/torrents/inspect/:id` every 1.5 seconds.
+3. **Confirm**: the card on top is "File to download": the file name (monospace), size, "The other 3 files in the torrent won't be downloaded." (when there are subtitle files, an extra green line "It comes with 2 subtitle files; they're downloaded too and added as the film's subtitles."), and small tags for the quality, source, codec and 10-bit guessed from the name. Below:
+   - The torrent is already on the site: "This torrent is already on the site: 〈title〉 · year". If you already have it, it says "It's already in your library or downloads." plus "Go to Downloads"; if not, it says adding takes no space and the subtitles are shared, with the button "Add to my library" (`POST /api/torrents/:id/hold`).
+   - Otherwise "Which film is it?": a search box (defaulting to the title read from the torrent name), the note "Pick one on TMDB. The title, poster and synopsis come from there, and subtitle searches use it." Below are TMDB result cards (poster, Chinese title, original title · year), floating up one by one. Once one is chosen it becomes a card with a primary-color border (with a small bounce), with "Pick another" beside it. Without a TMDB key, it explains that an administrator needs to set one.
+   - Buttons "Use another torrent" and "Start download" (disabled until a film is chosen). The not-enough-space wording: "Not enough space: the video and its preview need about …, only … is free, … short."
+4. **Done**: a green circle and check mark draw themselves, "Download started" ("Added to your library" when joining), title · version, "Follow it on the Downloads page. Once finished it shows up in your library." Buttons "Close" and "Go to Downloads".
 
-下載頁裡手動加入的那一列，版本後面有一個「手動加入」的小標籤。手動加入、YTS 沒有的片沒有電影頁。
+On the Downloads page, a row added by hand has a small "Added by hand" tag after the version. Films added by hand that YTS doesn't have have no film page.
 
-## 下載（05、34）
+## Downloads (05, 34)
 
-資料：`GET /api/torrents`，之後靠事件更新。
+Data: `GET /api/torrents`, then updated by events.
 
-三個區塊：「進行中與排隊」「需要處理」（有失敗的才出現）「最近完成」（依完成時間最新的 6 筆；原型是清單裡的前 6 筆，沒有排序）。
+Three sections: "Active and queued", "Needs attention" (only shown when something failed), "Recently finished" (the 6 most recently finished; in the prototype it's the first 6 in the list, unsorted).
 
-管理員有一個「顯示所有人的下載」的勾選，**預設不勾**（原型預設是勾著的；正式版讓管理員先看到自己的）。勾了之後清單換成全站的（`scope=all`），每一列多顯示持有人。不是自己持有的列只能看，沒有任何動作按鈕（和原型相同）；管理員要停掉別人的下載，到儲存空間管理頁強制刪除。
+Administrators have a "Show everyone's downloads" checkbox, **unchecked by default** (the prototype checks it by default; production lets administrators see their own first). When checked, the list switches to the whole site (`scope=all`) and each row also shows its holders. Rows you don't hold are view-only, with no action buttons (same as the prototype); to stop someone else's download, an administrator force-deletes it on the Storage management page.
 
-「進行中與排隊」的標題右邊一行總覽（Brian，2026-10-06）：「下載中 2 · 排隊 1 · 暫停 1」、合計速度、還要下載多少、每一部都有預估時間時「約 12 分鐘後全部完成」。
+A summary line to the right of the "Active and queued" heading (Brian, 2026-10-06): "2 downloading · 1 queued · 1 paused", the total speed, how much is left to download, and, when every film has an estimate, "all done in about 12 minutes".
 
-每一列：縮圖、片名與版本、進度條、一行說明、狀態標籤、動作，還沒完成的多一個「細節 ›」（到下載細節頁；片名和縮圖也連過去）。正在收到資料的那幾列，進度條上有一道光往前跑（減少動態效果時不跑）；停滯中的沒有。手機上縮圖在左、文字在右，狀態和按鈕在下面一整列。「最近完成」下面一行「其他完成的電影在片庫」加連結。
+Each row: thumbnail, title and version, progress bar, a line of details, status tag, actions; unfinished ones also get "Details ›" (to the Download details page; the title and thumbnail link there too). Rows currently receiving data have a shimmer running along the progress bar (not when reduced motion is on); stalled ones don't. On phones the thumbnail is on the left and the text on the right, with the status and buttons in a full-width row underneath. Under "Recently finished" is a line "Other finished films are in the Library" with a link.
 
-| 狀態 | 說明文字 | 動作 |
+| Status | Details text | Actions |
 | --- | --- | --- |
-| 下載中 | 43% · 1 GB / 2.4 GB · 11.8 MB/s · 37 個節點 · 剩約 12 分鐘 | 暫停、取消 |
-| 已暫停 | 43% · 1 GB / 2.4 GB · 暫停中，空間仍然保留 | 繼續、取消 |
-| 排隊中 | 第 2 順位 · 2.4 GB · 全站同時最多下載 2 部（數字來自 `Me.limits.maxActiveDownloads`） | 取消 |
-| 分析中 | 下載完成，正在產生波形與人聲區段 | 開啟（原型這裡沒有按鈕） |
-| 失敗 | 〈原因〉。已下載的 300 MB 還留在磁碟上，移除後才會釋放。 | 重試、移除 |
-| 完成 | 2 小時前完成 · 預覽檔已就緒（或「預覽檔轉檔中 40%，可以先用只有聲音的模式對字幕」） | 開啟 |
+| Downloading | 43% · 1 GB / 2.4 GB · 11.8 MB/s · 37 peers · about 12 min left | Pause, Cancel |
+| Paused | 43% · 1 GB / 2.4 GB · Paused, space still reserved | Resume, Cancel |
+| Queued | #2 in line · 2.4 GB · at most 2 downloads at once site-wide (the number comes from `Me.limits.maxActiveDownloads`) | Cancel |
+| Analyzing | Downloaded. Making the waveform and speech regions | Open (the prototype has no button here) |
+| Failed | 〈reason〉. The 300 MB already downloaded stays on disk until you remove it. | Retry, Remove |
+| Done | Finished 2 h ago · Preview file ready (or "Making preview file 40%. You can sync subtitles in audio-only mode meanwhile") | Open |
 
-失敗的原因：
+Failure reasons:
 
-| 代碼 | 文字 |
+| Code | Text |
 | --- | --- |
-| `STALLED` | 很久沒有下載到任何資料，可能沒有人在做種 |
-| `METADATA_TIMEOUT` | 找不到任何來源 |
-| `SIZE_MISMATCH` | 實際大小比 YTS 列的大，空間不夠 |
-| `NO_VIDEO_FILE` | 這個種子裡沒有影片檔 |
-| `UNSAFE_PATH` | 這個種子的內容不正常，已經停止 |
-| `DISK_FULL` | 磁碟沒有空間了 |
-| `IO_ERROR` | 寫入磁碟時發生錯誤 |
+| `STALLED` | No data for a long time. Maybe nobody is seeding |
+| `METADATA_TIMEOUT` | Couldn't find any peers |
+| `SIZE_MISMATCH` | The real size is larger than YTS listed, and there is not enough space |
+| `NO_VIDEO_FILE` | This torrent has no video file |
+| `UNSAFE_PATH` | This torrent's contents look wrong, so it was stopped |
+| `DISK_FULL` | The disk is full |
+| `IO_ERROR` | Writing to the disk failed |
 
-這張表的七句都是新的。原型的示範資料只有一筆失敗的下載，原因寫的是「找不到可用的來源（做種數 0）」，那是寫死在示範資料裡的；正式版依代碼顯示上面的句子。
+All seven sentences in this table are new. The prototype's demo data has only one failed download, whose reason reads "No usable peers found (0 seeds)", which is hard-coded in the demo data; production shows the sentences above by code.
 
-取消和移除先展開確認框：「取消下載並刪除已下載的部分？」/「移除這筆紀錄並刪除殘留的 300 MB？」還有別人持有時，確認後的提示是「已從你的清單移除，其他人的下載不受影響。」
+Cancel and Remove open a confirmation dialog first: "Cancel the download and delete what was downloaded?" / "Remove this entry and delete the 300 MB left over?" When others still hold it, the toast after confirming is "Removed from your list. Other people's downloads aren't affected."
 
-**繼續和重試都排到隊伍的最後面。** 重試的提示是「已重新排入下載。」繼續之後如果有空位、馬上就開始下載，不用提示；還要排隊才提示「已排回佇列，等其他下載完成後繼續。」原型的順序處理比較隨便，以這裡寫的為準。重試時空間不夠，在那一列下方說明（見「外框」的表）。
+**Resume and Retry both go to the back of the queue.** The Retry toast is "Queued again." After Resume, if there is a free slot it starts downloading right away, with no toast; only when it still has to wait is there a toast: "Back in the queue. It continues once other downloads finish." The prototype handles the order loosely; what is written here wins. When there isn't enough space to retry, it is explained under that row (see the table in "Shell").
 
-進度大約每 2 秒更新一次（`torrent` 程式寫入進度的頻率），只改那一列的數字和進度條，不要重畫整頁。
+Progress updates about every 2 seconds (how often the `torrent` program writes progress), changing only that row's numbers and progress bar, without redrawing the whole page.
 
-### 下載細節（`/downloads/:torrentId`，新；Brian，2026-10-06）
+### Download details (`/downloads/:torrentId`, new; Brian, 2026-10-06)
 
-下載頁每一列左邊是海報（TMDB 的，沒有時是 YTS 的），片名是連到這一頁的連結。持有人才看得到（和其他以片為對象的頁面相同）。
+Each row on the Downloads page has a poster on the left (TMDB's, or YTS's when there isn't one), and the title links to this page. Only holders can see it (same as other per-film pages).
 
-- **上方**（三個分頁共用）：海報、片名（中文在上）、版本、狀態、大字的百分比、進度條、下載與上傳速度、剩下時間、連線節點數、已下載／總大小；「暫停」或「繼續」，下載完成的有「開啟」。
-- 下面分成三個分頁（Brian，2026-10-06）：「節點地圖」「每一塊」「速度」，每個分頁的標籤下有一行小字（幾個節點、完成幾成、目前速度）；左右方向鍵切換，網址記住目前的分頁（`?view=pieces`）。
-- **節點地圖**：深色的世界地圖，兩種外觀都是深色。每個連線中的節點在它的國家發光，一條弧線連到這台伺服器。伺服器所在的國家自動偵測（依節點回報的位址，還沒有回報時依 `TZ` 推測，見 [06-torrent-worker.md](06-torrent-worker.md)），而且**地圖以它為中心**（Brian，2026-10-06）：世界左右轉到那個國家在正中間，邊緣接起來，每條弧線都走較短的那一邊。圖例寫「這台伺服器（台灣，依節點回報的位址）」或「（台灣，依時區推測）」。從對方下載時，光點沿著弧線流向我們；上傳給對方時往外流，顏色不同；線的粗細跟速度走，新連上的節點有一圈擴散的光。區網的節點畫在伺服器旁邊。地圖是裝飾（`aria-hidden`），底下的表格列出同樣的內容：位置（國旗、國名、遮住一半的位址；國旗是打包在網站裡的 flag-icons，區網和不明的是灰色方塊）、程式（qBittorrent 4.6.3 之類）、連線方向與方式、下載、上傳、對方擁有多少。手機上表格變成一列一張小卡。地圖下方標明「IP 位置資料：DB-IP.com（CC BY 4.0）· 地圖：Natural Earth」。
-- **每一塊的狀態**：檔案的每一塊一格：已完成、下載中（閃）、還沒有（越多節點有越亮）、沒有任何節點有（紅）。塊數超過 2,400 時一格代表好幾塊，部分完成的格子依比例填色。滑過或點一格，下方說明是第幾塊、完成多少、幾個節點有。上方一行總結：共幾塊、每塊多大、已完成、下載中、沒有節點有的數量。
-- **速度**：最近兩分鐘的下載與上傳速度曲線。
-- 只在下載中的時候有地圖、格子和曲線；排隊、暫停、失敗、完成時顯示一句說明。開頁到第一份資料之間寫「正在連到下載程式，兩秒內就會有畫面…」。
-- 頁面每 2 秒向 `GET /api/torrents/:id/live` 要一次資料；系統設定「減少動態效果」時，地圖和格子都不動畫。
+- **Top** (shared by all three tabs): poster, title (Chinese on top), version, status, a large percentage, progress bar, download and upload speed, time left, connected peers, downloaded / total size; "Pause" or "Resume", and "Open" once the download is finished.
+- Below, three tabs (Brian, 2026-10-06): "Peer map", "Pieces", "Speed", each with a small line under its label (how many peers, how much done, current speed); left and right arrow keys switch, and the URL remembers the current tab (`?view=pieces`).
+- **Peer map**: a dark world map, dark in both appearances. Each connected peer glows in its country, with an arc to this server. The server's country is detected automatically (from the addresses peers report, or guessed from `TZ` before any have reported, see [06-torrent-worker.md](06-torrent-worker.md)), and **the map is centered on it** (Brian, 2026-10-06): the world is rotated left or right until that country is in the middle, with the edges wrapping around, and each arc takes the shorter way. The legend says "This server (Taiwan, from the address peers report)" or "(Taiwan, guessed from the time zone)". When downloading from a peer, dots of light flow along the arc toward us; when uploading to a peer they flow outward, in a different color; line thickness follows speed, and a newly connected peer gets an expanding ring of light. Local-network peers are drawn next to the server. The map is decoration (`aria-hidden`); the table below lists the same content: location (flag, country name, half-masked address; the flags are flag-icons bundled with the site, and local-network and unknown peers get a gray square), client (qBittorrent 4.6.3 and the like), connection direction and type, down, up, how much the peer has. On phones the table becomes one small card per row. Under the map: "IP location data: DB-IP.com (CC BY 4.0) · Map: Natural Earth".
+- **State of each piece**: one cell per piece of the file: done, downloading (flashing), not yet (brighter the more peers have it), no peer has it (red). Above 2,400 pieces one cell stands for several pieces, and partly done cells are filled in proportion. Hovering or clicking a cell explains below which piece it is, how much is done, and how many peers have it. A summary line on top: total pieces, piece size, and the number done, downloading and with no peer.
+- **Speed**: download and upload speed curves for the last two minutes.
+- The map, cells and curves only exist while downloading; when queued, paused, failed or done, a sentence explains. Between opening the page and the first data it says "Connecting to the downloader. This takes about two seconds…".
+- The page asks `GET /api/torrents/:id/live` for data every 2 seconds; when the system setting "reduce motion" is on, neither the map nor the cells animate.
 
-## 片庫（06、25、30）
+## Library (06, 25, 30)
 
-頁首下方兩個分頁：「我的片庫」（預設）和「全站片庫」（`?scope=all`；Brian，2026-10-09），分頁標籤下方小字是各有幾部。左右方向鍵可以切換。
+Two tabs under the page header: "My library" (default) and "All films" (`?scope=all`; Brian, 2026-10-09), with the number of films in small text under each tab label. Left and right arrow keys switch.
 
-**全站片庫**：資料是 `GET /api/library?scope=all`，列出系統裡所有下載完成的片，每個人都看得到。說明文字：「系統裡所有已經下載好的電影。加入你的片庫不佔額外空間，字幕和同步結果和其他持有人共用。」每張卡片：海報、片名、版本、誰持有（「美玲、阿豪 持有」；自己有的前面標「你已持有」）、已確認字幕的語言（「已確認的字幕：繁體中文、English」，沒有就寫「還沒有確認的字幕」）和匯出過幾個 MKV。按鈕：沒持有的是「加入我的片庫」（`POST /api/torrents/:id/hold`，完成提示「已加入你的片庫，可以開始找字幕或匯出。」，按鈕變成「打開工作區」）；已持有的是「打開工作區」。片在這期間被刪掉時說「這部片已經被刪除了。」全站片庫沒有移除或刪除的按鈕：刪除規則不變，照下面「我的片庫」的方式。系統裡還沒有任何下載完成的片時說「系統裡還沒有下載好的電影。」並給「前往搜尋」。
+**All films**: the data is `GET /api/library?scope=all`, listing every finished film in the system, visible to everyone. Note: "Every film downloaded on this site. Adding one to your library takes no extra space, and you share its subtitles and sync work with its other holders." Each card: poster, title, version, who holds it ("Held by Meiling, Ahao"; if you hold it, "In your library" comes first), the languages of confirmed subtitles ("Confirmed subtitles: Traditional Chinese, English", or "No confirmed subtitles yet" when there are none) and how many MKVs have been exported. Buttons: for films you don't hold, "Add to my library" (`POST /api/torrents/:id/hold`, with the toast "Added to your library. You can look for subtitles or export now." when done, after which the button becomes "Open workspace"); for films you hold, "Open workspace". If the film was deleted meanwhile, it says "This film has been deleted." All films has no remove or delete buttons: the deletion rules don't change and work as in "My library" below. When the system has no finished films yet, it says "No films have been downloaded yet." and offers "Go to Search".
 
-**我的片庫**：資料：`GET /api/library`。列的是已經下載完成的片，**包含還在分析的**：它們已經可以進工作區找字幕，卡片上多一個「分析中」的標籤。
+**My library**: data: `GET /api/library`. It lists films that have finished downloading, **including ones still being analyzed**: they can already enter the workspace to look for subtitles, and their card gets an extra "Analyzing" tag.
 
-這一點和原型不同。原型的片庫只列分析完的片，工作區也要等分析完才打得開；正式版在下載完成的那一刻就列出來、發「下載完成」的通知，因為這時已經可以找字幕了，不用等波形。跟著變的地方：搜尋卡片顯示「已在片庫」；電影頁那一格和下載頁那一列的按鈕是「開啟」；側邊選單的數字不算它。
+This differs from the prototype. The prototype's library only lists films whose analysis is done, and the workspace can't be opened until analysis finishes; production lists the film the moment the download finishes and sends the "Download finished" notification, because subtitles can already be searched then without waiting for the waveform. What changes with it: the search card shows "In Library"; the cell on the film page and the row on the Downloads page get the "Open" button; the side menu count doesn't include it.
 
-上方一排篩選，每個帶數量：全部、還沒有字幕、字幕還沒確認、可以匯出、已匯出。
+A row of filters on top, each with a count: All, No subtitles yet, Subtitles not confirmed, Ready to export, Exported.
 
-每張卡片：海報、片名（連到工作區）、版本、三個步驟的進度（影片已下載 → 字幕：2 條已確認 → 已匯出 1 個 MKV）、和誰共用、一個主要按鈕（依進度是「找字幕」「同步字幕」「匯出 MKV」「查看匯出檔」）、「從片庫移除」（還有別人持有時）或「刪除整部片」（自己是最後一位時）。
+Each card: poster, title (linking to the workspace), version, progress through the three steps (Video downloaded → Subtitles: 2 confirmed → 1 MKV exported), who it's shared with, one main button (depending on progress: "Find subtitles", "Sync subtitles", "Export MKV", "View exports"), and "Remove from Library" (when others still hold it) or "Delete whole film" (when you are the last one).
 
-移除的確認文字是這一頁最重要的文案，兩種情況不能混：
+The removal confirmation text is the most important copy on this page, and the two cases must not be mixed up:
 
-- 最後一位持有人：「你是最後一位持有人，會刪除整部片：影片 1.9 GB、預覽檔 430 MB、所有字幕，以及 1 個匯出的 MKV（1.9 GB），共釋放 4.2 GB。刪除後無法復原。」確認按鈕是「刪除」，完成後說「已刪除整部片，連同字幕和匯出檔。」（影片的大小是 `Torrent.diskBytes`，預覽檔是 `MediaStatus.previewBytes`，匯出檔是 `LibraryItem.filmExports`；沒有預覽檔或匯出檔就不提）
-- 還有別人：「從你的片庫移除？美玲 還持有這部片，檔案不會刪除，也不會釋放空間。」
+- Last holder: "You're the last holder, so the whole film gets deleted: video 1.9 GB, preview file 430 MB, all subtitles, and 1 exported MKV (1.9 GB). That frees 4.2 GB. This can't be undone." The confirm button is "Delete", and when done it says "Deleted the whole film, with its subtitles and exports." (The video size is `Torrent.diskBytes`, the preview file is `MediaStatus.previewBytes`, the exports are `LibraryItem.filmExports`; leave out the preview file or exports when there are none.)
+- Others still hold it: "Remove from your library? Meiling still holds this film, so no files are deleted and no space is freed."
 
-空狀態：片庫完全是空的（25）給「前往搜尋」；某個篩選下沒有東西只說「這個分類裡沒有電影。換一個篩選條件看看。」
+Empty states: a completely empty library (25) offers "Go to Search"; when a filter has nothing it only says "No films in this group. Try another filter."
 
-## 工作區
+## Workspace
 
-一部片的三個分頁共用一個頁首：縮圖、片名、中文片名、年份、版本、和誰共用；「← 回到片庫」。分頁標籤下方有小字說明現況（「2 條」「還沒確認」「1 個 MKV」）。
+The three tabs of a film share one page header: thumbnail, title, Chinese title, year, version, who it's shared with; "← Back to Library". Each tab label has small text underneath describing the current state ("2", "Not confirmed", "1 MKV").
 
-資料：`GET /api/library/:torrentId`。下載還沒完成的片進不了工作區（`MEDIA_NOT_READY`）：顯示「這部片還在下載。」和前往下載頁的按鈕（新）。下載完成、還在分析的可以進來。
+Data: `GET /api/library/:torrentId`. A film whose download isn't finished can't enter the workspace (`MEDIA_NOT_READY`): it shows "This film is still downloading." and a button to the Downloads page (new). Films that finished downloading and are still being analyzed can enter.
 
-工作區一開啟，如果這部片從來沒分析過（`analysis` 是 `none`），前端呼叫一次 `POST /api/media/:id/analyze`。
+When the workspace opens, if the film has never been analyzed (`analysis` is `none`), the frontend calls `POST /api/media/:id/analyze` once.
 
-### 字幕（07、08、31）
+### Subtitles (07, 08, 31)
 
-三個區塊。
+Three sections.
 
-**這部片的字幕**：已加入的，一列一條：語言、來源、版本名稱、狀態（「已確認 · 81%」「還沒確認」；還沒確認但已經有分數的寫「還沒確認 · 85%」）、誰加的、「同步 / 重新同步」、「移除」。移除的確認是「移除這條字幕和它的同步結果？」。下方說明：「同一部片的字幕和同步結果由所有持有人共用：有人對好了，其他人就不用再對一次。」
+**This film's subtitles**: the added ones, one row each: language, source, release name, status ("Confirmed · 81%", "Not confirmed"; when not confirmed but already scored, "Not confirmed · 85%"), who added it, "Sync / Sync again", "Remove". The removal confirmation is "Remove these subtitles and their sync?". Note underneath: "A film's subtitles and their sync are shared by all its holders: once someone syncs them, nobody else has to."
 
-**從所有來源找字幕**：
+**Find subtitles in all sources**:
 
-- 語言的切換鈕（至少選一種）。
-- 「搜尋所有來源」→ 搜尋中 → 「重新搜尋」。
-- 各來源的狀態標籤：還沒查、查詢中…、n 筆、錯誤訊息加「重試」、已停用、字幕庫固定是「由你手動下載」。**各來源各自更新，先回來的先顯示。**
-- 來源的錯誤訊息依 `ProviderStatus.error.code`：
+- Language toggle buttons (at least one selected).
+- "Search all sources" → searching → "Search again".
+- A status tag for each source: Not searched, Searching…, n results, an error message plus "Retry", Disabled, and Zimuku is always "You download it yourself". **Each source updates on its own; whichever answers first is shown first.**
+- Source error messages follow `ProviderStatus.error.code`:
 
-  | 代碼 | 文字 |
+  | Code | Text |
   | --- | --- |
-  | `RATE_LIMITED` | 超過每分鐘 20 次的上限（原型的句子；有 `retryAt` 時後面加「，約 n 秒後自動重試」，新） |
-  | `UNREACHABLE` | 連不上這個來源（新） |
-  | `BAD_RESPONSE` | 這個來源的回應看不懂，可能改版了（新） |
-  | `NOT_CONFIGURED` | 還沒設定。JustSubtitles：「需要 TMDB 金鑰才能對出這部片」；射手網：「還沒設定 API token」（新） |
+  | `RATE_LIMITED` | Over the limit of 20 a minute (the prototype's sentence; with `retryAt`, append ", retrying automatically in about n s", new) |
+  | `UNREACHABLE` | Can't reach this source (new) |
+  | `BAD_RESPONSE` | Can't understand this source's reply. It may have changed (new) |
+  | `NOT_CONFIGURED` | Not set up. JustSubtitles: "Needs a TMDB key to identify this film"; Assrt (Shooter): "No API token set" (new) |
 
-- 候選表：來源、語言（加上來源的原始標籤）、版本名稱與上傳者與標記、對齊分數、「加入」或「已加入」。
-- 候選的兩種特別狀態：正在抓檔或處理上傳的檔案，顯示「處理中…」（新）；失敗的顯示原因和「移除」（新），不能加入：
+- Candidate table: source, language (plus the source's original label), release name, uploader and flags, sync score, "Add" or "Added".
+- Two special candidate states: while fetching the file or processing an uploaded file, it shows "Processing…" (new); failed ones show the reason and "Remove" (new), and can't be added:
 
-  | `fetchError` | 文字 |
+  | `fetchError` | Text |
   | --- | --- |
-  | `DOWNLOAD_FAILED` | 抓不到這個檔案 |
-  | `ARCHIVE_INVALID` | 壓縮檔打不開，或裡面的內容超過限制 |
-  | `NO_SUBTITLE` | 壓縮檔裡沒有字幕檔 |
-  | `PARSE_FAILED` | 讀不出任何一句字幕 |
+  | `DOWNLOAD_FAILED` | Couldn't fetch this file |
+  | `ARCHIVE_INVALID` | The archive won't open, or its contents are over the limits |
+  | `NO_SUBTITLE` | The archive has no subtitle file |
+  | `PARSE_FAILED` | Couldn't read a single subtitle line |
 
-  按「加入」時回 `CANDIDATE_UNAVAILABLE`：原因是上表之一就顯示那一句；原因是 `TIMEOUT` 顯示「還在抓這個檔案，請稍後再按一次。」（新）
-- 有候選之後出現排名的按鈕。它的文字：還沒排過是「全部自動對齊並排名」，進行中是「對齊中…」（停用），排過之後是「重新排名」。進行中每一列顯示「計算中…」，完成的顯示分數；全部完成後依分數排序，每種語言最高的標「建議」。
-- 射手網的結果旁邊要有來源標示和連結（它的使用條款要求）：「字幕服務由 assrt.net 提供」（新；名稱和網址來自 `ProviderStatus.credit`）。
+  When pressing "Add" returns `CANDIDATE_UNAVAILABLE`: if the reason is one in the table above, show that sentence; if the reason is `TIMEOUT`, show "Still fetching this file. Press it again in a moment." (new)
+- Once there are candidates, the ranking button appears. Its text: "Auto-align and rank all" before any ranking, "Aligning…" (disabled) while running, and "Rank again" after ranking. While running, each row shows "Calculating…", and finished ones show their score; once all are done they are sorted by score, and the highest in each language is marked "Recommended".
+- Assrt (Shooter) results need a source credit and link next to them (its terms of use require it): "Subtitles provided by assrt.net" (new; the name and address come from `ProviderStatus.credit`).
 
-標記：與 YTS 版本相符、聽障字幕、Big5 已轉 UTF-8、可轉成繁體、ASS 特效、雙語、下載後再判斷繁簡、壓縮檔。
+Flags: Matches the YTS release, Hearing impaired, Converted from Big5 to UTF-8, Can convert to Traditional, ASS styling, Bilingual, Script checked after download, Archive.
 
-「加入」之後的提示依情況：「已加入。」「已加入。依內容判斷是繁體中文。」「已加入，並從簡體轉成繁體。」都接著「下一步是同步。」
+The toast after "Add" depends on the case: "Added.", "Added. From the content, it's Traditional Chinese.", "Added, and converted from Simplified to Traditional Chinese.", each followed by "Next step: sync."
 
-**字幕庫**和**自己上傳**並排：見 [07-subtitle-providers.md](07-subtitle-providers.md)。上傳區可以拖放或點選。
+**Zimuku** and **Upload your own** sit side by side: see [07-subtitle-providers.md](07-subtitle-providers.md). The upload area accepts drag and drop or a click to pick.
 
-分析還沒完成時，「全部自動對齊並排名」停用並說明原因；搜尋和加入不受影響。
+While analysis isn't finished, "Auto-align and rank all" is disabled with the reason explained; searching and adding aren't affected.
 
-### 同步（09）
+### Sync (09)
 
-上方一張卡片選「正在同步的字幕」和它的狀態（「已確認 · 81%」或「還沒確認」），以及一句關於預覽來源的說明。下面是工作台，規格在 [09-sync-workbench.md](09-sync-workbench.md)。
+A card on top picks "Subtitles being synced" and shows their status ("Confirmed · 81%" or "Not confirmed"), plus a sentence about the preview source. Below is the workbench, specified in [09-sync-workbench.md](09-sync-workbench.md).
 
-預覽來源的說明，依情況：
+The preview-source sentence, by case:
 
-| 情況 | 句子 |
+| Case | Sentence |
 | --- | --- |
-| 能直接播 | 這個版本瀏覽器可以直接播放。 |
-| 用預覽檔 | 這個版本是 x265，預覽用的是另外轉好的 480p 預覽檔（430 MB），時間和原檔完全一致。 |
-| 預覽檔還在轉 | 這個版本是 x265，預覽檔還在轉（40%）。可以先用只有聲音的模式對字幕。 |
-| 沒有預覽影片，也沒有在轉 | 這個版本是 x265，瀏覽器不能直接播，目前只有聲音。要看畫面的話，在下面按「轉預覽檔」。（新） |
+| Plays directly | The browser can play this version directly. |
+| Uses a preview file | This version is x265, so the preview uses a separate 480p preview file (430 MB) with exactly the same timing. |
+| Preview file still converting | This version is x265 and its preview file is still being made (40%). You can sync in audio-only mode meanwhile. |
+| No preview video, and none being made | This version is x265, which the browser can't play, so there is only audio. To see the picture, press "Make preview file" below. (new) |
 
-每一句後面都接：「在下面的工作台按「確認同步」後，這條字幕就會標成已確認，可以到「匯出」封裝。」
+Each sentence is followed by: "Press "Confirm sync" in the workbench below to mark these subtitles as confirmed, then pack them in Export."
 
-還沒有任何字幕時：「還沒有可以同步的字幕。先到「字幕」分頁加入一條。」加「前往字幕」。
+When there are no subtitles yet: "No subtitles to sync yet. Add some on the Subtitles tab first." plus "Go to Subtitles".
 
-網址沒有指定字幕時（`/library/:torrentId/sync`），開第一條還沒確認的；都確認了就開第一條。
+When the URL doesn't name a subtitle (`/library/:torrentId/sync`), open the first unconfirmed one; if all are confirmed, open the first one.
 
-### 匯出（10、11）
+### Export (10, 11)
 
-**要封裝的字幕軌**：只列已確認的字幕。每一列：勾選加語言名稱、來源、語言標籤（等寬字的 `zh-TW`、`zh-CN`、`en`；`zh` 算 `zh-TW`）、「預設顯示」的單選。預設全部勾選，「預設顯示」落在第一條勾選的上面；沒勾的那一列，單選鈕停用。還有沒確認的字幕時提醒並連到同步分頁（「還有 1 條字幕沒確認：English。去同步」）。一條已確認的字幕都沒有時：「還沒有已確認的字幕。只有確認過同步的字幕才能封裝。」按鈕停用。全部取消勾選就按開始，在清單下方顯示「至少要選一條已確認的字幕。還沒有的話，先去同步。」
+**Subtitle tracks to pack**: only confirmed subtitles are listed. Each row: a checkbox with the language name, source, language tag (monospace `zh-TW`, `zh-CN`, `en`; `zh` counts as `zh-TW`), and a "Shown by default" radio button. All are checked by default, and "Shown by default" falls on the first checked one; unchecked rows have their radio button disabled. When some subtitles are still unconfirmed, a reminder links to the Sync tab ("1 subtitle not confirmed yet: English." "Go sync"). When there are no confirmed subtitles at all: "No confirmed subtitles yet. Only subtitles with a confirmed sync can be packed." and the button is disabled. Unchecking everything and pressing start shows "Pick at least one confirmed subtitle. If there aren't any, sync first." under the list.
 
-**檔名**：預設是 `片名.年份.畫質.zh-TW.mkv`（片名裡的非英數字元換成點）。規則：以 `.mkv` 結尾（`.mkv` 前面要有字），不能有 `/ \ : * ? " < > |`，最長 200 個字。伺服器另外拒絕控制字元（換行之類）、開頭是點、頭尾有空白的檔名，這些都歸在第一句（`CHARACTERS`）。欄位下方平常寫「影像和聲音直接複製，不重新編碼，畫質不變。」出錯時換成「檔名要以 .mkv 結尾，而且不能有 / \ : * ? " < > | 這些字元。」或「檔名最長 200 個字。」（新）
+**File name**: defaults to `Title.Year.Quality.zh-TW.mkv` (non-alphanumeric characters in the title become dots). Rules: ends in `.mkv` (with something before `.mkv`), can't contain `/ \ : * ? " < > |`, at most 200 characters. The server additionally rejects control characters (line breaks and the like), names starting with a dot, and names with leading or trailing spaces; these all fall under the first sentence (`CHARACTERS`). Under the field it normally says "Video and audio are copied as-is, not re-encoded, so quality is unchanged."; on an error that becomes "The file name must end in .mkv and can't contain / \ : * ? " < > |" or "The file name can be at most 200 characters." (new)
 
-**空間說明**：夠的時候是「匯出檔約 1.9 GB，和原檔一樣大。目前剩 3.7 GB，匯出後剩 1.8 GB。」不夠的時候（11）是紅色的：「**空間不足，不能匯出。** 匯出檔約 1.9 GB，目前只剩 1.2 GB，還差 700 MB。」加「前往儲存空間」，而且「開始匯出」停用（原型沒有停用，是按下去才提示）。這裡的大小用 `Workspace.exportNeedBytes`，也就是檢查空間時實際用的量（原檔大小加 1% 左右）；原型直接用原檔大小。
+**Space note**: when there is enough, "The export is about 1.9 GB, the same size as the original. 3.7 GB is free now, 1.8 GB after exporting." When there isn't (11), in red: "**Not enough space to export.** The export is about 1.9 GB, but only 1.2 GB is free, 700 MB short." plus "Go to Storage", and "Start export" is disabled (the prototype doesn't disable it; it only shows a message after the press). The size here is `Workspace.exportNeedBytes`, the amount actually used in the space check (the original file's size plus about 1%); the prototype uses the original file's size directly.
 
-**同一部片一次一個匯出**（Brian，2026-10-06）：這部片有排隊中或封裝中的匯出時，「開始匯出」停用，按鈕文字變成「匯出中…」，旁邊說「這部片正在匯出，完成後才能再開始一個。進度在下面的列表。」
+**One export per film at a time** (Brian, 2026-10-06): while this film has a queued or packing export, "Start export" is disabled, its text becomes "Exporting…", and next to it: "This film is being exported. You can start another once it finishes. Progress is in the list below."
 
-用詞：這個動作叫「匯出」（「開始匯出」「匯出 MKV」「匯出完成」）；進行中的狀態叫「封裝中」；做好了叫「可以下載」。
+Wording: the action is called "export" ("Start export", "Export MKV", "Export finished"); the in-progress state is called "Packing"; a finished one is "Ready to download".
 
-「開始匯出」旁邊的小字：「匯出檔不會自動刪除，會一直算在容量上限裡，直到有人手動刪掉。」
+Small text next to "Start export": "Exports aren't deleted automatically. They count toward the storage limit until someone deletes them."
 
-**這部片的匯出檔**：檔名、字幕軌、誰、什麼時候、大小、進度（「封裝中 43%」）或「可以下載」、「下載」「刪除」。開始時的提示：「開始封裝。影音不重新編碼，通常不到一分鐘。」下方：「下載連結支援續傳。下載到自己的電腦後，記得回來刪掉這裡的檔案。」
+**This film's exports**: file name, subtitle tracks, who, when, size, progress ("Packing 43%") or "Ready to download", "Download", "Delete". Toast on start: "Packing started. Nothing is re-encoded, so it usually takes under a minute." Underneath: "Download links can resume. Once it is on your own computer, come back and delete the file here."
 
-排隊中的顯示「等待封裝」，可以刪除（新）。失敗的顯示原因和「刪除」；要再做一次就重新按「開始匯出」（新）：
+Queued ones show "Waiting to pack" and can be deleted (new). Failed ones show the reason and "Delete"; to try again, press "Start export" again (new):
 
-| `errorCode` | 文字 |
+| `errorCode` | Text |
 | --- | --- |
-| `SOURCE_MISSING` | 找不到原始的影片檔，它可能已經被刪除 |
-| `MUX_FAILED` | 封裝時發生錯誤 |
-| `VERIFY_FAILED` | 封裝出來的檔案不完整 |
-| `DISK_FULL` | 磁碟沒有空間了 |
+| `SOURCE_MISSING` | Can't find the original video file. It may have been deleted |
+| `MUX_FAILED` | Packing failed |
+| `VERIFY_FAILED` | The packed file is incomplete |
+| `DISK_FULL` | The disk is full |
 
-## 儲存空間（12）
+## Storage (12)
 
-見 [10-storage.md](10-storage.md) 的「介面上的呈現」。「我持有的項目」可以直接在這裡移除；自己建立的匯出檔也列在這裡，可以下載和刪除。這一頁的確認文字比片庫頁短，全文和按鈕的文字在 [10-storage.md](10-storage.md) 的「確認的文字」。
+See "How it appears in the interface" in [10-storage.md](10-storage.md). Items in "What I hold" can be removed right here; exports you made are listed here too and can be downloaded and deleted. This page's confirmation text is shorter than the Library page's; the full text and button labels are in "Confirmation wording" in [10-storage.md](10-storage.md).
 
-## 個人設定（13）
+## Profile (13)
 
-六個區塊：基本資料（顯示名稱）、介面語言（跟隨瀏覽器、繁體中文、English；一改就存並立刻換）、電影海報（「海報的版本」：跟隨介面語言、台灣、香港、中國、美國（英文原版）、日本、韓國；說明「海報從 TMDB 來。選的國家沒有這部片的海報時，用 TMDB 預設的那張。」一改就存，提示「海報版本已更新。」，畫面上的海報立刻換）、字幕偏好（預設要找的語言、簡體自動轉成繁體、同步頁預設顯示第二語言、偏好的畫質）、變更密碼、登入中的裝置。
+Six sections: Basics (display name), Interface language (Follow the browser, 繁體中文, English; saved and switched as soon as it changes), Film posters ("Poster version": Follow the interface language, Taiwan, Hong Kong, China, United States (English original), Japan, South Korea; with the note "Posters come from TMDB. When the chosen country has no poster for a film, TMDB's default one is used." Saved as soon as it changes, with the toast "Poster version updated.", and the posters on screen change immediately), Subtitle preferences (languages to look for by default, convert Simplified Chinese to Traditional automatically, show a second language on the Sync tab by default, preferred quality), Change password, Signed-in devices.
 
-偏好一改就存。語言至少要留一種：「至少要保留一種語言。」
+Preferences are saved as soon as they change. At least one language must remain: "Keep at least one language."
 
-變更密碼的訊息：「請輸入目前的密碼。」「目前的密碼不正確。」（新）「新密碼至少要 8 個字。」「兩次輸入的新密碼不一樣。」成功後提示「密碼已變更。其他裝置需要重新登入。」
+Change-password messages: "Enter your current password.", "The current password is wrong." (new), "The new password must be at least 8 characters.", "The new passwords don't match." On success the toast is "Password changed. Other devices need to sign in again."
 
-登入中的裝置：每一列是作業系統和瀏覽器（「Windows · Edge」；認不出來寫「未知的裝置」，新）和最近使用的時間。目前這台標「目前使用中」，沒有按鈕；其他的有「登出這台」，按了之後提示「那台裝置已登出。」
+Signed-in devices: each row is the operating system and browser ("Windows · Edge"; when unrecognized, "Unknown device", new) and when it was last used. The current device is marked "This device" and has no button; the others have "Sign out this device", which shows the toast "That device has been signed out."
 
-## 管理頁
+## Admin pages
 
-### 總覽（14）
+### Overview (14)
 
-四個數字方塊，各自連到對應的頁面。每一塊是小標、大數字、一行說明：
+Four number tiles, each linking to its page. Each tile has a small heading, a big number and one line of notes:
 
-| 方塊 | 大數字 | 說明 |
+| Tile | Big number | Note |
 | --- | --- | --- |
-| 容量 | 已用的量 | 上限 26 GB，剩 3.7 GB |
-| 下載中 | 2 / 2（進行中 / 全站上限） | 「1 部在排隊」或「沒有排隊」 |
-| 使用者 | 啟用中的人數 | 1 個已停用 · 2 個邀請待用 |
-| 背景任務 | 正在跑的數量 | 目前那一個的種類和進度，例如「轉預覽檔：70%」；沒有就寫「目前沒有任務」 |
+| Storage | Amount used | Limit 26 GB, 3.7 GB free |
+| Downloading | 2 / 2 (active / site-wide limit) | "1 queued" or "Nothing queued" |
+| Users | Number of active users | 1 disabled · 2 open invites |
+| Background tasks | Number running | The kind and progress of the current one, e.g. "Make preview file: 70%"; with none, "No tasks right now" |
 
-「需要處理」列出所有問題。每一項是一個標籤（紅色的「問題」或黃色的「注意」）、一句話、一個按鈕；沒有問題時寫「目前沒有需要處理的事。」下面並排「來源狀況」和「最近的操作」。
+"Needs attention" lists every problem. Each item is a tag (a red "Problem" or a yellow "Warning"), a sentence and a button; with no problems it says "Nothing needs attention right now." Below, "Sources" and "Recent activity" sit side by side.
 
-`AdminOverview.problems` 裡每一項對應一列。句子由前端依 `code` 和 `data` 寫；標了（新）的是原型沒有示範的，照同樣的語氣寫：
+Each item in `AdminOverview.problems` is one row. The frontend writes the sentences from `code` and `data`; those marked (new) aren't shown in the prototype, and are written in the same voice:
 
-| 代碼 | 標籤 | 句子 | 按鈕 → 頁面 | `data` |
+| Code | Tag | Sentence | Button → page | `data` |
 | --- | --- | --- | --- | --- |
-| `OVER_LIMIT` | 問題 | 用量超過容量上限，所有人都不能下載或匯出。 | 處理 → 儲存空間管理 | |
-| `NEARLY_FULL` | 注意 | 容量只剩 1.6 GB。 | 查看 → 儲存空間管理 | `freeBytes` |
-| `DISK_LOW` | 問題 | 磁碟本身的可用空間只剩 1.2 GB。（新）門檻：可用空間少於系統保留（`STORAGE_RESERVE_GB`）的兩倍 | 查看 → 儲存空間管理 | `availableBytes` |
-| `FAILED_DOWNLOAD`，每個失敗的下載一項 | 問題 | 下載失敗：Charade 1080p BluRay（美玲）。〈原因〉，殘留 300 MB。 | 查看 → 下載 | `movieTitle`、`version`、`requestedBy`、`errorCode`、`bytes` |
-| `YTS_NOT_CONFIGURED` | 問題 | 還沒有設定 YTS 的網址，搜尋頁目前無法使用。（新） | 前往設定 → 來源設定 | |
-| `YTS_DOWN` | 問題 | YTS 連不上，搜尋頁目前無法使用。 | 更新網址 → 來源設定 | |
-| `SOURCE_DOWN`，每個有狀況的來源一項 | 連不上是問題，其餘是注意 | 射手網（偽）：超過每分鐘 20 次的上限，已自動延後。 | 查看 → 來源設定 | `source`、`code` |
-| `FAILED_TASK`，每個目前是失敗狀態的分析或預覽資產一項 | 注意 | 轉預覽檔失敗：Charade。〈原因〉。 | 查看 → 系統狀態 | `kind`、`movieTitle`、`errorCode` |
-| `SERVICE_DOWN` | 問題 | 下載程式沒有回應。（新） | 查看 → 系統狀態 | `service` |
-| `MISSING_FILES` | 注意 | 重新計算用量時發現 2 個項目的檔案不見了。（新） | 查看 → 儲存空間管理 | `count` |
-| `ORPHANS` | 注意 | 磁碟上有 1 個沒有紀錄的資料夾，佔 1.2 GB。（新） | 查看 → 儲存空間管理 | `count`、`bytes` |
-| `NO_HOLDERS` | 注意 | 有 2 個項目沒有任何持有人。（新） | 查看 → 儲存空間管理 | `count` |
+| `OVER_LIMIT` | Problem | Usage is over the storage limit, so nobody can download or export. | Handle → Storage management | |
+| `NEARLY_FULL` | Warning | Only 1.6 GB of storage left. | View → Storage management | `freeBytes` |
+| `DISK_LOW` | Problem | The disk itself has only 1.2 GB free. (new) Threshold: free space below twice the system reserve (`STORAGE_RESERVE_GB`) | View → Storage management | `availableBytes` |
+| `FAILED_DOWNLOAD`, one per failed download | Problem | Download failed: Charade 1080p BluRay (Meiling). 〈reason〉, 300 MB left over. | View → Downloads | `movieTitle`, `version`, `requestedBy`, `errorCode`, `bytes` |
+| `YTS_NOT_CONFIGURED` | Problem | The YTS address isn't set, so Search doesn't work right now. (new) | Go to settings → Sources | |
+| `YTS_DOWN` | Problem | Can't reach YTS, so Search doesn't work right now. | Update address → Sources | |
+| `SOURCE_DOWN`, one per source with issues | Problem when unreachable, Warning otherwise | Assrt (Shooter): over the limit of 20 a minute, postponed automatically. | View → Sources | `source`, `code` |
+| `FAILED_TASK`, one per analysis or preview asset currently in a failed state | Warning | Make preview file failed: Charade. 〈reason〉. | View → System status | `kind`, `movieTitle`, `errorCode` |
+| `SERVICE_DOWN` | Problem | Downloader is not responding. (new) | View → System status | `service` |
+| `MISSING_FILES` | Warning | The last recount found 2 items with missing files. (new) | View → Storage management | `count` |
+| `ORPHANS` | Warning | The disk has 1 folder with no record, taking 1.2 GB. (new) | View → Storage management | `count`, `bytes` |
+| `NO_HOLDERS` | Warning | 2 items have no holder. (new) | View → Storage management | `count` |
 
-`FAILED_DOWNLOAD` 的原因用「下載」那一節的表；括號裡是發起下載的人。`FAILED_TASK` 的原因用「系統狀態」那一節的表；它列的是**現在**還處於失敗狀態的東西，重試成功或那部片被移除之後就不再出現，不是歷史上失敗過的次數。
+The `FAILED_DOWNLOAD` reason uses the table in the "Downloads" section; the name in parentheses is whoever started the download. The `FAILED_TASK` reason uses the table in the "System status" section; it lists what is in a failed state **now**, and disappears once a retry succeeds or the film is removed; it is not a count of past failures.
 
-「來源狀況」每個來源一列：名稱、狀態標籤、多久以前檢查的（「3 分鐘前」）。名稱照原型：YTS（電影搜尋）、TMDB（片名與編號對照）、JustSubtitles、YIFY Subtitles、射手網（偽）、字幕庫。狀態標籤的字：「正常」「有狀況」「連不上」「手動」（字幕庫），以及「已停用」（新）。底下一個「來源設定」的按鈕。來源的狀況說明（「回應 200 · 0.4 秒」之類）顯示在來源設定頁，不在這裡。
+"Sources" has one row per source: name, status tag, how long ago it was checked ("3 min ago"). The names follow the prototype: YTS (film search), TMDB (titles and IDs), JustSubtitles, YIFY Subtitles, Assrt (Shooter), Zimuku. Status tag text: "Working", "Issues", "Unreachable", "Manual" (Zimuku), and "Disabled" (new). Underneath, a "Sources" button. The source status details ("Response 200 · 0.4 s" and the like) are shown on the Sources page, not here.
 
-「最近的操作」是最新的 6 筆：「**名字** 動作：對象」加時間，底下一個「全部紀錄」的按鈕。
+"Recent activity" is the latest 6 entries: "**Name** action: target" plus the time, with a "Full log" button underneath.
 
-### 使用者與邀請（15）
+### Users & invites (15)
 
-使用者表：名字與帳號、角色、狀態、最近上線、持有數、動作（改角色、停用/啟用、重設密碼、移除）。自己那一列沒有任何按鈕，只有一句「不能變更自己的角色或停用自己」。
+User table: name and username, role, status, last seen, number held, actions (change role, disable/enable, reset password, remove). Your own row has no buttons, only the sentence "You can't change your own role or disable yourself".
 
-- 「重設密碼」在那一列下方展開一次性的連結和「複製」。
-- 「移除」的確認：「移除 〈名字〉 的帳號？他獨自持有的 2 個項目會留在磁碟上，要到「儲存空間管理」手動刪除。」沒有獨自持有的項目時，後半句換成「他沒有獨自持有的檔案。」
-- 會讓系統沒有管理員的動作（`LAST_ADMIN`）：在那一列下方說明「至少要保留一位啟用中的管理員。」（新）
-- 表格下方：「停用的帳號不能登入，但他持有的檔案不會被動。」
+- "Reset password" expands a one-time link and "Copy" under that row.
+- The "Remove" confirmation: "Remove 〈name〉's account? The 2 items they hold alone stay on disk and must be deleted by hand in Storage management." When they hold nothing alone, the second half becomes "They hold no files alone."
+- Actions that would leave the system without an administrator (`LAST_ADMIN`): explained under that row as "Keep at least one active administrator." (new)
+- Under the table: "A disabled account can't sign in, but the files it holds are left alone."
 
-邀請：選角色和有效期限（1、3、7 天）建立。清單顯示邀請碼、角色、狀態、建立者、「複製連結」「撤銷」（或「清除」）。
+Invites: created by picking a role and a validity period (1, 3, 7 days). The list shows the invite code, role, status, creator, "Copy link" and "Revoke" (or "Clear").
 
-### 儲存空間管理（16、33）
+### Storage management (16, 33)
 
-見 [10-storage.md](10-storage.md)。上限的說明文字在輸入時即時更新。強制刪除的確認文字在 [10-storage.md](10-storage.md) 的「確認的文字」。
+See [10-storage.md](10-storage.md). The limit's explanatory text updates live while typing. The force-delete confirmation text is in "Confirmation wording" in [10-storage.md](10-storage.md).
 
-「重新計算用量」按下去之後按鈕變成「重新計算中…」（新），做完時頁面自己更新，並提示結果：數字和紀錄一致時是「已重新掃描磁碟，實際用量和紀錄一致。」；有修正或有發現時說明修正了幾筆、發現幾個孤兒資料夾和幾筆遺失（新；數字來自那個工作的 `summary`）。
+After pressing "Recount usage", the button becomes "Recounting…" (new); when it finishes, the page updates itself and a toast reports the result: when the numbers match the records, "Rescanned the disk. Actual usage matches the records."; when something was corrected or found, it says how many entries were corrected and how many orphan folders and missing items were found (new; the numbers come from that job's `summary`).
 
-原型沒有的區塊：「重新計算時發現的」。孤兒資料夾一列一個（位置、資料夾名稱、大小、「刪除」）；遺失的檔案一列一個（哪一部片的什麼東西），只能看。沒有任何發現時不顯示這個區塊。
+A section the prototype doesn't have: "Found while recounting". Orphan folders are one per row (location, folder name, size, "Delete"); missing files are one per row (which film's what), view only. When nothing was found this section isn't shown.
 
-### 來源設定（17）
+### Sources (17)
 
-**三個橫向分頁**（Brian，2026-10-06：原本全部卡片排成一長頁，太長）：「電影資料」（YTS、TMDB）、「字幕來源」（JustSubtitles、YIFY Subtitles、射手網（偽）、字幕庫、共用設定）、「自動對齊」。樣子和工作區的分頁一樣，每個分頁標籤下面一行小字說現況：前兩個是裡面來源最差的狀況（「1 個連不上」「1 個有狀況」「還有沒測試的」「都正常」；停用的來源不算），「自動對齊」是「語音辨識開 · Claude」這樣。目前的分頁寫在網址（`?tab=movies|subtitles|align`），重新整理或從總覽的「查看」連過來都停在同一頁；左右方向鍵換分頁。寬螢幕上卡片兩欄並排，手機一欄，分頁標籤一列左右滑。
+**Three horizontal tabs** (Brian, 2026-10-06: all the cards used to be laid out on one long page, which was too long): "Film data" (YTS, TMDB), "Subtitle sources" (JustSubtitles, YIFY Subtitles, Assrt (Shooter), Zimuku, shared settings), and "Auto-align". They look like the workspace tabs, and each tab label has a line of small text underneath describing the current state: for the first two, the worst state among their sources ("1 unreachable", "1 with issues", "Some not tested", "All working"; disabled sources don't count); for "Auto-align", something like "Speech recognition on · Claude". The current tab is in the URL (`?tab=movies|subtitles|align`), so a reload or a "View" link from the Overview lands on the same tab; left and right arrow keys switch tabs. On wide screens the cards sit in two columns, on phones in one, with the tab labels in a single row that scrolls sideways.
 
-一個來源一張卡片，標題旁是狀態（各來源最近的狀況隨 `GET /api/admin/settings` 一起回來）。欄位和驗證在 [13-settings.md](13-settings.md)。金鑰欄位是密碼框，已經設定的顯示「已設定，留空表示不變」。每張卡片有「測試」，按下去顯示「測試中…」，結果顯示在按鈕旁邊（句子由前端依結果的代碼寫，對照表在 [13-settings.md](13-settings.md)）。原型每張卡片只有一個測試；正式版的 JustSubtitles 卡片多一個「測試 SubDL 官方 API」（新），因為兩種模式可以分開測。TMDB 是自己一張卡片，有自己的測試。
+One card per source, with its status next to the title (each source's latest status comes back with `GET /api/admin/settings`). Fields and validation are in [13-settings.md](13-settings.md). Key fields are password boxes; ones already set show "Set. Leave empty to keep it". Each card has "Test", which shows "Testing…" when pressed, with the result shown next to the button (the frontend writes the sentence from the result's code; the mapping is in [13-settings.md](13-settings.md)). In the prototype each card has only one test; in production the JustSubtitles card gets an extra "Test the official SubDL API" (new), because the two modes can be tested separately. TMDB has a card of its own, with its own test.
 
-原型裡「原型開關：模擬 YTS 連不上」不要做。
+Don't build the prototype's "Prototype switch: simulate YTS being unreachable".
 
-### LLM 設定（新，Brian 2026-10-07）
+### LLM settings (new, Brian 2026-10-07)
 
-`/admin/llm`，選單在「來源設定」後面。規則在 [18-llm.md](18-llm.md)。
+`/admin/llm`, after "Sources" in the menu. The rules are in [18-llm.md](18-llm.md).
 
-- 右上「新增設定檔」。
-- 「設定檔」卡片：說明一行（優先順序、權重分攤、失敗換層、冷卻 60 秒／金鑰被拒 10 分鐘），表格：名稱、供應商、模型、「第 1 層 · 權重 3」、狀態（停用／冷卻到 14:05（被限流）／正常）、金鑰（已設定／沒有金鑰）、「編輯」「刪除」（刪除先確認）。沒有設定檔時是空狀態，說明設定檔用在翻譯字幕和自動對齊。
-- 「翻譯的次數限制」卡片：每人每小時最多開始幾次（0 到 100）。
-- 「最近的使用紀錄」卡片：時間、設定檔、用途（翻譯／自動對齊／測試）、使用者、結果、花了幾秒。
-- 新增和編輯是浮動視窗，欄位順序見 [18-llm.md](18-llm.md) 的「浮動視窗」。
+- "Add profile" in the top right.
+- The "Profiles" card: a line of explanation (priority order, weight sharing, falling through to the next layer, cooling down for 60 seconds / 10 minutes when a key is rejected), and a table: name, provider, model, "Layer 1 · weight 3", status (Disabled / Cooling down until 14:05 (rate-limited) / Working), key (Key set / No key), "Edit", "Delete" (delete asks for confirmation first). With no profiles it is an empty state explaining that profiles are used for subtitle translation and auto-align.
+- The "Translation limit" card: how many translations each person can start per hour (0 to 100).
+- The "Recent usage" card: time, profile, purpose (Translation / Auto-align / Test), user, result, how many seconds it took.
+- Adding and editing happen in a floating window; the field order is in "Floating window" in [18-llm.md](18-llm.md).
 
-「來源設定 → 自動對齊」只剩語音辨識的開關，加一句「語言模型改在「LLM 設定」頁設定」和連結。
+"Sources → Auto-align" only keeps the speech recognition switch, plus a sentence saying the language model is now set up on the "LLM settings" page, with a link.
 
-工作區的「字幕」分頁：每條字幕多一個「翻譯」，按下去是翻譯的浮動視窗（目標語言、形式）；表格下方的「翻譯」區列出進行中、失敗、取消的翻譯（進度條、「取消翻譯」、「繼續」）。完成的翻譯直接變成一條字幕，來源寫「AI 翻譯」。
+The workspace's "Subtitles" tab: each subtitle gets an extra "Translate", which opens the translation floating window (target language, form); the "Translation" section under the table lists running, failed and cancelled translations (progress bar, "Cancel translation", "Resume"). A finished translation becomes a subtitle directly, with the source "AI translation".
 
-### 下載設定（19）
+### Download settings (19)
 
-四個區塊：數量與速度、連線、做種、下載完成後。這一頁是一張表單，**有未儲存的變更時底部的儲存列會提示**；「還原成目前的設定」。
+Four sections: Count and speed, Connection, Seeding, After a download finishes. The page is one form, and **when there are unsaved changes the save bar at the bottom says so**; "Revert to current settings".
 
-和原型不同：連入埠是唯讀的（D31），「測試外部能不能連入」換成連入狀況的顯示（D32）；多兩個欄位（tracker 清單、停滯逾時）（D37）。
+Differences from the prototype: the incoming port is read-only (D31), and "Test whether outside peers can connect" is replaced by a display of incoming connections (D32); there are two more fields (tracker list, stall timeout) (D37).
 
-### 系統狀態（20）
+### System status (20)
 
-服務表（容器、用途、狀態、已運作多久）：四列，`api`、`torrent`、`media`、`postgres`。`proxy` 不在表上（這一頁打得開就表示它在運作）。用途那一欄是固定的說明加上服務回報的版本，例如「下載程式（WebTorrent 3.0.21）」。超過 30 秒沒有回報的服務顯示「沒有回應」（新）。這一頁開著的時候每 10 秒重新抓一次。
+Service table (container, purpose, status, uptime): four rows, `api`, `torrent`, `media`, `postgres`. `proxy` isn't in the table (if this page opens, it's running). The purpose column is a fixed description plus the version the service reports, e.g. "Downloader (WebTorrent 3.0.21)". A service that hasn't reported for more than 30 seconds shows "Not responding" (new). While the page is open it refetches every 10 seconds.
 
-背景任務表：任務（種類的中文名稱：分析波形與人聲、語音辨識、轉預覽檔、自動對齊、字幕排名、匯出 MKV、重新計算用量）、項目（片名或檔名）、狀態（「進行中」「等待」「完成」「失敗」，以及「已取消」，新）、說明（進行中寫進度，完成寫「用時 40 秒」，失敗寫原因）、動作。只有能重試的失敗工作有「重試」（`Task.retryable`：分析、語音辨識、預覽檔、重新計算）。預覽檔的重試可能因為空間不足被拒絕，在那一列說明。
+Background task table: task (the kind's display name: Analyze waveform and speech, Speech recognition, Make preview file, Auto-align, Rank subtitles, Export MKV, Recount usage), item (film title or file name), status ("Running", "Waiting", "Done", "Failed", and "Cancelled", new), details (progress while running, "Took 40 s" when done, the reason when failed), actions. Only failed jobs that can be retried have "Retry" (`Task.retryable`: analysis, speech recognition, preview file, recount). A preview file retry may be refused for lack of space, which is explained in that row.
 
-失敗的原因（`Task.errorCode`；分析和預覽資產的代碼和 `MediaStatus.errors` 相同，句子都是新的）：
+Failure reasons (`Task.errorCode`; the codes for analysis and preview assets are the same as in `MediaStatus.errors`, and the sentences are all new):
 
-| 代碼 | 文字 |
+| Code | Text |
 | --- | --- |
-| `NO_AUDIO` | 這個檔案沒有聲音軌 |
-| `PROBE_FAILED` | 讀不了這個影片檔，它可能是壞的 |
-| `PEAKS_FAILED` | 產生波形時發生錯誤 |
-| `SPEECH_FAILED` | 偵測人聲時發生錯誤 |
-| `TRANSCODE_FAILED` | 轉檔時發生錯誤 |
-| `TIMEOUT` | 等太久沒有結果 |
-| 匯出的四個代碼 | 用「匯出」那一節的表 |
-| 其他 | 發生錯誤（代碼照樣顯示在後面，方便回報） |
+| `NO_AUDIO` | This file has no audio track |
+| `PROBE_FAILED` | Can't read this video file. It may be damaged |
+| `PEAKS_FAILED` | Making the waveform failed |
+| `SPEECH_FAILED` | Detecting speech failed |
+| `TRANSCODE_FAILED` | Converting failed |
+| `TIMEOUT` | Took too long with no result |
+| The four export codes | Use the table in the "Export" section |
+| Anything else | Something went wrong (with the code shown after it, to help with reporting) |
 
-磁碟的摘要：「資料磁碟共 … ，系統保留 … 。容量上限設為 … ，目前用了 … 。」
+Disk summary: "The data disk has … with … reserved for the system. The storage limit is …, and … is used."
 
-這一頁和其他管理頁可以出現技術名詞（容器名稱、WebTorrent、ffmpeg、tracker、DHT、埠號）：它是給管理員看的。
+This page and the other admin pages may use technical terms (container names, WebTorrent, ffmpeg, tracker, DHT, port numbers): they are for administrators.
 
-### 操作紀錄（21）
+### Activity log (21)
 
-時間、使用者、動作、對象，可以依使用者篩選。每頁 50 筆，底部「更早的紀錄」往前翻（原型沒有分頁，新）。使用者那一欄用紀錄當時的名字（`actorName`），帳號已經被移除的也看得懂。動作和對象的句子由前端依代碼和資料寫，對照表在 [12-auth.md](12-auth.md)。
+Time, user, action, target, filterable by user. 50 entries per page, with "Older entries" at the bottom to page back (the prototype has no paging; new). The user column uses the name at the time of the entry (`actorName`), so entries from accounts that have since been removed still make sense. The frontend writes the action and target sentences from the code and data; the mapping is in [12-auth.md](12-auth.md).
 
-## 原型裡是假的、正式版不要帶進來的東西
+## Things in the prototype that are fake and must not reach production
 
-- 登入頁的「原型捷徑」、帳號選單裡的「改用 … 的身分看」和「重設示範資料」
-- 來源設定裡的「原型開關：模擬 YTS 連不上」
-- 每一頁底部的「原型：電影、使用者與字幕都是示範資料…」
-- 同步分頁上方的「這份字幕的問題」選單
-- 「示範資料」「原型裡的進度是加速模擬的」這類字樣
-- 示範的網域 `paiban.home.example`、`yts.example`
-- 原型用來說明「這裡是假的」的那些句子：開啟字幕庫時的「原型不會真的開啟外部網站…」、下載匯出檔時的「原型沒有真的檔案可以下載…」、上傳壓縮檔時的「已收到 …。正式版會在伺服器解壓…」、上傳字幕檔時的「已讀取 …：n 句。」、操作紀錄頁的「在原型裡操作，這裡會跟著新增。」
-- 註冊頁邀請碼欄位下方提示示範邀請碼的那一行
+- "Prototype shortcuts" on the sign-in page, and "View as …" and "Reset demo data" in the account menu
+- "Prototype switch: simulate YTS being unreachable" in Sources
+- "Prototype: films, users and subtitles are all demo data…" at the bottom of every page
+- The "Problems with these subtitles" menu at the top of the Sync tab
+- Wording like "Demo data" and "Progress in the prototype is a sped-up simulation"
+- The demo domains `paiban.home.example` and `yts.example`
+- The prototype's sentences explaining that something is fake: "The prototype doesn't really open external sites…" when opening Zimuku, "The prototype has no real file to download…" when downloading an export, "Received …. In production the server unpacks it…" when uploading an archive, "Read …: n lines." when uploading a subtitle file, and "Actions you take in the prototype are added here." on the Activity log page
+- The line under the invite code field on the registration page that hints at the demo invite code
 
-## 通知
+## Notifications
 
-原型有四種通知（下載完成、下載失敗、匯出完成、字幕對好了）。正式版有六種（`Notification.kind`），句子由前端依 `data` 寫：
+The prototype has four kinds of notification (download finished, download failed, export finished, subtitles synced). Production has six (`Notification.kind`), and the frontend writes the sentences from `data`:
 
-| 種類 | 句子 | 點了去哪裡 |
+| Kind | Sentence | Where clicking goes |
 | --- | --- | --- |
-| `download.completed` | 下載完成：〈片名〉 · 〈版本〉 | 那部片的工作區 |
-| `download.failed` | 下載失敗：〈片名〉 · 〈版本〉 | 下載頁 |
-| `export.completed` | 匯出完成：〈片名〉 | 那部片的匯出分頁 |
-| `export.failed` | 匯出失敗：〈片名〉（新） | 那部片的匯出分頁 |
-| `subtitle.confirmed` | 〈名字〉 把 〈片名〉 的〈語言〉字幕對好了 | 那部片的同步分頁 |
-| `item.deleted` | 管理員 〈名字〉 刪除了〈項目〉：〈片名或檔名〉（新）。項目依 `itemKind`：影片、還在下載的影片、失敗下載的殘留、預覽檔、匯出檔 | 片庫 |
+| `download.completed` | Download finished: 〈title〉 · 〈version〉 | That film's workspace |
+| `download.failed` | Download failed: 〈title〉 · 〈version〉 | Downloads page |
+| `export.completed` | Export finished: 〈title〉 | That film's Export tab |
+| `export.failed` | Export failed: 〈title〉 (new) | That film's Export tab |
+| `subtitle.confirmed` | 〈name〉 synced the 〈language〉 subtitles of 〈title〉 | That film's Sync tab |
+| `item.deleted` | Administrator 〈name〉 deleted 〈item〉: 〈film title or file name〉 (new). The item follows `itemKind`: video, video still downloading, failed download leftovers, preview file, export | Library |
 
-點了去哪裡：原型一律開那部片工作區預設的分頁；正式版直接開對應的分頁。對象已經不存在時（`link` 是 null）改去片庫；匯出的兩種改去儲存空間頁，因為電影被刪掉之後，匯出檔在那裡下載。
+Where clicking goes: the prototype always opens the workspace's default tab for that film; production opens the matching tab directly. When the target no longer exists (`link` is null), it goes to the Library instead; the two export kinds go to the Storage page instead, because once the film is deleted, that is where the export is downloaded.
 
-「下載完成」在下載完成的那一刻發，不等聲音分析（原型是分析完才發）。下載完成和匯出完成時，如果當事人正開著網站，另外跳一則提示訊息（「下載完成：… [開啟]」「匯出完成：…」）。
+"Download finished" is sent the moment the download finishes, without waiting for the audio analysis (the prototype sends it after analysis). When a download or an export finishes and that person has the site open, a toast also pops up ("Download finished: … [Open]", "Export finished: …").
 
-## 原型的檢查怎麼搬
+## Carrying over the prototype's checks
 
-`prototype/platform/e2e.cjs` 的 72 項裡，下面這些綁著原型才有的東西。行為要保留，做法要換：
+Of the 72 items in `prototype/platform/e2e.cjs`, the ones below are tied to things only the prototype has. Keep the behavior, change the approach:
 
-| 原型的檢查 | 正式版怎麼做 |
+| Prototype check | How production does it |
 | --- | --- |
-| `search by Chinese title` | 不適用：正式版不做中文片名搜尋。這是唯一整項拿掉的 |
-| `search lists all demo films`、`sort by rating puts Metropolis first` 這類比對片數和片名的 | 對著假的 YTS 做，片單是它提供的那 14 部 |
-| `downloads page lists active, failed and finished`（數到 8 列以上） | 那個數字包含別人的下載。正式版的「顯示所有人的下載」預設不勾：先勾起來，或改成只數自己的 |
-| `progress moves on its own`（加速的動畫） | 用本機做種，等真的進度 |
-| `one source failing does not hide the others`、`retry brings the third source in`（原型內建射手網第一次會失敗） | 讓假的字幕來源第一次回額度錯誤（`30900`），之後正常 |
-| `uploaded file is read`（原型在瀏覽器裡讀檔，提示「已讀取 …：n 句。」） | 檔案上傳到伺服器。檢查清單上先出現一列「處理中…」，再變成可以加入的候選 |
-| `a second export no longer fits and is refused`（按下去才提示） | 「開始匯出」是停用的。檢查按鈕的狀態和紅色的說明 |
-| `download settings validate each field`（包含連入埠的欄位） | 連入埠是唯讀的，沒有那個欄位。其餘欄位照測，另加 tracker 清單和停滯逾時 |
-| `connection test reports back`、`search shows the YTS outage with a way out`（用「模擬 YTS 連不上」的開關） | 把假的 YTS 停掉，或把網址設到一個連不上的地方 |
-| 用任何密碼登入、用帳號選單切換身分、重設示範資料 | 用測試建立的帳號，真的登入和登出；每個測試自己準備資料 |
+| `search by Chinese title` | Doesn't apply: production doesn't do Chinese-title search. This is the only item dropped entirely |
+| `search lists all demo films`, `sort by rating puts Metropolis first` and similar checks comparing film counts and titles | Run them against the fake YTS, whose catalog is the 14 films it serves |
+| `downloads page lists active, failed and finished` (counts 8 or more rows) | That number includes other people's downloads. Production's "Show everyone's downloads" is unchecked by default: check it first, or count only your own |
+| `progress moves on its own` (the sped-up animation) | Use local seeding and wait for real progress |
+| `one source failing does not hide the others`, `retry brings the third source in` (the prototype has Assrt (Shooter) fail the first time) | Make the fake subtitle source return a quota error (`30900`) the first time, then work normally |
+| `uploaded file is read` (the prototype reads the file in the browser and shows the toast "Read …: n lines.") | The file is uploaded to the server. Check that the list first shows a "Processing…" row, which then becomes a candidate that can be added |
+| `a second export no longer fits and is refused` (message shown only after pressing) | "Start export" is disabled. Check the button's state and the red explanation |
+| `download settings validate each field` (including the incoming port field) | The incoming port is read-only and has no field. Test the other fields as before, plus the tracker list and stall timeout |
+| `connection test reports back`, `search shows the YTS outage with a way out` (using the "simulate YTS being unreachable" switch) | Stop the fake YTS, or set the address to somewhere unreachable |
+| Signing in with any password, switching identity from the account menu, resetting demo data | Use accounts created by the tests, and really sign in and out; each test prepares its own data |
 
-## 每一頁都要有的
+## What every page needs
 
-- 載入中、空的、出錯三種狀態（原型裡有畫的照做，沒畫的比照同類頁面）
-- 鍵盤可以操作，焦點看得見
-- 400 px 寬不出現橫向捲軸；表格太寬時在自己的容器裡橫向捲動
-- 淺色和深色主題
-- 表單的錯誤訊息出現在欄位旁邊，並把焦點移到第一個出錯的欄位
-- 數字、時間、大小用等寬數字
+- Loading, empty and error states (follow the prototype where it draws them; where it doesn't, follow similar pages)
+- Keyboard operable, with visible focus
+- No horizontal scrollbar at 400 px wide; tables that are too wide scroll sideways inside their own container
+- Light and dark themes
+- Form error messages appear next to the field, and focus moves to the first field with an error
+- Numbers, times and sizes use tabular figures

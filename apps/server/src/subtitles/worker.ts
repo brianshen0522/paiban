@@ -23,7 +23,7 @@ import {
 import { coveredLanguages, filmContext, type StagedFile, stagingDir } from './store.js';
 
 /**
- * The api's share of subtitle work (docs/07-subtitle-providers.md, "誰做哪一步"): searching the
+ * The api's share of subtitle work (docs/07-subtitle-providers.md, "Who does which step"): searching the
  * sources, and asking them for download addresses and downloading. Both need keys only the api
  * can open. There is no queue: the rows are the work. A search is a `subtitle_searches` row in
  * 'running'; a download is a candidate in 'fetching' with nothing staged yet. Each source has its
@@ -188,7 +188,7 @@ export class SubtitleWorker {
       }
       if (!found) {
         found = await providerFor(env, settings, provider).search(film, languages);
-        // Parsed results only: a raw answer may carry somebody else's key (docs/07, "快取").
+        // Parsed results only: a raw answer may carry somebody else's key (docs/07, "Caching").
         await pool.query(
           `insert into provider_cache (provider, cache_key, payload, expires_at) values ($1, $2, $3, now() + make_interval(hours => $4))
            on conflict (provider, cache_key) do update set payload = excluded.payload, fetched_at = now(), expires_at = excluded.expires_at`,
@@ -227,7 +227,7 @@ export class SubtitleWorker {
           ? err
           : new ProviderFailure('UNREACHABLE', err instanceof Error ? err.message : 'failed');
       if (!(err instanceof ProviderFailure)) log.warn({ err, provider }, 'subtitle search failed unexpectedly');
-      // 射手網's limit: one automatic retry when the source is free again (docs/07, "限制").
+      // Assrt's limit: one automatic retry when the source is free again (docs/07, "Limits").
       const retryAt = f.code === 'RATE_LIMITED' && f.retryAt && !this.autoRetried.has(key) ? f.retryAt : null;
       const fin = await pool.query(
         `update subtitle_searches set state = 'error', error_code = $3, retry_at = $4, finished_at = now()
@@ -313,7 +313,7 @@ export class SubtitleWorker {
         manifest.push({ file: String(i), name: d.fileName });
       }
       await writeFile(join(part, 'manifest.json'), JSON.stringify(manifest));
-      // Checked again right before it is handed over (docs/03, "刪除一個下載時發生的事").
+      // Checked again right before it is handed over (docs/03, "What happens when a download is deleted").
       const still = await one(
         pool,
         `select 1 from subtitle_candidates c join torrents t on t.id = c.torrent_id
@@ -363,7 +363,7 @@ const noQuery = (u: string | null) => {
 };
 
 /**
- * A source's new results (docs/03-data-model.md, "候選"): rows never fetched (`new`) or failed
+ * A source's new results (docs/03-data-model.md, "Candidates"): rows never fetched (`new`) or failed
  * are replaced; fetched ones stay. Only rows in the languages this search covered are replaced,
  * so a search for English does not wipe Chinese rows found earlier.
  */

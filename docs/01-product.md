@@ -1,81 +1,81 @@
-# 01 產品範圍
+# 01 Product scope
 
-## 一句話
+## In one sentence
 
-拍板是一個自己架的網站：在上面搜尋電影、下載、找字幕、把字幕對準，最後拿到一個帶字幕的 MKV。整個過程不用離開瀏覽器。
+Paiban (拍板) is a self-hosted website: search for films on it, download them, find subtitles, line the subtitles up, and end up with an MKV that has subtitles. The whole process never leaves the browser.
 
-名字的由來：拍板是片場用來對齊聲音和畫面的工具，「拍板」也是「定案」的意思，正好是這個網站最核心的兩個動作：對準字幕，然後確認。
+Where the name comes from: a 拍板 is the clapperboard used on set to line up sound and picture, and "拍板" also means "to make the final call". Those are exactly the two core actions of this site: line the subtitles up, then confirm.
 
-## 誰在用
+## Who uses it
 
-| 角色 | 能做什麼 |
+| Role | What they can do |
 | --- | --- |
-| 成員 | 搜尋、下載、管理自己的片庫、找字幕、同步、匯出、看自己佔了多少空間、改自己的設定 |
-| 管理員 | 成員能做的全部，加上：邀請與管理使用者、設定容量上限、刪除任何檔案、設定各個來源、調整下載設定、看系統狀態與操作紀錄 |
+| member | Search, download, manage their own library, find subtitles, sync, export, see how much space they take up, change their own settings |
+| administrator | Everything a member can do, plus: invite and manage users, set the storage limit, delete any file, configure each source, adjust download settings, see system status and the activity log |
 
-人數是個位數到十幾個人。不需要為大量使用者設計，但要考慮兩個人同時操作同一部片的情況。
+The number of people is single digits to a dozen or so. There's no need to design for many users, but two people working on the same film at the same time has to be considered.
 
-## 主流程
+## Main flow
 
-1. **搜尋**：輸入片名（英文為主），看到海報、年份、評分和有哪些畫質。
-2. **選版本**：進入電影頁，看到這部片在 YTS 上的每一個版本（畫質、來源、編碼、聲道、大小、做種數），以及這個版本放不放得下。
-3. **下載**：按下載。空間夠就開始（或排隊），不夠就告訴使用者差多少、去哪裡清。別人已經下載過同一個版本時，改成「加入我的片庫」。
-4. **等下載完成**：下載頁看得到進度。完成後系統自動分析聲音（波形、哪裡有人在講話），瀏覽器不能直接播的版本另外轉一份預覽檔。
-5. **找字幕**：在這部片的工作區按一次搜尋，同時查所有來源。也可以自己上傳。可以讓系統把每一條候選字幕都自動對齊一次，依分數排名。
-6. **同步**：把一條字幕加入後進工作台。按「自動對齊」，聽幾個檢查點，不準就微調，最後按「確認同步」。
-7. **匯出**：選要封裝的字幕軌和預設軌，按開始。影音不重新編碼，通常不到一分鐘。
-8. **下載 MKV**：從瀏覽器下載，支援續傳。下載完記得回來刪掉網站上的匯出檔，空間才會釋出。
+1. **Search**: type a title (mainly in English) and see posters, years, ratings and which qualities are available.
+2. **Pick a version**: open the film page and see every version of this film on YTS (quality, source, codec, audio channels, size, seeds), and whether that version fits.
+3. **Download**: press Download. If there's enough space it starts (or queues); if not, the user is told how much is missing and where to clear it. When someone else has already downloaded the same version, it becomes "Add to my library".
+4. **Wait for the download to finish**: progress is visible on the Downloads page. When done, the system automatically analyzes the sound (waveform, where people are talking), and for versions browsers can't play directly it also makes a preview file.
+5. **Find subtitles**: in the film's workspace, press search once to query all sources at the same time. You can also upload your own. You can have the system auto-align every candidate once and rank them by score.
+6. **Sync**: add a subtitle, then go to the workbench. Press "Auto-align", listen to a few checkpoints, fine-tune if it's off, and finally press "Confirm sync".
+7. **Export**: choose the subtitle tracks to pack and the default track, then press Start. Audio and video aren't re-encoded; it usually takes less than a minute.
+8. **Download the MKV**: download it from the browser, with resume support. When the download finishes, remember to come back and delete the export on the site, so the space is freed.
 
-每一部片在片庫裡都顯示它走到哪一步：影片 → 字幕 → 匯出。
+Every film in the library shows which step it has reached: video → subtitles → export.
 
-## 名詞
+## Terms
 
-文件、程式和介面都用同一套說法。左欄是介面上的中文，中間是程式裡的英文。
+Documents, code and the interface all use the same vocabulary. The left column is the interface wording (English, with the Traditional Chinese in parentheses), the middle is the English in code.
 
-| 介面 | 程式 | 意思 |
+| Interface | Code | Meaning |
 | --- | --- | --- |
-| 版本 | version | YTS 上一部電影的一個 torrent，例如「1080p BluRay x264」 |
-| 下載 | torrent | 系統裡的一個下載項目。一個 info hash 全站只有一個 |
-| 片庫 | library | 一位使用者持有的、已下載完成的電影 |
-| 持有人 | holder | 把某個下載加入自己片庫的使用者。可以有很多位 |
-| 工作區 | workspace | 一部片的頁面，有「字幕、同步、匯出」三個分頁 |
-| 候選字幕 | candidate | 搜尋到或上傳、但還沒加入的字幕 |
-| 字幕 | subtitle | 已加入某部片的字幕。同一部片的所有持有人共用 |
-| 句 | cue | 字幕裡的一句，有開始時間、結束時間和文字 |
-| 同步工作台 | workbench | 對字幕的那個畫面 |
-| 位移 | offset | 整段字幕提前或延後的秒數 |
-| 速率 | scale | 字幕時間的伸縮比例，用來修正影格率不同（例如 25 fps 與 23.976 fps） |
-| 分段 | segment | 一段連續的句子共用同一組位移和速率。剪輯版本不同時需要兩段以上 |
-| 對齊點 | anchor | 使用者指定「這一句就是在這個時間」 |
-| 檢查點 | checkpoint | 系統挑出來、請使用者用耳朵確認的幾句 |
-| 對齊分數 | score | 字幕出現的時間裡，有多少比例偵測到人聲。只是輔助 |
-| 同步文件 | sync doc | 一條字幕目前的同步結果：分段、逐句修改、對齊點、檢查點 |
-| 草稿 / 已確認 | draft / confirmed | 字幕的兩種狀態。只有已確認的字幕能匯出 |
-| 預覽檔 | proxy | 給瀏覽器播的低解析度副本，只用來對字幕 |
-| 只有聲音的模式 | audio-only | 預覽檔還沒好時，先用聲音和波形對字幕 |
-| 匯出檔 | export | 封裝好的 MKV |
-| 容量上限 | limit | 管理員設定的全站上限 |
-| 預留 | reserved | 還沒下載完、但已經算進用量的空間 |
+| version (版本) | version | One torrent of a film on YTS, e.g. "1080p BluRay x264" |
+| download (下載) | torrent | One download item in the system. There is only one per info hash site-wide |
+| Library (片庫) | library | The finished films a user holds |
+| holder (持有人) | holder | A user who added a download to their own library. There can be many |
+| workspace (工作區) | workspace | A film's page, with three tabs: "Subtitles", "Sync", "Export" |
+| candidate subtitles (候選字幕) | candidate | Subtitles found by search or uploaded, but not yet added |
+| subtitles (字幕) | subtitle | Subtitles added to a film. Shared by every holder of that film |
+| line (句) | cue | One line of a subtitle, with a start time, an end time and text |
+| sync workbench (同步工作台) | workbench | The screen where subtitles are lined up |
+| offset (位移) | offset | Seconds the whole subtitle is moved earlier or later |
+| rate (速率) | scale | The stretch factor of subtitle times, used to fix differing frame rates (e.g. 25 fps vs 23.976 fps) |
+| segment (分段) | segment | A run of consecutive lines sharing one offset and rate. Different cuts need two or more |
+| anchor (對齊點) | anchor | The user saying "this line is at this time" |
+| checkpoint (檢查點) | checkpoint | A few lines the system picks for the user to confirm by ear |
+| sync score (對齊分數) | score | The share of the time subtitles are on screen during which speech is detected. Only a hint |
+| sync doc (同步文件) | sync doc | A subtitle's current sync result: segments, per-line edits, anchors, checkpoints |
+| draft / confirmed (草稿 / 已確認) | draft / confirmed | The two states of a subtitle. Only confirmed subtitles can be exported |
+| preview file (預覽檔) | proxy | A low-resolution copy for the browser to play, used only for syncing subtitles |
+| audio-only mode (只有聲音的模式) | audio-only | Syncing subtitles with the sound and waveform while the preview file isn't ready yet |
+| export (匯出檔) | export | The packed MKV |
+| storage limit (容量上限) | limit | The site-wide limit set by an administrator |
+| reserved (預留) | reserved | Space already counted in usage for something that hasn't finished downloading |
 
-## 支援的瀏覽器
+## Supported browsers
 
-最近兩個主要版本的 Chrome、Edge、Firefox、Safari（含 iOS Safari）。
+The latest two major versions of Chrome, Edge, Firefox and Safari (including iOS Safari).
 
-- H.264 的版本所有瀏覽器都能直接播。
-- HEVC（x265）在 Firefox 幾乎不能播，在 Chrome 和 Edge 要看硬體。所以 x265 和 10-bit 的版本一律準備預覽檔，不依賴瀏覽器。
-- 同步工作台用得到 `requestVideoFrameCallback`（Chrome/Edge 83、Safari 15.4、Firefox 132 起支援）。不支援時退回 `requestAnimationFrame`，功能不變，只是字幕顯示的時間點粗一點。
-- 版面要在 400 px 寬的手機上不出現橫向捲軸。同步工作台在手機上能用，但以桌面為主要情境。
+- Every browser can play H.264 versions directly.
+- HEVC (x265) barely plays in Firefox, and in Chrome and Edge it depends on the hardware. So x265 and 10-bit versions always get a preview file rather than relying on the browser.
+- The sync workbench uses `requestVideoFrameCallback` (supported since Chrome/Edge 83, Safari 15.4, Firefox 132). Without it, it falls back to `requestAnimationFrame`; the features are the same, only the subtitle display timing is a bit coarser.
+- The layout must not show a horizontal scroll bar on a 400 px wide phone. The sync workbench is usable on a phone, but the desktop is the main use case.
 
-## 使用上要讓人放心的幾件事
+## Things that should put people at ease
 
-這些是寫每一頁時的判斷依據。
+These are the basis for judgment calls when writing every page.
 
-- **系統不會偷偷刪東西。** 任何刪除都是人按下去的，而且按之前會說清楚會刪掉什麼、釋出多少空間。
-- **空間不夠要在開始前說。** 不能讓使用者等了一小時才失敗。
-- **一個來源壞掉不影響其他來源。** 字幕搜尋裡任何一個網站連不上，其他的照常顯示。
-- **分數只是輔助。** 自動對齊之後還是要請使用者聽幾句，介面要一直引導到「確認」這一步。
-- **做過的事不會白做。** 字幕和同步結果是這部片的所有持有人共用的；有人對好了，其他人直接能用。
+- **The system never deletes anything behind your back.** Every deletion is something a person pressed, and before pressing it, they're told clearly what will be deleted and how much space it frees.
+- **Lack of space is reported before starting.** Users must not wait an hour only to see it fail.
+- **One broken source doesn't affect the others.** If any one site in the subtitle search can't be reached, the others show as usual.
+- **The score is only a hint.** After auto-align, users are still asked to listen to a few lines, and the interface keeps guiding them to the "confirm" step.
+- **Work done isn't wasted.** Subtitles and sync results are shared by every holder of the film; once someone has lined them up, everyone else can use them directly.
 
-## 法律提醒
+## Legal note
 
-這段只是資訊，不是法律意見。YTS 上的內容大多沒有得到權利人授權；BitTorrent 在下載的同時也會上傳給別人。在大多數地方這樣使用有法律風險，由架設和使用這個網站的人自行承擔。開發與測試一律使用 `fixtures/` 的合成素材和可自由散布的影片（D29）。
+This section is information only, not legal advice. Most content on YTS isn't authorized by the rights holders; BitTorrent also uploads to others while downloading. In most places this kind of use carries legal risk, borne by whoever hosts and uses this site. Development and testing always use the synthetic material in `fixtures/` and freely distributable videos (D29).

@@ -7,7 +7,7 @@ import { publishCandidates, publishNotification, publishSubtitle, publishTorrent
 
 /**
  * LISTEN paiban_events on a dedicated connection (not one borrowed from the pool) and turn the
- * other services' {type, id} wake-ups into events (docs/04-api.md, "伺服器之間的通知").
+ * other services' {type, id} wake-ups into events (docs/04-api.md, "Notifications between servers").
  * Reconnects after a lost connection.
  */
 export function listenForEvents(databaseUrl: string, pool: Pool, hub: EventHub, log: Logger): () => Promise<void> {

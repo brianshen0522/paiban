@@ -91,7 +91,7 @@ export const useAdminSystem = () =>
   useQuery({
     queryKey: keys.adminSystem,
     queryFn: () => get<AdminSystem>('/api/admin/system'),
-    // Heartbeats are not pushed (docs/04-api.md, "即時更新"): the page polls while it is open.
+    // Heartbeats are not pushed (docs/04-api.md, "Live updates"): the page polls while it is open.
     refetchInterval: 10_000,
   });
 export const useWorkspace = (torrentId: string) =>

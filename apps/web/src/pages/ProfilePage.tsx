@@ -11,7 +11,7 @@ import { keys } from '../lib/queries';
 
 const LANGS: Lang[] = ['zh-Hant', 'zh-Hans', 'en'];
 
-/** docs/11-pages.md, "個人設定": name, appearance, preferences (saved as they change), password, devices. */
+/** docs/11-pages.md, "Profile (13)": name, appearance, preferences (saved as they change), password, devices. */
 export function ProfilePage() {
   const me = useOutletContext<Me>();
   return (

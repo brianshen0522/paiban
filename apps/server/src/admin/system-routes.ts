@@ -45,7 +45,7 @@ export function toTask(r: TaskRow): Task {
 const TASKS =
   'select id, kind, subject, input, state, progress, error_code, result, created_at, started_at, finished_at from tasks';
 
-/** docs/11-pages.md, "系統狀態" and the storage page's recalculation. */
+/** docs/11-pages.md, "System status (20)" and the storage page's recalculation. */
 export function systemRoutes(app: FastifyInstance, deps: Deps): void {
   const { pool, config } = deps;
 
@@ -72,7 +72,7 @@ export function systemRoutes(app: FastifyInstance, deps: Deps): void {
     return { services, tasks, disk: await diskInfo(pool, deps.disk, config.storageReserveBytes) };
   });
 
-  /** docs/08-media-pipeline.md, "手動重試": a new task; the failed one stays as a record. */
+  /** docs/08-media-pipeline.md, "Manual retry": a new task; the failed one stays as a record. */
   app.post('/api/admin/tasks/:id/retry', async (req) => {
     const admin = requireAdmin(req);
     const { id } = parse(z.object({ id: z.uuid() }), req.params);

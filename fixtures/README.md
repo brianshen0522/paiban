@@ -1,111 +1,111 @@
-# 測試素材
+# Test fixtures
 
-這裡的每一個檔案都是為這個專案合成的：對白是寫的、聲音是文字轉語音、畫面是 ffmpeg 畫的。**沒有任何第三方的影音或字幕內容**，可以放進 repo、放進測試、放進 CI。
+Every file here was synthesized for this project: the dialogue was written, the voices are text-to-speech, the picture was drawn by ffmpeg. **There is no third-party audio, video or subtitle content**, so it can go in the repo, in tests and in CI.
 
-## 影片
+## Videos
 
-一段 92.4 秒的「電影」：兩個人（A、B）在辦公室找一捲帶子，共 26 句英文對白。畫面是兩個方塊，誰在講話誰就亮起來，下方是波形，左上角是時間碼。第 13 句和第 14 句之間有 13 秒沒有對白（只有幾聲翻東西的悶響）；第 22 句之前有一聲電梯的提示音。背景有很輕的底噪和持續音，讓人聲偵測不是在完全安靜的環境下工作。
+A 92.4-second "film": two people (A, B) looking for a tape in an office, 26 lines of English dialogue in all. The picture is two squares; whoever is speaking lights up. Below them is a waveform, and a timecode in the top left. Between lines 13 and 14 there are 13 seconds without dialogue (only a few muffled thuds of things being rummaged through); before line 22 there's an elevator chime. In the background there's a very faint noise floor and a sustained tone, so that speech detection isn't working in complete silence.
 
-| 檔案 | 內容 | 用途 |
+| File | Contents | Use |
 | --- | --- | --- |
-| `clip.mp4` | H.264 8-bit、480×270、23.976 fps、AAC 單聲道。1.4 MB | 「能直接播」的版本。下載、分析、同步、匯出的主要素材 |
-| `clip.hevc10.mp4` | 同樣的畫面，HEVC 10-bit、AAC 5.1。2.3 MB。每一格的時間戳和 `clip.mp4` 相同 | 「不能直接播」的版本：聲音檔要轉檔、要做預覽檔 |
-| `clip.webm` | 同樣的內容，VP9 + Opus。2.4 MB | 需要真的播放影片的瀏覽器測試用這個，這樣不依賴測試用的 Chromium 能不能解 H.264（交接時的版本不能，Playwright 1.63 可以，見 `docs/15-testing.md`）。它也算「能直接播」的版本（規則在 `docs/08-media-pipeline.md`） |
+| `clip.mp4` | H.264 8-bit, 480×270, 23.976 fps, AAC mono. 1.4 MB | The "plays directly" version. The main material for download, analysis, sync and export |
+| `clip.hevc10.mp4` | The same picture, HEVC 10-bit, AAC 5.1. 2.3 MB. Every frame's timestamp is the same as in `clip.mp4` | The "can't play directly" version: the audio file needs transcoding, and a preview file has to be made |
+| `clip.webm` | The same content, VP9 + Opus. 2.4 MB | Browser tests that really need to play video use this, so they don't depend on whether the test Chromium can decode H.264 (the version at handover couldn't, Playwright 1.63 can; see `docs/15-testing.md`). It also counts as a "plays directly" version (the rules are in `docs/08-media-pipeline.md`) |
 
-## 分析結果
+## Analysis results
 
-| 檔案 | 內容 |
+| File | Contents |
 | --- | --- |
-| `data.json` | 原型用的資料包：`duration`、`fps`、`speechHz`（100）、`speechFrames`（9242）、`speech`（42 段人聲，單位是 10 毫秒的影格）、`peaksPerSec`（50）、`peaks`（base64；4,620 組最小值與最大值的有號位元組）、`cues`（26 句，每句有 `id`、`start`、`end`、`zh`、`en`、`who`） |
-| `clip.npz` | ffsubsync 對 `clip.mp4` 做人聲偵測的快取（`--vad webrtc`）。裡面的 `speech` 陣列和 `data.json` 的 `speech` 是同一份資料 |
+| `data.json` | The prototypes' data pack: `duration`, `fps`, `speechHz` (100), `speechFrames` (9242), `speech` (42 speech regions, in 10-millisecond frames), `peaksPerSec` (50), `peaks` (base64; 4,620 pairs of signed-byte minimums and maximums), `cues` (26 lines, each with `id`, `start`, `end`, `zh`, `en`, `who`) |
+| `clip.npz` | ffsubsync's speech detection cache for `clip.mp4` (`--vad webrtc`). Its `speech` array is the same data as `speech` in `data.json` |
 
-對 `clip.mp4` 跑 `reference/pipeline/analyze.sh`，產生的 `speech.json` 和 `peaks.bin` 要和 `data.json` 裡的完全相同。
+Running `reference/pipeline/analyze.sh` on `clip.mp4` must produce a `speech.json` and `peaks.bin` exactly identical to what's in `data.json`.
 
-另外兩個檔案的聲音重新編碼過，人聲偵測的結果有極小的差異，拿它們做測試時不要比對完全相等：
+The other two files have re-encoded audio, so their speech detection results differ very slightly; don't compare for exact equality when testing with them:
 
-| 檔案 | 和 `clip.mp4` 相比 | 對測試的影響 |
+| File | Compared with `clip.mp4` | Effect on tests |
 | --- | --- | --- |
-| `clip.hevc10.mp4` | 大約 1% 的影格不同 | 分數差不到 1 個百分點 |
-| `clip.webm` | 9,242 個影格裡 28 個不同（偵測出 44 段人聲，不是 42 段） | 分數是 79.5% 上下，顯示成 79%（`clip.mp4` 是 79.6%，顯示成 80%）。自動對齊算出來的位移、速率、分段和 `clip.mp4` 完全相同 |
+| `clip.hevc10.mp4` | About 1% of frames differ | Score differs by less than 1 percentage point |
+| `clip.webm` | 28 of 9,242 frames differ (44 speech regions detected, not 42) | Score around 79.5%, shown as 79% (`clip.mp4` is 79.6%, shown as 80%). The offset, rate and segments auto-align computes are exactly the same as for `clip.mp4` |
 
-用 `clip.webm` 的測試，比對分數時容許正負 1 個百分點。
+Tests that use `clip.webm` allow plus or minus 1 percentage point when comparing scores.
 
-`cues` 的時間是「字幕人員會下的時間」：比台詞早 0.05 秒出現、台詞結束後多留 0.35 秒、不和下一句重疊。所以正確的字幕和人聲的重疊比例是 80%，不是 100%。
+The `cues` times are "the times a subtitler would set": appear 0.05 seconds before the line is spoken, stay 0.35 seconds after it ends, and don't overlap the next line. So the overlap between the correct subtitles and speech is 80%, not 100%.
 
-## 字幕
+## Subtitles
 
-`truth.*` 是時間正確的字幕。其他是故意弄錯的，模擬下載來的字幕常見的三種問題。
+`truth.*` are subtitles with correct timing. The others are deliberately wrong, simulating the three common problems of downloaded subtitles.
 
-| 檔案 | 問題 | 把它對回去需要 |
+| File | Problem | What it takes to fix |
 | --- | --- | --- |
-| `truth.zh-TW.srt`、`truth.en.srt` | 沒有 | |
-| `late.zh-TW.srt` | 整體晚 2.4 秒 | 位移 −2.4 |
-| `rate.zh-TW.srt` | 是給 25 fps 的版本做的（`t × 23.976 / 25 + 0.8`） | 速率 ×1.0427，位移 −0.834 |
-| `cut.zh-TW.srt` | 這份字幕的版本在第 13 句之後少了一段 12 秒的戲（前 13 句 `t − 1.2`，之後 `t − 13.2`） | 兩段：+1.2 和 +13.2 |
+| `truth.zh-TW.srt`, `truth.en.srt` | None | |
+| `late.zh-TW.srt` | 2.4 seconds late overall | Offset −2.4 |
+| `rate.zh-TW.srt` | Made for a 25 fps version (`t × 23.976 / 25 + 0.8`) | Rate ×1.0427, offset −0.834 |
+| `cut.zh-TW.srt` | The cut these subtitles were made for is missing a 12-second scene after line 13 (first 13 lines `t − 1.2`, after that `t − 13.2`) | Two segments: +1.2 and +13.2 |
 
-同一份 `late` 字幕的其他編碼和格式：
+The same `late` subtitles in other encodings and formats:
 
-| 檔案 | 測什麼 |
+| File | What it tests |
 | --- | --- |
 | `late.zh-TW.big5.srt` | Big5 |
-| `late.zh-TW.utf16le-bom.srt` | UTF-16 LE、有 BOM、CRLF 換行 |
-| `late.zh-CN.srt` | 簡體（UTF-8），用 opencc-js 從繁體轉的 |
-| `late.zh-CN.gb18030.srt` | 簡體，GB18030 |
-| `late.zh-CN.to-zh-TW.expected.srt` | 上面的簡體轉回繁體（`cn` → `twp`）應該得到的結果 |
-| `late.bilingual.ass` | ASS：每句中英兩行、有樣式標記、另有一行註解和一行繪圖指令（都應該被略過）。UTF-8 帶 BOM、CRLF |
+| `late.zh-TW.utf16le-bom.srt` | UTF-16 LE, with BOM, CRLF line endings |
+| `late.zh-CN.srt` | Simplified Chinese (UTF-8), converted from Traditional with opencc-js |
+| `late.zh-CN.gb18030.srt` | Simplified Chinese, GB18030 |
+| `late.zh-CN.to-zh-TW.expected.srt` | What converting the Simplified version above back to Traditional (`cn` → `twp`) should give |
+| `late.bilingual.ass` | ASS: two lines per cue, Chinese and English, with style tags, plus one comment line and one drawing command line (both should be skipped). UTF-8 with BOM, CRLF |
 | `late.en.vtt` | WebVTT |
-| `archive.zip` | 字幕網站常見的壓縮檔：一個 Big5 的繁體字幕、一個英文字幕、一個說明文字檔、一個 `__MACOSX` 的雜檔 |
+| `archive.zip` | An archive of the kind subtitle sites commonly serve: one Big5 Traditional Chinese subtitle, one English subtitle, one readme text file, one `__MACOSX` junk file |
 
-`archives/`（階段 0 用 `scripts/phase0/make-archives.sh` 產生，在一個暫時的 Debian 容器裡用 RARLAB 的 `rar` 7 和 `7zip`；這兩個工具都不在產品的映像檔裡）：
+`archives/` (generated in phase 0 with `scripts/phase0/make-archives.sh`, in a temporary Debian container using RARLAB's `rar` 7 and `7zip`; neither tool is in the product's image):
 
-| 檔案 | 內容 | 該有的結果 |
+| File | Contents | Expected result |
 | --- | --- | --- |
-| `archive.rar` | 和 `archive.zip` 同樣的四個項目，RAR5 | 和 `archive.zip` 相同。`rar` 7 已經不能寫 RAR4，所以沒有 RAR4 的樣本 |
-| `archive.7z` | 同上，7z | 同上 |
-| `hostile.traversal.zip` | 一個正常字幕加一個 `../../escaped.srt` | 整包拒絕（`ARCHIVE_INVALID`） |
-| `hostile.absolute.zip` | 一個正常字幕加一個 `/tmp/absolute.srt` | 整包拒絕 |
-| `hostile.symlink.zip` | 一個正常字幕加一個指向 `/etc/passwd` 的符號連結 | 整包拒絕 |
-| `hostile.bomb.zip` | 一個正常字幕加一個解開後 60 MB 的項目（壓縮後 62 KB） | 整包拒絕 |
-| `hostile.many.zip` | 201 個字幕檔 | 整包拒絕（上限 200） |
-| `nosubtitle.zip` | 只有一個文字檔 | `NO_SUBTITLE` |
-| `broken.zip` | 檔頭像 zip，內容不是 | `ARCHIVE_INVALID` |
+| `archive.rar` | The same four entries as `archive.zip`, RAR5 | Same as `archive.zip`. `rar` 7 can no longer write RAR4, so there is no RAR4 sample |
+| `archive.7z` | Same as above, 7z | Same as above |
+| `hostile.traversal.zip` | One normal subtitle plus a `../../escaped.srt` | Whole archive rejected (`ARCHIVE_INVALID`) |
+| `hostile.absolute.zip` | One normal subtitle plus a `/tmp/absolute.srt` | Whole archive rejected |
+| `hostile.symlink.zip` | One normal subtitle plus a symbolic link pointing to `/etc/passwd` | Whole archive rejected |
+| `hostile.bomb.zip` | One normal subtitle plus an entry that's 60 MB when extracted (62 KB compressed) | Whole archive rejected |
+| `hostile.many.zip` | 201 subtitle files | Whole archive rejected (limit 200) |
+| `nosubtitle.zip` | Only one text file | `NO_SUBTITLE` |
+| `broken.zip` | Header looks like zip, content isn't | `ARCHIVE_INVALID` |
 
-映像檔裡的 bsdtar 3.7.4 能解前兩個，內容和 `archive.zip` 完全相同。它自己只會拒絕含 `..` 的項目（其他照解）、去掉開頭的 `/`；符號連結照樣解出來、數量和大小不限制。所以這些檢查要由程式自己做（`docs/agent-notes.md`）。
+The bsdtar 3.7.4 in the image can extract the first two, with contents exactly the same as `archive.zip`. On its own it only rejects entries containing `..` (extracting the rest anyway) and strips a leading `/`; symbolic links are extracted as-is, and count and size are not limited. So these checks have to be done by our own code (`docs/agent-notes.md`).
 
-## ffsubsync 的結果
+## ffsubsync results
 
-| 檔案 | 內容 |
+| File | Contents |
 | --- | --- |
-| `ffsubsync/<情境>.linear.out.srt` | `ffsubsync clip.npz -i <情境>.zh-TW.srt -o …` 的輸出 |
-| `ffsubsync/<情境>.split.out.srt` | 加上 `--split-penalty` 的輸出 |
-| `expected.ffsubsync.json` | 每次執行 ffsubsync 自己印出的位移、速率、分段，以及和 `truth` 比較的誤差 |
+| `ffsubsync/<scenario>.linear.out.srt` | Output of `ffsubsync clip.npz -i <scenario>.zh-TW.srt -o …` |
+| `ffsubsync/<scenario>.split.out.srt` | Output with `--split-penalty` added |
+| `expected.ffsubsync.json` | The offset, rate and segments ffsubsync itself printed on each run, and the error compared with `truth` |
 
-有了這些，解析 ffsubsync 輸出、還原變換、挑選結果的程式不用安裝 ffsubsync 就能做單元測試（`packages/shared/src/sync-core/core.test.ts` 就是這樣做的）。
+With these, the code that parses ffsubsync output, recovers the transform and picks a result can be unit tested without installing ffsubsync (`packages/shared/src/sync-core/core.test.ts` does exactly this).
 
-## 比較長的素材
+## Longer fixtures
 
-`film/film.json`：一部 21.5 分鐘合成影片的人聲資料（557 段）和四份字幕（各 180 句）：`truth`、`late`（+2.37 秒）、`pal`（`t × 23.976 / 25 + 1.1`）、`cut`（第 33 句之後少了 40 秒）。影片本身太大沒有附；這個檔案足夠測對齊核心在比較長、落差比較大的情況下的行為。這裡的 `truth` 是每句台詞實際發聲的區間，所以正確字幕的分數是 95%。
+`film/film.json`: speech data (557 regions) for a 21.5-minute synthetic film and four sets of subtitles (180 lines each): `truth`, `late` (+2.37 seconds), `pal` (`t × 23.976 / 25 + 1.1`), `cut` (40 seconds missing after line 33). The video itself is too large to include; this file is enough to test how the sync core behaves on longer material with bigger discrepancies. Here `truth` is the interval in which each line is actually voiced, so the correct subtitles score 95%.
 
-## 重新產生
+## Regenerating
 
 ```bash
-# 在 fixtures/ 這個資料夾裡執行。
+# Run inside the fixtures/ folder.
 
-# 簡體版和轉換的預期結果。用的是 reference/subtitles 裝的 opencc-js:
+# Simplified versions and expected conversion results. Uses the opencc-js installed by reference/subtitles:
 (cd ../reference/subtitles && npm ci)
 node make_simplified.mjs
 
-# 其他全部。用裝有 ffsubsync 0.5.1 的那個 Python 來跑(它會用到 ffsubsync 帶進來的 srt 套件):
+# Everything else. Run with the Python that has ffsubsync 0.5.1 installed (it uses the srt package ffsubsync brings in):
 FFSUBSYNC=/path/to/venv/bin/ffsubsync /path/to/venv/bin/python make_fixtures.py
 ```
 
-`clip.mp4` 和 `data.json` 是來源，不會被重新產生。另外兩個影片檔是從 `clip.mp4` 轉的：
+`clip.mp4` and `data.json` are sources and are never regenerated. The other two video files were converted from `clip.mp4`:
 
 ```bash
-# clip.hevc10.mp4(實際用的指令)
+# clip.hevc10.mp4 (the command actually used)
 ffmpeg -i clip.mp4 -map 0:v:0 -map 0:a:0 -c:v libx265 -preset medium -crf 30 -pix_fmt yuv420p10le -tag:v hvc1 \
   -fps_mode passthrough -c:a aac -ac 6 -b:a 192k -movflags +faststart clip.hevc10.mp4
 
-# clip.webm(當時的參數沒有留下來;類似這樣)
+# clip.webm (the original parameters weren't kept; something like this)
 ffmpeg -i clip.mp4 -c:v libvpx-vp9 -crf 34 -b:v 0 -fps_mode passthrough -c:a libopus -b:a 64k clip.webm
 ```

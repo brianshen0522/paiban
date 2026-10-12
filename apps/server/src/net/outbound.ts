@@ -2,7 +2,7 @@ import { APP_VERSION, SITE_NAME_ASCII } from '@paiban/shared';
 import { isInternalAddress, resolveHost } from './address.js';
 
 /**
- * The one HTTP client for talking to the outside (docs/12-auth.md, "對外請求"): host allow-list,
+ * The one HTTP client for talking to the outside (docs/12-auth.md, "Outbound requests"): host allow-list,
  * no internal addresses (checked after DNS), https only, at most 3 redirects each checked again,
  * timeout, size cap read as the body arrives, and logs without query strings. YTS uses it now; the
  * subtitle sources reuse it in phase 5.

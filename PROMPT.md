@@ -1,75 +1,75 @@
-# 給 coding agent 的 prompt
+# Prompts for the coding agent
 
-在這個資料夾裡開啟 coding agent，把下面「啟動」那一段整段貼給它。
+Open the coding agent in this folder and paste it the whole "Getting started" section below.
 
-## 貼之前
+## Before you paste
 
-- **在哪台機器上跑。** 第一個階段要建置並啟動 Docker 映像檔、連到外面的網站做確認，所以那台機器要有 Docker（而且正在執行）、連得上網路，另外要有 git 和 Node.js 22.18 以上（一開始跑參考測試用）。最理想的是之後要架站的那台機器；不是的話也可以，網路和效能的結論到上線前會在正式的機器上再量一次。少了哪一樣，coding agent 會跳過做不到的項目並在報告裡列出來，不會卡住。
-- **金鑰（可以之後再補）。** 有 TMDB 金鑰或射手網 token 的話：把 `deploy/.env.example` 複製成 `deploy/.env`，填在最下面的 `TMDB_KEY`、`ASSRT_TOKEN`、`SUBDL_KEY`。沒有就不用管，那幾個來源的確認會先跳過。**不要把金鑰貼在對話裡。**
-- 「啟動」那一段最後四行是你的環境，知道的就填，不知道的留空或整行刪掉都可以。
+- **Which machine to run on.** The first phase builds and starts the Docker images and reaches outside websites to check them, so that machine needs Docker (and running), network access, git, and Node.js 22.18 or later (for running the reference tests at the start). Ideally it's the machine you'll host the site on; if not, that's fine too, and the network and performance conclusions will be measured again on the real machine before launch. If anything is missing, the coding agent skips the items it can't do and lists them in the report; it won't get stuck.
+- **Keys (can be added later).** If you have a TMDB key or an Assrt (Shooter) token: copy `deploy/.env.example` to `deploy/.env` and fill in `TMDB_KEY`, `ASSRT_TOKEN`, `SUBDL_KEY` at the bottom. If not, don't worry; the checks for those sources are skipped for now. **Don't paste keys in the conversation.**
+- The last four lines of "Getting started" are about your environment. Fill in what you know; anything you don't know can be left blank or the whole line deleted.
 
-## 啟動
-
-```text
-你要在這個資料夾裡實作一個叫「拍板」（Paiban）的自架網站。規格、原型、參考程式和測試素材都已經在裡面；這裡還沒有任何產品的程式碼，做出來的東西直接放在這個資料夾。
-
-請依序做：
-
-1. 這個資料夾如果還不是 git repo，先 git init，把目前的內容原樣做成第一個 commit。
-2. 讀 README.md 和 AGENTS.md，然後依 README 列的順序讀完 docs/ 的 18 份文件。讀的時候把疑問、矛盾和缺漏記在 docs/agent-notes.md。
-3. 看原型：prototype/platform/index.html 和 prototype/workbench/index.html。能的話用瀏覽器實際操作一遍（prototype/README.md 有說明）；不能就讀 prototype/ 底下的原始碼和截圖。
-4. 跑 AGENTS.md「指令」一節列的四組參考測試，確認在你的環境都通過（需要 Node.js 22.18 以上和 npm 套件庫；跑不了就說明原因）。
-5. 用幾段話告訴我：你理解這個系統要做什麼、你打算怎麼進行階段 0、讀完之後你認為規格有哪些問題或需要我決定的地方。除非有會擋住階段 0 的問題，否則不用等我回覆。
-6. 開始 docs/14-plan.md 的「階段 0：確認假設」。照它的每一項做，能自動化的寫成腳本留在 repo 裡。
-7. 階段 0 做完就停下來：依 docs/reports/README.md 的格式寫 docs/reports/phase-0.md，並在對話裡給我摘要。不要自己接著做階段 1。
-
-幾件事先講清楚：
-
-- AGENTS.md 的「絕對不能做的事」沒有例外。最重要的三條：不寫任何會自動刪除使用者檔案的程式；不繞過驗證碼或任何擋自動存取的機制；不使用、不儲存、不記錄別人的 API 金鑰。
-- 開發和測試不下載有版權的影片。用 fixtures/、假的 YTS、本機做種；需要真實電影時用 Blender 基金會的開放電影。自動化測試不使用從真實來源下載的字幕；階段 0 第 4 項手動確認來源時，每個來源最多下載一兩個字幕壓縮檔來看格式，放在 .scratch/，不提交。
-- 階段 0 第 1 項需要 deploy/.env。沒有這個檔案就由你從 deploy/.env.example 複製；資料庫密碼、SECRET_KEY 和第一個管理員的密碼由你用亂數產生後寫進去（管理員的帳號空著就填 admin），已經有值的不要動。不要把這些值印出來或提交，只要告訴我檔案在哪裡、管理員的帳號密碼是哪兩個變數。
-- 階段 0 有幾項需要網路，其中查詢射手網和 TMDB 需要金鑰。金鑰我會自己填在 deploy/.env 的 TMDB_KEY、ASSRT_TOKEN、SUBDL_KEY（只有手動確認用的腳本會讀它們），不會貼在對話裡。空著的就跳過那個來源，在報告裡列出來；我之後補上時再請你補做。
-- 對真實網站的確認請把請求量壓到最低，每個來源幾個請求就夠，而且只做一次，把回應存下來重複使用。
-- 做不到的事（例如沒有 Docker、沒有網路、沒有瀏覽器）直接告訴我是哪一項、為什麼，然後繼續做其他能做的。不要假裝做了，也不要悄悄換成別的做法。
-- 規格和你查到的事實不一樣時以事實為準：修改文件、記在 docs/changes.md、在報告裡告訴我。
-- 用繁體中文和我溝通。程式碼、註解、commit 訊息用英文。
-
-我的環境：
-- 現在這台機器（作業系統；有沒有 Docker 在執行；能不能連外）：
-- 之後要部署的機器（是不是就是這一台；CPU、記憶體、磁碟大小、x86 或 ARM）：
-- 目前能用的 YTS 網址：
-- 金鑰：（已經填在 deploy/.env / 之後再補）
-```
-
-## 之後每個階段
-
-看完報告、回答完它的問題之後，貼這一段。把 N 換成數字，中間寫上你的回覆。
+## Getting started
 
 ```text
-階段 N 的報告我看過了。
+In this folder you are implementing a self-hosted website called Paiban (拍板). The spec, prototypes, reference code and test fixtures are already here; there is no product code yet, and what you build goes directly in this folder.
 
-（你對報告裡「需要 Brian 決定或提供的」每一項的回覆。沒有就寫「沒有要補充的」。）
+Please do these in order:
 
-請繼續 docs/14-plan.md 的下一個階段。開始前重讀那個階段列出的文件；做完一樣停下來寫報告，不要自己接著做再下一個階段。
+1. If this folder isn't a git repo yet, run git init first and make the current contents, as they are, the first commit.
+2. Read README.md and AGENTS.md, then read all 18 documents in docs/ in the order README lists. While reading, record questions, contradictions and gaps in docs/agent-notes.md.
+3. Look at the prototypes: prototype/platform/index.html and prototype/workbench/index.html. If you can, operate them in a browser (prototype/README.md explains how); if not, read the source and screenshots under prototype/.
+4. Run the four sets of reference tests listed in the "Commands" section of AGENTS.md and confirm they all pass in your environment (needs Node.js 22.18 or later and the npm registry; if you can't run them, explain why).
+5. Tell me in a few paragraphs: what you understand this system is meant to do, how you plan to go about phase 0, and, having read everything, what problems you see in the spec or what needs my decision. Unless a problem blocks phase 0, you don't need to wait for my reply.
+6. Start "Phase 0: check the assumptions" in docs/14-plan.md. Do each of its items; anything that can be automated, write as a script and keep it in the repo.
+7. Stop when phase 0 is done: write docs/reports/phase-0.md in the format of docs/reports/README.md and give me a summary in the conversation. Don't go on to phase 1 by yourself.
+
+A few things up front:
+
+- "Things you must never do" in AGENTS.md has no exceptions. The three most important: write no code that deletes user files automatically; don't bypass CAPTCHAs or any mechanism that blocks automated access; don't use, store or log anyone else's API key.
+- Don't download copyrighted videos for development and testing. Use fixtures/, the fake YTS and local seeding; when you need a real film, use the Blender Foundation's open movies. Automated tests don't use subtitles downloaded from real sources; when checking the sources by hand in phase 0 item 4, download at most one or two subtitle archives per source to look at the format, keep them in .scratch/, and don't commit them.
+- Phase 0 item 1 needs deploy/.env. If the file doesn't exist, copy it from deploy/.env.example yourself; generate the database password, SECRET_KEY and the first administrator's password randomly and write them in (if the administrator username is empty, fill in admin), and don't touch values that are already set. Don't print these values or commit them; just tell me where the file is and which two variables hold the administrator's username and password.
+- Several phase 0 items need the network, and querying Assrt (Shooter) and TMDB needs keys. I'll fill the keys in myself, in TMDB_KEY, ASSRT_TOKEN and SUBDL_KEY in deploy/.env (only the manual check scripts read them), and won't paste them in the conversation. Skip any source whose key is empty and list it in the report; when I add it later I'll ask you to do it then.
+- Keep requests to real websites to a minimum: a few requests per source is enough, do it only once, and save the responses for reuse.
+- If you can't do something (for example, no Docker, no network, no browser), tell me directly which item and why, then carry on with whatever else you can do. Don't pretend you did it, and don't quietly switch to a different approach.
+- When the spec differs from the facts you find, the facts win: change the documents, record it in docs/changes.md, and tell me in the report.
+- Communicate with me in Traditional Chinese. Code, comments and commit messages in English.
+
+My environment:
+- This machine (operating system; is Docker running; can it reach the internet):
+- The machine I'll deploy to (is it this one; CPU, memory, disk size, x86 or ARM):
+- A YTS address that currently works:
+- Keys: (already in deploy/.env / will add later)
 ```
 
-十個階段依序是：0 確認假設、1 帳號與外框、2 搜尋與電影頁、3 下載與容量上限、4 影片分析與預覽、5 字幕來源、6 同步工作台、7 匯出、8 管理與通知、9 上線準備。
+## Each phase after that
 
-## 換了一個新的對話時
-
-coding agent 不記得上一個對話。重新開始時先貼這一段，讓它從檔案裡找回進度。
+After reading the report and answering its questions, paste this. Replace N with the number and write your replies in the middle.
 
 ```text
-這個資料夾是「拍板」（Paiban）的專案，已經實作到一半。
+I've read the phase N report.
 
-請讀 AGENTS.md、docs/00-decisions.md、docs/14-plan.md、docs/changes.md、docs/agent-notes.md，以及 docs/reports/ 裡編號最大的那份報告；再看 git log 最近的二十個 commit 和目前的工作目錄狀態。
+(Your reply to each item under "What Brian needs to decide or provide" in the report. If there's nothing, write "Nothing to add.")
 
-然後告訴我：目前做到哪個階段、那個階段還剩什麼、有沒有做到一半沒提交的東西。先不要改任何檔案，等我說下一步。
+Please continue with the next phase of docs/14-plan.md. Before starting, reread the documents that phase lists; when it's done, stop and write the report the same way, and don't go on to the phase after that by yourself.
 ```
 
-## 要它改東西時
+The ten phases in order: 0 check the assumptions, 1 accounts and shell, 2 search and film page, 3 downloads and the storage limit, 4 video analysis and preview, 5 subtitle sources, 6 sync workbench, 7 export, 8 admin and notifications, 9 launch preparation.
 
-不在計畫裡的要求（改畫面、加功能、修問題）直接用自己的話說就可以。兩個習慣會讓結果比較好：
+## When you start a new conversation
 
-- 說清楚要的結果，不用說怎麼做。例如「片庫的卡片在手機上太高，一個畫面只看得到一張」，而不是「把 padding 改小」。
-- 如果這個要求改變了規格，請它一起改 `docs/` 裡對應的文件，並記在 `docs/changes.md`。這樣之後換對話時，文件還是對的。
+The coding agent doesn't remember the previous conversation. When starting over, paste this first so it can recover its progress from the files.
+
+```text
+This folder is the Paiban (拍板) project, implemented about halfway.
+
+Please read AGENTS.md, docs/00-decisions.md, docs/14-plan.md, docs/changes.md, docs/agent-notes.md, and the highest-numbered report in docs/reports/; then look at the last twenty commits in git log and the current state of the working directory.
+
+Then tell me: which phase we're at, what's left in that phase, and whether anything is half-done and uncommitted. Don't change any files yet; wait for me to say what's next.
+```
+
+## When you want it to change something
+
+For requests outside the plan (changing a screen, adding a feature, fixing a problem), just say it in your own words. Two habits make the results better:
+
+- Say clearly what result you want, not how to do it. For example, "the cards in the Library are too tall on a phone; only one fits on a screen", rather than "make the padding smaller".
+- If the request changes the spec, ask it to change the corresponding documents in `docs/` too and record it in `docs/changes.md`. That way the documents are still right when you switch conversations later.

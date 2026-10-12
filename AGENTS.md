@@ -1,126 +1,127 @@
-# 給 coding agent 的工作規則
+# Working rules for the coding agent
 
-你要在這個資料夾裡實作「拍板」（Paiban）：一個自己架的網站，用來搜尋電影、下載、找字幕、在網頁上把字幕對準，最後輸出帶字幕的 MKV。
+In this folder you are implementing Paiban (拍板): a self-hosted website for searching films, downloading them, finding subtitles, lining the subtitles up in the browser, and finally producing an MKV with subtitles.
 
-規格、原型、參考程式和測試素材都已經在這個資料夾裡。**先讀 [README.md](README.md)，它會告訴你每樣東西在哪、依什麼順序讀。**
+The spec, prototypes, reference code and test fixtures are already in this folder. **Read [README.md](README.md) first. It tells you where everything is and in what order to read it.**
 
-委託人是 Brian。他讀寫繁體中文。
+The client is Brian. He reads and writes Traditional Chinese.
 
-## 依據的優先順序
+## Order of authority
 
-資料之間有衝突時，前面的贏：
+When sources conflict, the earlier one wins:
 
-1. Brian 在對話裡直接說的話
+1. What Brian says directly in the conversation
 2. `docs/00-decisions.md`
-3. `docs/` 的其他文件：系統的**行為**以它們為準
-4. `packages/shared/src/contracts/api.ts`、`db/schema.sql`：資料的**形狀**（端點清單、欄位、型別、約束）以它們為準
-5. `prototype/`：畫面、文案和互動的參考
-6. `reference/`：演算法和指令的參考（對齊核心、字幕文字處理、ffmpeg 與 ffsubsync 的指令、WebTorrent 的用法）
+3. The other documents in `docs/`: they govern the system's **behavior**
+4. `packages/shared/src/contracts/api.ts`, `db/schema.sql`: they govern the **shape** of the data (endpoint list, fields, types, constraints)
+5. `prototype/`: reference for screens, copy and interaction
+6. `reference/`: reference for algorithms and commands (sync core, subtitle text processing, ffmpeg and ffsubsync commands, how to use WebTorrent)
 
-第 3 和第 4 項管的是不同的事。真的對不上時（文件提到合約裡沒有的欄位，或合約有文件沒說明的東西），行為聽文件的，然後把合約補齊，兩邊一起改。
+Items 3 and 4 govern different things. When they truly don't match (a document mentions a field the contract doesn't have, or the contract has something no document explains), follow the documents for behavior, then complete the contract: change both together.
 
-第 5 和第 6 項也是：原型管看得到的東西，參考程式管算出來的東西。原型裡也有一份對齊核心（`core.js`），那一份以 `packages/shared/src/sync-core/core.ts` 為準。
+Items 5 and 6 are the same: the prototypes govern what you can see, the reference code governs what gets computed. The prototypes also contain a copy of the sync core (`core.js`); for that one, `packages/shared/src/sync-core/core.ts` is authoritative.
 
-遇到衝突或缺漏：記進 `docs/agent-notes.md`。能依上面的順序判斷的就判斷並寫下理由。要改動 `docs/00-decisions.md` 裡來源是「指定」「代決」或「假設」的決定，或你沒有把握的，停下來問；來源是「交接」的可以先照你認為更好的做法做，但要在報告裡講清楚。
+When you find a conflict or a gap: record it in `docs/agent-notes.md`. If the order above lets you decide, decide and write down why. If changing a decision in `docs/00-decisions.md` whose source is "Specified", "Decided for Brian" or "Assumption", or if you are unsure, stop and ask. Decisions whose source is "Handover" you may change first to what you think is better, but say so clearly in the report.
 
-**原型是行為和畫面的參考，不是架構的參考。** 它是一個把所有東西塞在一起的單一 HTML 檔，後端全是假的。照它的樣子和行為做，不要照它的寫法做。
+**The prototypes are a reference for behavior and screens, not for architecture.** Each is a single HTML file with everything crammed in, and the back end is entirely fake. Build what they look like and how they behave, not the way they are written.
 
-## 絕對不能做的事
+## Things you must never do
 
-這些不因為「這樣比較方便」或「測試需要」而有例外。
+None of these has an exception for "it's more convenient this way" or "the tests need it".
 
-1. **不寫任何會自動刪除使用者檔案的程式。** 沒有排程清理、沒有保存期限、沒有「空間不夠就清掉舊的」。能刪除 `/data` 底下檔案的只有一個指定的模組（WebTorrent 的刪檔呼叫也只從那裡發），而且每個入口都對應到某個人按下的動作（`docs/10-storage.md` 列出了僅有的幾種草稿清理例外）。
-2. **不繞過驗證碼、挑戰頁或任何擋自動存取的機制。** 不偽裝成瀏覽器、不輪換標頭或 IP、不用無頭瀏覽器去抓擋爬蟲的網站。遇到就把那個來源標成不可用。
-3. **不使用、不儲存、不記錄任何不屬於 Brian 的 API 金鑰。** 第三方回應裡夾帶的金鑰在解析時就丟掉。手動錄下真實回應時，寫進任何檔案之前（包含 `.scratch/`）先把金鑰換成 `PLACEHOLDER`。
-4. **種子只有兩個入口：YTS 的搜尋結果，和「手動加入種子」視窗**（磁力連結或 .torrent 檔，2026-10-09 起，Brian 指定，D26）。手動加入的種子只保留 info hash、過濾過的 tracker 和 info 字典，網頁種子（web seed）和其他欄位一律丟掉，只下載裡面最大的影片檔；伺服器不替使用者去抓網址上的 .torrent。沒有其他入口（例如 API 直接帶 hash、從別的網站匯入）。（階段 0 用來了解網路狀況的那支獨立腳本不是產品的一部分；它只下載 Blender 基金會的開放電影。）
-5. **開發和測試不下載有版權的影片。** 用 `fixtures/`、假的 YTS、本機做種；需要真實電影時用 Blender 基金會的開放電影。自動化測試也不使用從真實來源下載的字幕。唯一的例外是兩次手動的來源確認（階段 0 第 4 項、階段 5 的手動驗收）：每個來源下載最少數量的字幕壓縮檔，只為了確認格式，不提交、不當成測試素材（D29）。階段 0 的放在 `.scratch/`，看完就刪；階段 5 的是透過開發中的網站抓的，確認完把那幾條候選和字幕移除。
-6. **自動化測試不連外部網路。**
-7. **不把任何真的金鑰、密碼、token 寫進 repo、log、測試素材或對話。** 需要 Brian 的金鑰時，請他自己填進本機的 `deploy/.env` 或管理頁。你替本機產生的密碼（資料庫、`SECRET_KEY`、第一個管理員）只寫進 `deploy/.env`，那個檔案不進版本控制；報告和對話裡只說是哪個變數，不說值。測試和開發設定裡的假值（假的金鑰、測試帳號的密碼）不在此限，但要一眼看得出是假的，例如 `test-key-not-real`。
-8. **不從外部網域載入任何前端資源**（字型、腳本、圖片）。網頁只向這個網站自己的伺服器發請求；使用者自己點的外部連結在新分頁開啟（D30）。
+1. **Write no code that deletes user files automatically.** No scheduled clean-up, no retention period, no "clear out old ones when space runs low". Only one designated module may delete files under `/data` (WebTorrent's delete calls are also issued only from there), and every entry point corresponds to an action someone clicked (`docs/10-storage.md` lists the only few exceptions for clearing scratch files).
+2. **Do not bypass CAPTCHAs, challenge pages or any mechanism that blocks automated access.** Don't pose as a browser, don't rotate headers or IPs, don't use a headless browser to scrape sites that block scrapers. When you hit one, mark that source unavailable.
+3. **Do not use, store or log any API key that doesn't belong to Brian.** Keys that come along in third-party responses are dropped while parsing. When recording real responses by hand, replace the keys with `PLACEHOLDER` before writing to any file (including `.scratch/`).
+4. **Torrents have exactly two ways in: YTS search results, and the "Add a torrent by hand" window** (a magnet link or a .torrent file; since 2026-10-09, specified by Brian, D26). A torrent added by hand keeps only its info hash, its filtered trackers and its info dictionary; web seeds and every other field are dropped, and only its largest video file (and the subtitle files beside it) is downloaded. The server never fetches a .torrent from an address on someone's behalf. There is no other way in (for example an API taking a bare hash, or importing from another site). (The standalone script phase 0 uses to understand network conditions is not part of the product; it only downloads the Blender Foundation's open movies.)
+5. **Do not download copyrighted videos for development and testing.** Use `fixtures/`, the fake YTS and local seeding; when you need a real film, use the Blender Foundation's open movies. Automated tests also don't use subtitles downloaded from real sources. The only exceptions are the two manual source checks (phase 0 item 4, and the manual acceptance in phase 5): for each source, download the minimum number of subtitle archives, only to confirm the format; don't commit them and don't use them as test fixtures (D29). Phase 0's go in `.scratch/` and are deleted once looked at; phase 5's are fetched through the site under development, and once confirmed, those few candidates and subtitles are removed.
+6. **Automated tests do not reach the outside network.**
+7. **Never write a real key, password or token into the repo, logs, test fixtures or the conversation.** When you need Brian's key, ask him to fill it into the local `deploy/.env` or the admin pages himself. Passwords you generate for the local machine (database, `SECRET_KEY`, the first administrator) are written only into `deploy/.env`, which is not under version control; in reports and conversation, say only which variable, never the value. Fake values in test and development settings (fake keys, test account passwords) are exempt, but they must be obviously fake at a glance, e.g. `test-key-not-real`.
+8. **Load no front-end resources from external domains** (fonts, scripts, images). The web page sends requests only to this site's own server; external links the user clicks open in a new tab (D30).
 
-## 語言
+## Language
 
-| 東西 | 語言 |
+| What | Language |
 | --- | --- |
-| 程式碼、識別字、註解、commit 訊息、log | 英文 |
-| 使用者看得到的所有文字 | 繁體中文（台灣用語）和英文兩份（2026-10-08 起，Brian），集中在 `apps/web/src/copy/`，元件裡不直接寫任何語言的字串 |
-| `docs/` 裡的文件、給 Brian 的報告、和 Brian 的對話 | 繁體中文 |
+| Code, identifiers, comments, commit messages, logs | English |
+| All text users can see | Traditional Chinese (Taiwan usage) and English (since 2026-10-08, Brian), kept together in `apps/web/src/copy/`; components contain no strings in any language directly |
+| The documents in `docs/` | English (since 2026-10-12, Brian) |
+| Reports to Brian and conversation with Brian | Traditional Chinese |
 
-使用者看得到的站名只出現在一個常數裡（D9）。
+The site name users see appears in only one constant (D9).
 
-## 怎麼工作
+## How to work
 
-- 照 `docs/14-plan.md` 的階段做。**一次一個階段，做完停下來回報，等 Brian 說繼續。**
-- 每個階段開始前，重讀那個階段列出的文件。
-- 小步提交，每個提交都通過型別檢查、lint 和測試。commit 訊息說明為什麼，不只是做了什麼。
-- 先寫會失敗的測試，再寫實作，尤其是 `docs/15-testing.md`「一定要有的測試」那幾類。
-- 偏離規格時，在 `docs/changes.md` 記下改了什麼、為什麼、影響哪些文件，並且**把那些文件一起改掉**。規格和程式不一致比規格不完美更糟。
-- 不確定第三方的實際行為時，去查、去試，不要猜。查到的和文件不同就更新文件。
-- 報告要誠實：沒做完的說沒做完，沒驗證的說沒驗證，測試沒過的不要說過了。
-- 不要為了通過測試而改測試的預期值，除非你能說明原本的預期為什麼是錯的。
-- 不加規格沒要求的功能。想到值得做的，寫進報告的建議裡。
+- Follow the phases in `docs/14-plan.md`. **One phase at a time; when it's done, stop, report, and wait for Brian to say continue.**
+- Before each phase, reread the documents that phase lists.
+- Commit in small steps; every commit passes the type check, lint and tests. Commit messages explain why, not just what.
+- Write a failing test first, then the implementation, especially for the categories in "Tests that must exist" in `docs/15-testing.md`.
+- When you deviate from the spec, record in `docs/changes.md` what changed, why, and which documents are affected, and **change those documents too**. Spec and code disagreeing is worse than an imperfect spec.
+- When you're unsure how a third party actually behaves, look it up or try it; don't guess. If what you find differs from the documents, update the documents.
+- Report honestly: say what isn't finished is not finished, what isn't verified is not verified, and don't say tests passed when they didn't.
+- Don't change a test's expected values to make it pass, unless you can explain why the original expectation was wrong.
+- Don't add features the spec doesn't ask for. If you think of something worth doing, put it in the report's suggestions.
 
-## 品質
+## Quality
 
-每個功能完成時：
+When each feature is done:
 
-- 型別完整，沒有 `any` 逃生口（第三方函式庫的邊界除外，而且要包起來）
-- 有測試
-- 載入中、空的、出錯的狀態都有
-- 錯誤訊息說明發生了什麼、可以怎麼做
-- 鍵盤可以操作，焦點看得見
-- 400 px 寬不出現橫向捲軸
-- 淺色和深色主題都正常
-- `docs/12-auth.md` 的檢查清單沒有被違反
+- Types are complete, with no `any` escape hatches (except at third-party library boundaries, and those are wrapped)
+- It has tests
+- Loading, empty and error states all exist
+- Error messages explain what happened and what can be done
+- It can be operated by keyboard, and focus is visible
+- No horizontal scroll bar at 400 px wide
+- Both light and dark themes work
+- The checklist in `docs/12-auth.md` is not violated
 
-## 參考程式怎麼用
+## How to use the reference code
 
-`reference/` 裡的東西都是實際跑過、有測試的：
+Everything in `reference/` has actually been run and has tests:
 
-- `pipeline/`：ffmpeg 和 ffsubsync 的指令。指令的每個選項都有理由（寫在 `docs/08-media-pipeline.md`），不要隨意增減。
-- `subtitles/text.mjs`：編碼、語言判斷、ASS 轉換。改寫成 TypeScript，測試一起搬。
-- `torrent/local-swarm-test.mjs`：WebTorrent 的用法和離線測試的做法。
-- `providers/`：各來源回應的形狀。JustSubtitles、YIFY、YTS 的是錄下來的真實回應；TMDB、射手網的仍是**手寫的示意**，拿到網址或金鑰後用 `scripts/phase0/check-sources.mjs` 換掉（哪個是哪個見它的 README）。
+- `pipeline/`: the ffmpeg and ffsubsync commands. Every option in the commands has a reason (written in `docs/08-media-pipeline.md`); don't add or remove options casually.
+- `subtitles/text.mjs`: encoding, language detection, ASS conversion. Rewrite it in TypeScript and move the tests along with it.
+- `torrent/local-swarm-test.mjs`: how to use WebTorrent and how to do offline tests.
+- `providers/`: the shape of each source's responses. The JustSubtitles, YIFY and YTS ones are recorded real responses; the TMDB and Assrt (Shooter) ones are still **hand-written illustrations**. Once you have the address or key, replace them with `scripts/phase0/check-sources.mjs` (its README says which is which).
 
-對齊核心（`packages/shared/src/sync-core/core.ts`）和 API 合約（`packages/shared/src/contracts/api.ts`）已經從交接包搬進 `packages/shared`，瀏覽器和伺服器共用同一份。改對齊核心之前先確定它的 17 項測試還會過。
+The sync core (`packages/shared/src/sync-core/core.ts`) and the API contract (`packages/shared/src/contracts/api.ts`) have already been moved from the handover pack into `packages/shared`, so the browser and the server share one copy. Before changing the sync core, make sure its 17 tests will still pass.
 
-`packages/shared/src/contracts/api.ts` 和 `db/schema.sql` 是合約。要改可以，但要連同對應的文件一起改，並記在 `docs/changes.md`。`db/schema.sql` 同時就是資料庫的第一個遷移（`apps/server` 啟動時套用），見 `docs/changes.md`。
+`packages/shared/src/contracts/api.ts` and `db/schema.sql` are the contract. You may change them, but change the corresponding documents with them and record it in `docs/changes.md`. `db/schema.sql` is also the database's first migration (applied when `apps/server` starts); see `docs/changes.md`.
 
-## 指令
+## Commands
 
-隨著專案長出來，把實際的指令填在這裡，並保持更新。階段 0 結束時至少有安裝、型別檢查、lint、測試、建置映像檔；端對端測試和本機開發的指令在它們做出來的那個階段補上。
+As the project grows, fill in the actual commands here and keep them up to date. By the end of phase 0 there are at least install, type check, lint, test and image build; end-to-end test and local development commands are added in the phase where they are built.
 
-需要 Node.js 24、pnpm 12、Docker（含 Compose v2）。
+Requires Node.js 24, pnpm 12, Docker (with Compose v2).
 
 ```bash
-pnpm install                                         # 安裝
-pnpm typecheck                                       # 型別檢查(TypeScript 7,strict)
-pnpm lint                                            # Biome:lint + 格式檢查;pnpm format 會直接修正
-pnpm test                                            # 各套件的 Vitest
-pnpm build                                           # 建置 shared、server、web
+pnpm install                                         # Install
+pnpm typecheck                                       # Type check (TypeScript 7, strict)
+pnpm lint                                            # Biome: lint + format check; pnpm format fixes in place
+pnpm test                                            # Vitest for each package
+pnpm build                                           # Build shared, server, web
 
-pnpm db:test                                         # 測試用的 PostgreSQL(port 55432);pnpm test 之前先起來
-pnpm dev                                             # 本機開發:資料庫、假的 YTS、假的字幕來源(8091)、本機做種、api、torrent、media、網頁
-                                                     # 打開 http://localhost:5173,用 admin / paiban-dev-not-real 登入,
-                                                     # 在「來源設定」把 YTS 網址設成 http://127.0.0.1:8090
+pnpm db:test                                         # PostgreSQL for tests (port 55432); start it before pnpm test
+pnpm dev                                             # Local development: database, fake YTS, fake subtitle source (8091), local seeding, api, torrent, media, web
+                                                     # Open http://localhost:5173, sign in as admin / paiban-dev-not-real,
+                                                     # and in "Sources" set the YTS address to http://127.0.0.1:8090
 
-mkdir -p deploy/data                                 # 第一次:先建資料夾,否則 Docker 會用 root 建立
-docker compose -f deploy/docker-compose.yml build    # 建置映像檔(paiban-server、paiban-proxy)
-docker compose -f deploy/docker-compose.yml up -d    # 起五個容器;網址是 deploy/.env 的 PUBLIC_URL
-scripts/phase0/reference-in-image.sh                 # 在映像檔裡跑全部參考測試與 pipeline 比對
-pnpm test:image [檔案…]                              # 在映像檔裡跑伺服器測試(需要 ffmpeg、ffsubsync、bsdtar、語音辨識的那些在主機上會略過);先 pnpm db:test
-pnpm test:image test/e2e-flow.test.ts                # 離線的完整流程(搜尋→下載→分析→字幕→對齊→匯出→下載 MKV→刪除),約 1.5 分鐘
-SEED_EXTRA_FILM=<Blender 開放電影的路徑> pnpm dev       # 本機開發時多一個長片版本(2160p),拿來走完整流程
+mkdir -p deploy/data                                 # First time: create the folder first, otherwise Docker creates it as root
+docker compose -f deploy/docker-compose.yml build    # Build the images (paiban-server, paiban-proxy)
+docker compose -f deploy/docker-compose.yml up -d    # Start the five containers; the address is PUBLIC_URL in deploy/.env
+scripts/phase0/reference-in-image.sh                 # Run all reference tests and pipeline comparisons inside the image
+pnpm test:image [file…]                              # Run server tests inside the image (the ones needing ffmpeg, ffsubsync, bsdtar or speech recognition are skipped on the host); run pnpm db:test first
+pnpm test:image test/e2e-flow.test.ts                # Offline full flow (search → download → analyze → subtitles → sync → export → download MKV → delete), about 1.5 minutes
+SEED_EXTRA_FILM=<path to a Blender open movie> pnpm dev  # In local development, one extra feature-length version (2160p) for walking through the full flow
 ```
 
-自動對齊的手動評估（真實影片，不進自動化測試）：`apps/server/scripts/asr-eval.mts`，用法在檔案開頭。部署、更新、備份見 [docs/deploy.md](docs/deploy.md)。
+Manual evaluation of auto-align (real videos, not part of automated tests): `apps/server/scripts/asr-eval.mts`; usage is at the top of the file. Deployment, updates and backups: see [docs/deploy.md](docs/deploy.md).
 
-階段 0 的手動檢查（不進自動化測試，會連外部網路）在 `scripts/phase0/`，每支檔案開頭有用法：`check-sources.mjs`（真實的字幕來源）、`real-swarm.mjs`（真實的 BitTorrent 下載，Blender 開放電影）、`real-film.sh`（真實電影的對齊）、`make-archives.sh` / `check-archives.sh`（壓縮檔）、`playback/`（瀏覽器播放測試頁）。
+The phase 0 manual checks (not part of automated tests; they reach the outside network) are in `scripts/phase0/`, each file with usage at the top: `check-sources.mjs` (real subtitle sources), `real-swarm.mjs` (real BitTorrent download, Blender open movie), `real-film.sh` (alignment on a real film), `make-archives.sh` / `check-archives.sh` (archives), `playback/` (browser playback test page).
 
-現在就能跑的（確認參考程式在你的環境正常）：
+What you can run right now (to confirm the reference code works in your environment):
 
 ```bash
 (cd reference/subtitles && npm ci && npm test)
 (cd db && npm ci && npm test)
-(cd reference/torrent && npm ci && npm test)                  # 本機兩個用戶端互傳;成功時印出 PASS
+(cd reference/torrent && npm ci && npm test)                  # Two local clients transfer to each other; prints PASS on success
 ```

@@ -193,11 +193,11 @@ create index torrents_movie on torrents (movie_id);
 -- Who has this film in their library. One copy on disk no matter how many holders.
 -- A torrent with no holders can exist only after its last holder's account was removed;
 -- an administrator deletes it by hand.
--- What a download is doing right now, for its detail page (docs/11-pages.md, "下載細節"). The page
+-- What a download is doing right now, for its detail page (docs/11-pages.md, "Download details"). The page
 -- keeps `wanted_until` a few seconds ahead while it is open; the torrent service writes `data`
 -- every pass for rows still wanted. Throwaway state, so the table is unlogged.
 -- A magnet link or .torrent file someone is about to add by hand (docs/06-torrent-worker.md,
--- "手動加入"). The torrent service fetches a magnet's metadata; a .torrent file carries it.
+-- "Adding by hand"). The torrent service fetches a magnet's metadata; a .torrent file carries it.
 create table torrent_inspections (
   id          uuid primary key default gen_random_uuid(),
   created_by  uuid references users (id) on delete cascade,
@@ -264,7 +264,7 @@ create table media_files (
   proxy_bytes    bigint not null default 0,
   reserve_bytes  bigint not null default 0 check (reserve_bytes >= 0),  -- still reserved for preview assets not finished yet
   error          jsonb,                                -- {analysis?, audio?, proxy?, asr?: MediaErrorCode}: one entry per asset, cleared when that asset is requested again
-  -- Speech recognition on a few windows of the film, after the analysis (docs/08, "語音辨識"):
+  -- Speech recognition on a few windows of the film, after the analysis (docs/08, "Speech recognition"):
   -- asr.json in the media folder, counted in analysis_bytes. 'none' = switched off or no audio.
   asr_state      text not null default 'none' check (asr_state in ('none', 'pending', 'running', 'ready', 'failed')),
   asr_language   text,                                 -- what recognition decided was spoken

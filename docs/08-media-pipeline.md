@@ -1,173 +1,173 @@
-# 08 影片處理（media）
+# 08 Video processing (media)
 
-`media` 程式執行所有用到 ffmpeg 和 ffsubsync 的背景工作。這份文件裡的每一道指令都在 ffmpeg 6.1.1 和 ffsubsync 0.5.1 上實際跑過；可以直接執行的版本在 `reference/pipeline/`。
+The `media` program runs every background job that uses ffmpeg and ffsubsync. Every command in this document has actually been run on ffmpeg 6.1.1 and ffsubsync 0.5.1; runnable versions are in `reference/pipeline/`.
 
-## 一部片下載完成之後
+## After a film finishes downloading
 
 ```mermaid
 flowchart TD
-  A[下載完成] --> P[media.analyze 的第一步<br/>探測:片長、編碼、能不能直接播]
-  P --> W[media.analyze 接著做<br/>波形、人聲]
-  P -->|不能直接播| C[media.preview<br/>先做 audio.m4a,再做 proxy.mp4]
-  W --> R1[有波形、分數、吸附、自動對齊]
-  C --> R2[audio.m4a 好了:可以用只有聲音的模式同步]
-  C --> R3[proxy.mp4 好了:可以看著畫面同步]
+  A[Download finished] --> P[First step of media.analyze<br/>probe: duration, codecs, direct play or not]
+  P --> W[media.analyze continues<br/>waveform, speech]
+  P -->|no direct play| C[media.preview<br/>audio.m4a first, then proxy.mp4]
+  W --> R1[Waveform, score, snap, auto-align available]
+  C --> R2[audio.m4a ready: can sync in audio-only mode]
+  C --> R3[proxy.mp4 ready: can sync while watching the picture]
 ```
 
-`torrent` 建立 `media_files` 之後 `NOTIFY paiban_media`。`media` 的對帳步驟看到這一列，替它排入工作（規則在下面的「對帳」）。每個下載完成的檔案都會先被探測；預覽資產不用等波形和人聲做完，探測一結束就可以開始轉。
+After `torrent` creates the `media_files` row it sends `NOTIFY paiban_media`. The reconciliation step in `media` sees the row and queues jobs for it (rules under "Reconciliation" below). Every finished file is probed first; preview assets do not wait for the waveform and speech data, and transcoding can start as soon as probing is done.
 
-## 實測數字
+## Measured numbers
 
-2 核心的沙盒環境，一部 2 小時的合成影片（單聲道 AAC、640×360）。真實的 1080p 影片在分析這幾步的耗時相近，因為只解碼聲音。
+A 2-core sandbox, a 2-hour synthetic video (mono AAC, 640×360). Real 1080p video takes about as long in the analysis steps, because only the audio is decoded.
 
-| 工作 | 耗時 | 產出大小 |
+| Job | Time | Output size |
 | --- | --- | --- |
-| 波形（`peaks.bin`） | 12 秒 | 720 KB（gzip 後 310 KB） |
-| 人聲偵測（`ref.npz`） | 23 到 27 秒 | 18 KB |
-| 聲音檔，串流複製 | 4 秒 | 和原本的聲音軌一樣大 |
-| 聲音檔，轉成立體聲 AAC 96 kbps | 3 分 43 秒 | 81 MB |
-| 預覽檔 480p（來源是 1080p 10-bit HEVC、5.1 聲道） | 即時速度的 3.1 倍 | 每分鐘 2.6 MB |
-| 預覽檔 720p（同上） | 即時速度的 2.4 倍 | 每分鐘 5.3 MB |
-| 自動對齊一條字幕（人聲已快取） | ffsubsync 兩次共 0.7 秒；對齊核心 26 句 0.08 秒、180 句 0.4 秒（1,500 句估計約 3 秒，沒有實測） | |
-| 封裝 MKV | 取決於磁碟速度；92 秒的片段 0.1 秒 | 和原檔差不多 |
+| Waveform (`peaks.bin`) | 12 s | 720 KB (310 KB gzipped) |
+| Speech detection (`ref.npz`) | 23 to 27 s | 18 KB |
+| Audio file, stream copy | 4 s | Same size as the original audio track |
+| Audio file, transcoded to stereo AAC 96 kbps | 3 min 43 s | 81 MB |
+| Preview file 480p (source is 1080p 10-bit HEVC, 5.1 channels) | 3.1× real time | 2.6 MB per minute |
+| Preview file 720p (same source) | 2.4× real time | 5.3 MB per minute |
+| Auto-align one subtitle track (speech already cached) | ffsubsync, two runs, 0.7 s total; sync core 0.08 s for 26 lines, 0.4 s for 180 lines (1,500 lines estimated at about 3 s, not measured) | |
+| Pack the MKV | Depends on disk speed; 0.1 s for a 92-second clip | About the same as the original file |
 
-預覽檔的速度是用 60 秒的片段量的。**2160p 的來源會慢很多，在 NAS 等級的 CPU 上可能比即時還慢**，這正是需要「只有聲音的模式」的原因。
+Preview speed was measured on 60-second clips. **A 2160p source is much slower, and on a NAS-class CPU may be slower than real time**, which is exactly why "audio-only mode" is needed.
 
-## 分析（`media.analyze`）
+## Analysis (`media.analyze`)
 
-輸入是 `media_files` 的一列。參考：`reference/pipeline/analyze.sh`。一個工作，兩個部分：
+The input is one `media_files` row. Reference: `reference/pipeline/analyze.sh`. One job, two parts:
 
-- **探測**：`probe_state` 是 `pending` 就做。每個檔案都會做一次，不到一秒。它決定這個檔案能不能直接播、片長多少、預覽資產的計畫要不要修正。
-- **波形和人聲**：探測成功、而且 `analysis_state` 是 `pending` 才做。自動分析關掉（`media.analyzeAuto`）時，下載完成後是 `none`，這一部分要等到有人開啟這部片的工作區、前端呼叫 `POST /api/media/:id/analyze` 才做。
+- **Probe**: runs when `probe_state` is `pending`. Done once for every file, in under a second. It decides whether the file can be played directly, how long it is, and whether the plan for preview assets needs correcting.
+- **Waveform and speech**: runs only when probing succeeded and `analysis_state` is `pending`. When automatic analysis is off (`media.analyzeAuto`), it is `none` after the download finishes, and this part waits until someone opens the film's workspace and the frontend calls `POST /api/media/:id/analyze`.
 
-兩個部分各有自己的狀態，各自認領（`pending` → `running`）、各自結束。`POST /api/media/:id/analyze` 把 `none` 或 `failed` 的 `analysis_state` 設成 `pending`；`probe_state` 是 `failed` 時也一併設回 `pending`，再探測一次。
+Each part has its own state, is claimed on its own (`pending` → `running`) and finishes on its own. `POST /api/media/:id/analyze` sets an `analysis_state` of `none` or `failed` to `pending`; when `probe_state` is `failed`, it also sets that back to `pending` to probe again.
 
-### 1. 探測
+### 1. Probe
 
 ```bash
 ffprobe -v error -show_format -show_streams -of json "$SRC" > probe.json
 ```
 
-寫回 `media_files`：片長、容器、影像編碼、像素格式、寬高、影格率、聲音編碼、聲道數。
+Written back to `media_files`: duration, container, video codec, pixel format, width and height, frame rate, audio codec, channel count.
 
-**能不能直接播**在這裡定案，取代下載前的預測：
+**Whether it can be played directly** is settled here, replacing the prediction made before the download:
 
 ```
 direct_play =
-     容器是 MP4
-     && 影像是 h264 且像素格式是 yuv420p(8-bit 4:2:0)
-     && (沒有聲音軌 || 第一條聲音軌是 aac 或 mp3)
-  || 容器是 WebM
-     && 影像是 vp8、vp9 或 av1 且像素格式是 yuv420p
-     && (沒有聲音軌 || 第一條聲音軌是 opus 或 vorbis)
+     container is MP4
+     && video is h264 with pixel format yuv420p (8-bit 4:2:0)
+     && (no audio track || first audio track is aac or mp3)
+  || container is WebM
+     && video is vp8, vp9 or av1 with pixel format yuv420p
+     && (no audio track || first audio track is opus or vorbis)
 ```
 
-- ffprobe 對 MP4 回的 `format_name` 是 `mov,mp4,m4a,3gp,3g2,mj2`。對 MKV 和 WebM 回的是同一個值（`matroska,webm`），所以 WebM 要另外看副檔名是不是 `.webm`。MKV 一律不算能直接播。
-- WebM 這一條主要是為了測試：端對端測試用 `fixtures/clip.webm`，這樣不依賴測試用的瀏覽器能不能解 H.264（交接時的 Playwright Chromium 不能；階段 0 用的 Playwright 1.63 可以，見 15-testing.md）。YTS 不發 WebM，正式環境幾乎遇不到。
-- 判定寫成一個函式，之後要調整（例如某些瀏覽器播不了 5.1 聲道的 AAC）只改一個地方。
+- For MP4, ffprobe returns a `format_name` of `mov,mp4,m4a,3gp,3g2,mj2`. For MKV and WebM it returns the same value (`matroska,webm`), so for WebM the file extension must also be `.webm`. MKV never counts as directly playable.
+- The WebM rule is mainly for testing: the end-to-end tests use `fixtures/clip.webm`, so they do not depend on whether the test browser can decode H.264 (the Playwright Chromium at handover could not; Playwright 1.63, used in Phase 0, can; see 15-testing.md). YTS does not release WebM, so production almost never sees it.
+- The check is written as one function, so later adjustments (for example, some browsers cannot play 5.1-channel AAC) change only one place.
 
-預測和實際不同時：
+When the prediction and the result differ:
 
-| 預測 | 實際 | 處理 |
+| Predicted | Actual | Handling |
 | --- | --- | --- |
-| 不能播 | 能播 | `audio_state`、`proxy_state` 改成 `none`，`reserve_bytes` 歸零 |
-| 能播 | 不能播 | 之前沒有預留，也沒有預覽計畫，所以依**現在**的設定算。在交易裡 `storage_admit(預覽預留)`：通過就把 `audio_state`（和 `proxy_state`，如果自動轉檔有開）設成 `pending` 並寫入預留量；不通過就維持 `none`，`error.proxy` 記 `PREVIEW_NO_SPACE`，工作台會說明「下載完成時空間不足，沒有產生預覽檔。」並給「轉預覽檔」的按鈕 |
+| Not playable | Playable | `audio_state` and `proxy_state` become `none`, `reserve_bytes` is set to zero |
+| Playable | Not playable | Nothing was reserved and there was no preview plan, so compute it from the **current** settings. In a transaction, `storage_admit(preview reservation)`: if admitted, set `audio_state` (and `proxy_state`, if automatic transcoding is on) to `pending` and write the reserved amount; if not, keep `none` and record `PREVIEW_NO_SPACE` in `error.proxy`. The workbench explains "There was not enough space when the download finished, so no preview file was made." and offers a "Make preview file" button |
 
-拿到實際片長後，用它重算預留量（下載前用的是 YTS 的片長，可能是 0）：
+Once the actual duration is known, recompute the reservation with it (before the download, the YTS duration was used, which may be 0):
 
-- 變少：直接改小。
-- 變多：差額再過一次 admission。通過就調高。不通過就**放棄預覽影片**：`proxy_state = 'none'`、`error` 記 `PREVIEW_NO_SPACE`，預留量改成只有聲音檔的量；聲音檔照做。聲音檔很小，這裡不再另外檢查，道理和 [10-storage.md](10-storage.md) 的「小檔案」相同。
+- Smaller: just reduce it.
+- Larger: run the difference through admission again. If admitted, raise it. If not, **give up the preview video**: `proxy_state = 'none'`, record `PREVIEW_NO_SPACE` in `error`, and reduce the reservation to just the audio file's amount; the audio file is still made. The audio file is small, so it is not checked separately here, for the same reason as "Small files" in [10-storage.md](10-storage.md).
 
-特殊情況：
+Special cases:
 
-| 情況 | 處理 |
+| Case | Handling |
 | --- | --- |
-| 沒有聲音軌 | 波形和人聲都做不出來：`analysis_state = 'failed'`，`error.analysis` 記 `NO_AUDIO`。聲音檔不做（`audio_state = 'none'`，那一部分的預留釋出）。預覽影片照做，只是沒有聲音。電影仍然可以進工作區，只是沒有波形、分數和自動對齊 |
-| ffprobe 讀不了這個檔案 | `probe_state = 'failed'`，`error.analysis` 記 `PROBE_FAILED`。等著做的分析也標成 `failed`；預覽資產放棄（`none`，預留釋出）。檔案很可能是壞的，介面上要看得到這個原因。它不會自動再試；有人按「重新分析」或「轉預覽檔」才會 |
+| No audio track | Neither waveform nor speech can be made: `analysis_state = 'failed'`, `error.analysis` records `NO_AUDIO`. The audio file is not made (`audio_state = 'none'`, that part of the reservation is released). The preview video is still made, just without sound. The film can still be opened in a workspace, just without waveform, score or auto-align |
+| ffprobe cannot read the file | `probe_state = 'failed'`, `error.analysis` records `PROBE_FAILED`. Pending analysis is also marked `failed`; preview assets are given up (`none`, reservation released). The file is most likely broken, and the interface must show this reason. It is not retried automatically; only when someone presses "Analyze again" or "Make preview file" |
 
-探測成功：`probe_state = 'ready'`，其他欄位寫回資料庫，`NOTIFY paiban_media`（預覽資產可以排入了）和 `paiban_events`（`torrent`；預留量有變就再加 `usage`）。
+Probe succeeded: `probe_state = 'ready'`, the other fields are written to the database, and `NOTIFY paiban_media` (preview assets can now be queued) and `paiban_events` (`torrent`; plus `usage` if the reservation changed).
 
-### 1b. 種子內附的字幕（Brian，2026-10-09）
+### 1b. Subtitles from the torrent (Brian, 2026-10-09)
 
-探測成功之後（不論結果，探測本身都不會因為這一步失敗），把下載帶來的字幕加成這部片的字幕：
+After a successful probe (whatever the result; the probe itself never fails because of this step), add the subtitles that came with the download as subtitles of this film:
 
-- **旁邊的檔案**：`/data/torrents/<hash>/` 底下（最多四層）的 `.srt`、`.ass`、`.ssa`、`.vtt`，只看一般檔案（不跟符號連結），每個最大 5 MB，最多 50 個，依路徑排序。顯示的名稱是種子資料夾裡的路徑（`Subs/English.srt`）。
-- **影片裡的字幕軌**：ffprobe 結果裡 `codec_type = subtitle`、編碼是文字的（`subrip`、`ass`、`ssa`、`webvtt`、`mov_text`、`text`），最多 20 軌。一次 `ffmpeg -nostdin -v error -y -i <影片> -map 0:<n> -c:s srt|ass <work>/track-<n>.srt|ass …` 全部寫出來（`nice`），寫在 `tmp/work/bundled-<媒體 id>/`，做完刪掉這個工作資料夾。顯示的名稱是「〈影片檔名〉 #〈軌號〉（〈語言標籤〉 · 〈軌道標題〉）」。圖片式的字幕（PGS、VobSub）轉不成文字，略過。
-- 每一條照「加入」的方式寫（[07-subtitle-providers.md](07-subtitle-providers.md)）：解碼、判斷格式與語言（判斷不出語言時參考字幕軌的語言標籤），`provider = 'bundled'`、`provider_ref` 是 `file:<路徑>` 或 `track:<軌號>`、狀態是還沒確認、`added_by` 是空的（不是某個人加的）。簡體的照下載發起人的「簡體自動轉成繁體」偏好轉換（原本的句子留在 `cues.original.json`）。同步文件是預設的（不偏移），附上檢查點。
-- 內容和這部片已有的字幕相同（`sha256`）就跳過，所以重新分析不會加兩次。下載正在被刪除的就什麼都不加。
-- 每加一條 `NOTIFY paiban_events`（`{type: 'subtitle', id}`），`api` 推給持有人；最後推一次用量。
-- YTS 和手動加入的下載都一樣。手動加入的種子本來只下載最大的影片檔，旁邊的字幕檔也一起選進來下載（[06-torrent-worker.md](06-torrent-worker.md)「手動加入」）。
+- **Files alongside**: `.srt`, `.ass`, `.ssa`, `.vtt` under `/data/torrents/<hash>/` (up to four levels deep), regular files only (symbolic links are not followed), at most 5 MB each, at most 50, sorted by path. The displayed name is the path inside the torrent folder (`Subs/English.srt`).
+- **Subtitle tracks inside the video**: streams in the ffprobe result with `codec_type = subtitle` and a text codec (`subrip`, `ass`, `ssa`, `webvtt`, `mov_text`, `text`), at most 20 tracks. All are written out in one `ffmpeg -nostdin -v error -y -i <video> -map 0:<n> -c:s srt|ass <work>/track-<n>.srt|ass …` (`nice`), into `tmp/work/bundled-<media id>/`, and that work folder is deleted afterwards. The displayed name is "〈video file name〉 #〈track number〉 (〈language tag〉 · 〈track title〉)". Image-based subtitles (PGS, VobSub) cannot be converted to text and are skipped.
+- Each one is written the same way as "Adding" ([07-subtitle-providers.md](07-subtitle-providers.md)): decode, detect format and language (when the language cannot be detected, use the subtitle track's language tag), `provider = 'bundled'`, `provider_ref` is `file:<path>` or `track:<track number>`, status not yet confirmed, `added_by` empty (not added by any person). Simplified Chinese is converted according to the download initiator's "convert Simplified to Traditional automatically" preference (the original lines are kept in `cues.original.json`). The sync doc is the default (no offset), with checkpoints attached.
+- If the content is the same as a subtitle this film already has (`sha256`), it is skipped, so analyzing again does not add it twice. If the download is being deleted, nothing is added.
+- For each one added, `NOTIFY paiban_events` (`{type: 'subtitle', id}`), and `api` pushes it to the holders; usage is pushed once at the end.
+- Same for YTS downloads and downloads added by hand. A torrent added by hand normally downloads only the largest video file; the subtitle files alongside it are selected for download too ([06-torrent-worker.md](06-torrent-worker.md) "Adding by hand").
 
-### 2. 波形
+### 2. Waveform
 
 ```bash
 ffmpeg -v error -nostdin -i "$SRC" -map 0:a:0 -vn -ac 1 -ar 8000 -f s16le - \
   | node peaks.mjs 50 peaks.bin
 ```
 
-`peaks.bin` 的格式：有號 8 位元整數，兩個一組（最小值、最大值），每秒 50 組。第 p 組涵蓋 `[p/50, (p+1)/50)` 秒。瀏覽器整個抓下來當 `Int8Array` 用。產生它的程式是 `reference/pipeline/peaks.mjs`，正式版把同樣的邏輯寫在 `media` 裡，直接讀 ffmpeg 的 stdout。
+The `peaks.bin` format: signed 8-bit integers in pairs (minimum, maximum), 50 pairs per second. Pair p covers `[p/50, (p+1)/50)` seconds. The browser fetches the whole thing and uses it as an `Int8Array`. The program that makes it is `reference/pipeline/peaks.mjs`; the production version puts the same logic in `media` and reads ffmpeg's stdout directly.
 
-### 3. 人聲偵測
+### 3. Speech detection
 
 ```bash
-ln -s "$SRC" "$WORK/ref.mp4"                 # $WORK 是這個工作自己的暫存資料夾
+ln -s "$SRC" "$WORK/ref.mp4"                 # $WORK is this job's own temp folder
 ffsubsync "$WORK/ref.mp4" --serialize-speech --vad webrtc < /dev/null
-mv "$WORK/ref.npz" "$OUT/ref.npz"            # $OUT 是 /data/media/<id>
+mv "$WORK/ref.npz" "$OUT/ref.npz"            # $OUT is /data/media/<id>
 ```
 
-三個一定要照做的細節，都是實測出來的：
+Three details that must be followed, all found by testing:
 
-- **`--vad webrtc` 不能省。** 預設值是 `subs_then_webrtc`：影片檔裡如果有內嵌的字幕軌，ffsubsync 會拿那條字幕的時間當作「人聲」，而不是分析聲音。用一個內嵌了錯誤字幕的檔案測試，結果有 46% 的影格和真正的人聲不同。
-- **輸出位置由參考檔的路徑決定**：它寫在「參考檔路徑去掉副檔名 + `.npz`」。所以在工作的暫存資料夾裡建一個指向原檔的符號連結，用連結當參考檔，快取就落在暫存資料夾裡，再搬到輸出資料夾。下載資料夾保持原樣；唯一會被清掉的是這個工作自己的暫存。連結的副檔名要和原檔相同。
-- **不給字幕也能跑**：不帶 `-i`、stdin 接 `/dev/null`，它做完人聲偵測就結束。
+- **`--vad webrtc` must not be left out.** The default is `subs_then_webrtc`: if the video file has an embedded subtitle track, ffsubsync uses that subtitle's timing as "speech" instead of analyzing the audio. Tested with a file that had a wrong subtitle embedded, 46% of frames differed from the real speech.
+- **The output location is determined by the reference file's path**: it writes to "reference file path without the extension + `.npz`". So create a symbolic link in the job's temp folder pointing to the original file and use the link as the reference file; the cache lands in the temp folder and is then moved to the output folder. The download folder stays untouched; the only thing that gets cleaned up is this job's own temp files. The link must have the same extension as the original file.
+- **It runs without a subtitle**: with no `-i` and stdin connected to `/dev/null`, it exits after speech detection.
 
-`ref.npz` 裡是一個叫 `speech` 的陣列，每 10 毫秒一個值（0 或 1）。之後對齊時把這個檔案當參考檔，就不用再分析聲音。
+`ref.npz` contains an array called `speech`, one value (0 or 1) every 10 milliseconds. Later alignments use this file as the reference, so the audio does not need to be analyzed again.
 
-### 4. 給瀏覽器的人聲資料
+### 4. Speech data for the browser
 
 ```bash
 python npz_to_speech_json.py ref.npz speech.json
 ```
 
-`{"hz": 100, "frames": N, "segments": [[開始影格, 結束影格), …]}`。這就是 API 的 `SpeechData`，也是對齊核心的輸入。
+`{"hz": 100, "frames": N, "segments": [[start frame, end frame), …]}`. This is the API's `SpeechData`, and also the input to the sync core.
 
-### 分析結束
+### End of analysis
 
-| 結果 | 狀態 |
+| Result | State |
 | --- | --- |
-| 波形和人聲都做出來了 | `analysis_state = 'ready'` |
-| 其中一樣做不出來（兩次嘗試都失敗） | `analysis_state = 'failed'`，`error` 記 `PEAKS_FAILED` 或 `SPEECH_FAILED` |
+| Both waveform and speech were made | `analysis_state = 'ready'` |
+| One of them could not be made (both attempts failed) | `analysis_state = 'failed'`, `error` records `PEAKS_FAILED` or `SPEECH_FAILED` |
 
-失敗時，已經做出來的那個檔案留著照用：只有波形沒有人聲時，工作台有波形，但沒有分數、吸附和自動對齊。兩個端點（`peaks`、`speech`）各自看檔案在不在。
+On failure, whichever file was made is kept and used: with a waveform but no speech, the workbench has the waveform but no score, snap or auto-align. The two endpoints (`peaks`, `speech`) each check whether their file exists.
 
-寫入 `analysis_bytes`，`NOTIFY`（`torrent`、`usage`）。畫面上的「分析中」變成「完成」。「下載完成」的通知不在這裡發：它在下載完成的那一刻就由 `torrent` 發了，不管分析成不成功。
+Write `analysis_bytes`, `NOTIFY` (`torrent`, `usage`). "Analyzing" on screen becomes "Done". The "download finished" notification is not sent here: `torrent` sent it the moment the download finished, whether or not analysis succeeds.
 
-## 預覽資產（`media.preview`）
+## Preview assets (`media.preview`)
 
-只有不能直接播的版本才做。一個工作依序做兩樣，做不做看那一列的狀態：
+Made only for versions that cannot be played directly. One job does two things in order, each depending on that row's state:
 
-1. `audio_state = 'pending'`：做聲音檔 `audio.m4a`。
-2. `proxy_state = 'pending'`：做預覽影片 `proxy.mp4`，解析度是 `proxy_res`。
+1. `audio_state = 'pending'`: make the audio file `audio.m4a`.
+2. `proxy_state = 'pending'`: make the preview video `proxy.mp4` at resolution `proxy_res`.
 
-先做聲音檔是因為它快：影像還在轉檔時，使用者已經可以聽著聲音、看著波形對字幕（「只有聲音的模式」）。每做完一樣就寫入實際大小、重算 `reserve_bytes`、`NOTIFY`（`torrent`、`usage`），不用等另一樣。
+The audio file comes first because it is fast: while the video is still transcoding, the user can already sync subtitles by listening to the sound and looking at the waveform ("audio-only mode"). As each one finishes, write its actual size, recompute `reserve_bytes`, and `NOTIFY` (`torrent`, `usage`), without waiting for the other.
 
-參考：`reference/pipeline/preview.sh`。
+Reference: `reference/pipeline/preview.sh`.
 
-### 聲音檔
+### Audio file
 
-| 來源的第一條聲音軌 | 做法 |
+| Source's first audio track | Approach |
 | --- | --- |
-| AAC、1 或 2 聲道、位元率不超過 128 kbps | 串流複製（幾秒） |
-| 其他（5.1、其他編碼） | 轉成立體聲 AAC 96 kbps（2 小時的片約 4 分鐘） |
-| 沒有聲音軌 | 不做（探測時就已經把 `audio_state` 設成 `none`） |
+| AAC, 1 or 2 channels, bitrate no more than 128 kbps | Stream copy (a few seconds) |
+| Anything else (5.1, other codecs) | Transcode to stereo AAC 96 kbps (about 4 minutes for a 2-hour film) |
+| No audio track | Not made (probing already set `audio_state` to `none`) |
 
 ```bash
-# 轉檔的情況
+# When transcoding is needed
 ffmpeg -v error -nostdin -y -i "$SRC" -map 0:a:0 -vn -ac 2 -c:a aac -b:a 96k \
   -movflags +faststart -f mp4 audio.m4a.part && mv audio.m4a.part audio.m4a
 ```
 
-### 預覽影片
+### Preview video
 
 ```bash
 ffmpeg -v error -nostdin -y -progress pipe:1 -nostats -i "$SRC" -map 0:V:0 -map 0:a:0? \
@@ -176,230 +176,230 @@ ffmpeg -v error -nostdin -y -progress pipe:1 -nostats -i "$SRC" -map 0:V:0 -map 
   -c:a aac -ac 2 -b:a 96k -movflags +faststart -f mp4 proxy.mp4.part && mv proxy.mp4.part proxy.mp4
 ```
 
-720p 時 `min(720,ih)`、`-maxrate 1500k -bufsize 3000k`。
+For 720p: `min(720,ih)`, `-maxrate 1500k -bufsize 3000k`.
 
-- **`-fps_mode passthrough` 是重點。** 它讓每一格的時間戳和原檔完全相同。實測：1,439 格的時間戳清單，原檔和預覽檔的雜湊一模一樣。所以在預覽檔上對出來的時間，就是原檔的時間。
-- **`-maxrate` 讓大小有上限。** 檔案不會超過「（影像上限 + 聲音 96 kbps）× 片長」，這就是下載前預留空間的依據（數字在 [10-storage.md](10-storage.md)）。完成後改記實際大小，通常只有上限的一半。
-- **`min(480,ih)`：不放大。** 來源比目標小時維持原本的高度。
-- **`0:V:0`（大寫）** 是第一條真正的影像軌，不會選到封面圖。**`0:a:0?`** 的問號表示「有就用」：來源沒有聲音軌時，預覽影片照樣做得出來，只是沒有聲音。
-- 進度：`-progress pipe:1` 會輸出 `out_time_us=<微秒>`，除以片長就是進度，每 2 秒寫一次 `proxy_progress`。
-- 用 `nice -n 10` 跑，讓網站和下載優先。
+- **`-fps_mode passthrough` is the key.** It keeps every frame's timestamp exactly the same as in the original. Measured: for a list of 1,439 frame timestamps, the hashes of the original and the preview file were identical. So a time synced on the preview file is the original file's time.
+- **`-maxrate` caps the size.** The file never exceeds "(video cap + 96 kbps audio) × duration", which is the basis for the space reserved before the download (numbers in [10-storage.md](10-storage.md)). After completion the actual size is recorded instead, usually only half of the cap.
+- **`min(480,ih)`: no upscaling.** When the source is smaller than the target, it keeps its original height.
+- **`0:V:0` (uppercase)** is the first real video track and never picks cover art. The question mark in **`0:a:0?`** means "use it if present": when the source has no audio track, the preview video is still made, just without sound.
+- Progress: `-progress pipe:1` outputs `out_time_us=<microseconds>`; divided by the duration, that is the progress, written to `proxy_progress` every 2 seconds.
+- Run with `nice -n 10`, so the website and downloads take priority.
 
-### 做完、失敗、被刪掉
+### Done, failed, deleted
 
-- 把狀態改成 `ready` 的那個更新要帶條件（`where … = 'running'`）。改不到，表示這個資產在轉的途中被人刪掉了：把剛改名的檔案刪掉（那是這個工作自己的產物），結束。
-- 失敗（兩次嘗試都失敗之後）：刪掉 `.part`，那個資產的狀態 `failed`，`error` 記 `TRANSCODE_FAILED`，釋出它的預留量。兩樣資產互不影響：預覽影片失敗時聲音檔照用，使用者仍然可以用只有聲音的模式。
-- 管理員刪除預覽檔（[10-storage.md](10-storage.md)）：`api` 把兩個狀態設成 `none`、大小和預留歸零、刪掉檔案。正在轉的工作在下一次檢查時（2 秒內）發現自己那個資產不再是 `running`，就終止 ffmpeg、刪掉自己的 `.part`、結束。
+- The update that sets the state to `ready` must be conditional (`where … = 'running'`). If it updates nothing, the asset was deleted by someone during transcoding: delete the file that was just renamed (it is this job's own output) and finish.
+- Failure (after both attempts fail): delete the `.part`, set that asset's state to `failed`, record `TRANSCODE_FAILED` in `error`, and release its reservation. The two assets do not affect each other: if the preview video fails, the audio file is still used and the user can still use audio-only mode.
+- An administrator deletes the preview file ([10-storage.md](10-storage.md)): `api` sets both states to `none`, sets size and reservation to zero, and deletes the files. A job that is transcoding finds at its next check (within 2 seconds) that its asset is no longer `running`, kills ffmpeg, deletes its own `.part` and finishes.
 
-### 事後要求
+### Requesting later
 
-`POST /api/media/:id/proxy`：使用者在工作台按「轉預覽檔」（自動轉檔關掉、之前空間不足、失敗過、或被管理員刪掉之後）。它把聲音檔和預覽影片當中是 `none` 或 `failed` 的都設成 `pending`，預覽影片的解析度用現在的設定，兩者的預留量加起來過一次 admission。通過後清掉 `error`，`NOTIFY paiban_media`。探測失敗過（`probe_state` 是 `failed`）的檔案，同時把 `probe_state` 設回 `pending`：預覽資產要等探測成功才會開始，不這樣做它們會一直停在等待中。需要多少空間寫在 `MediaStatus.previewNeedBytes`，按鈕旁邊要顯示。
+`POST /api/media/:id/proxy`: the user presses "Make preview file" in the workbench (after automatic transcoding was off, there was not enough space earlier, it failed, or an administrator deleted it). It sets whichever of the audio file and preview video is `none` or `failed` to `pending`, uses the current setting for the preview video's resolution, and runs the two reservations together through admission once. If admitted, it clears `error` and sends `NOTIFY paiban_media`. For a file whose probe failed (`probe_state` is `failed`), it also sets `probe_state` back to `pending`: preview assets start only after a successful probe, and without this they would stay waiting forever. The space needed is in `MediaStatus.previewNeedBytes` and must be shown next to the button.
 
-## 自動對齊
+## Auto-align
 
-輸入：一條字幕或候選的句子清單，加上這部片的 `ref.npz` 和 `speech.json`。輸出：`AlignResult`。可以直接執行的參考實作是 `reference/pipeline/align.ts`。
+Input: the line list of a subtitle or candidate, plus this film's `ref.npz` and `speech.json`. Output: `AlignResult`. A runnable reference implementation is `reference/pipeline/align.ts`.
 
-同一套計算在兩個地方用：
+The same computation is used in two places:
 
-| 佇列 | 什麼時候 | 結果去哪裡 |
+| Queue | When | Where the result goes |
 | --- | --- | --- |
-| `subtitle.align` | 使用者在工作台按「自動對齊」。他在等 | 寫進 `tasks.result`，由 `api` 回給瀏覽器 |
-| `subtitle.rank` | 「全部自動對齊並排名」，一條候選一個工作 | 寫回那條候選的 `align_score` 和 `align_result` |
+| `subtitle.align` | The user presses "Auto-align" in the workbench. They are waiting | Written to `tasks.result`, returned to the browser by `api` |
+| `subtitle.rank` | "Auto-align and rank all", one job per candidate | Written back to that candidate's `align_score` and `align_result` |
 
-分成兩個佇列，是為了讓使用者按下去的那一次不用排在三十條候選後面。
+There are two queues so that the one the user pressed does not wait behind thirty candidates.
 
-### 為什麼用兩種方法
+### Why two methods
 
-| 方法 | 長處 | 短處 |
+| Method | Strengths | Weaknesses |
 | --- | --- | --- |
-| ffsubsync | 很多人在真實影片上用過；分段模式能找出多個斷點 | 分段模式在字幕停留得比台詞久時，會整體偏早約 0.3 秒（實測）；結果只印到小數三位 |
-| 對齊核心（`packages/shared` 裡的 `autoAlign`） | 和工作台用同一套計分；在合成素材上三種情境都在 60 毫秒內 | 只找一個斷點；搜尋範圍以外的落差找不到；沒有在真實影片上驗證過 |
+| ffsubsync | Used by many people on real video; split mode can find multiple breakpoints | In split mode, when subtitles stay on longer than the dialogue, the whole result is about 0.3 seconds early (measured); results are printed to only three decimal places |
+| Sync core (`autoAlign` in `packages/shared`) | Same scoring as the workbench; within 60 milliseconds in all three scenarios on synthetic material | Finds only one breakpoint; cannot find offsets outside the search range; not verified on real video |
 
-兩者都只在合成語音上測過。讓它們各算一次、用同一把尺比較、並告訴使用者兩邊是否一致，是目前能給的最好的信心指標。
+Both have been tested only on synthetic speech. Having each compute a result, comparing them with the same yardstick, and telling the user whether they agree is the best confidence indicator available for now.
 
-### 步驟
+### Steps
 
 ```
-1. 寫一份暫存 SRT:時間照原樣,文字換成 "#<句子編號>"。
-   (ffsubsync 只需要時間;這樣輸出能用編號對回去,字幕內容也不會進它的 log。)
+1. Write a temporary SRT: times as they are, text replaced with "#<line number>".
+   (ffsubsync needs only the times; this way the output can be matched back by number, and the subtitle text never enters its log.)
 
 2. ffsubsync ref.npz -i in.srt -o linear.srt --max-offset-seconds 60
-   → 用最小平方法從「輸入的開始時間 → 輸出的開始時間」求出速率和位移   fitLinearSegment
-   → 速率和某個已知比例差不到 0.002 就取那個比例                      snapScale
-   → 在 ±1.5 秒內依人聲重新對正位移                                   refineSegments
+   → least squares on "input start time → output start time" gives rate and offset   fitLinearSegment
+   → if the rate is within 0.002 of a known ratio, take that ratio                     snapScale
+   → re-align the offset against speech within ±1.5 seconds                            refineSegments
 
-3. 允許分段時:
+3. When splitting is allowed:
    ffsubsync ref.npz -i in.srt -o split.srt --max-offset-seconds 60 --split-penalty
-   → 相鄰兩句的斜率取中位數當速率,每句的位移相近的連成一段            fitPiecewise
-   → 每一段各自重新對正                                               refineSegments
+   → median slope between adjacent lines as the rate; lines with similar offsets form a segment   fitPiecewise
+   → each segment is re-aligned on its own                                             refineSegments
 
-4. 對齊核心:autoAlign(speech, cues, { allowSplit, radius: 60 })
+4. Sync core: autoAlign(speech, cues, { allowSplit, radius: 60 })
 
-5. 用同一個目標函數給每個候選打分,每多一段扣 3 秒的台詞;              pickAlignment
-   差距在 0.3 秒台詞以內時,取段數少的,再取比較常見的速率。
+5. Score every candidate with the same objective function, minus 3 seconds of dialogue per extra segment;   pickAlignment
+   when within 0.3 seconds of dialogue, take the one with fewer segments, then the more common rate.
 
-6. agree = 另一種方法的結果,每一句的開始時間都和選中的差不到 0.15 秒。
+6. agree = in the other method's result, every line's start time is within 0.15 seconds of the chosen one.
 ```
 
-括號右邊是 `packages/shared/src/sync-core/core.ts` 裡對應的函式，全部有測試。
+The names on the right are the corresponding functions in `packages/shared/src/sync-core/core.ts`, all tested.
 
-任何一次 ffsubsync 失敗（結束碼不是 0、沒有輸出、輸出的句數對不上、超過 20 秒）就略過那個候選，只要還有一個候選就照常回傳。兩種方法都失敗才算工作失敗。ffsubsync 正常不到 1 秒，20 秒已經很寬；對齊核心的時間可以預期（見「效能」），不另外設逾時。
+If any ffsubsync run fails (non-zero exit code, no output, output line count does not match, more than 20 seconds), that candidate is skipped; as long as one candidate remains, the result is returned as usual. The job fails only when both methods fail. ffsubsync normally takes under 1 second, so 20 seconds is generous; the sync core's time is predictable (see "Performance"), so it has no separate timeout.
 
-### 結果怎麼回到 `api`
+### How the result gets back to `api`
 
-`POST /api/subtitles/:id/auto-align` 要等結果才回應，而計算在另一個程式裡：
+`POST /api/subtitles/:id/auto-align` waits for the result before responding, but the computation runs in another program:
 
-1. `api` 建立一列 `tasks`（種類 `align`，`input` 是字幕的 id 和 `allowSplit`），排入 `subtitle.align`，然後等 `paiban_events` 上這個工作的通知（`{type: 'task', id}`）。
-2. `media` 做完，把 `AlignResult` 寫進 `tasks.result`、`state` 改成 `done`（或 `failed`），`NOTIFY`。
-3. `api` 讀出結果，回給瀏覽器。工作是 `failed`，或 60 秒內沒有等到通知，回 `ALIGN_FAILED`。等不到的時候，`api` 把那一列 `tasks` 標成 `failed`（`TIMEOUT`）；`media` 之後就算做完，它帶條件的更新也改不到，結果直接丟掉。
+1. `api` creates a `tasks` row (kind `align`, `input` is the subtitle id and `allowSplit`), queues it on `subtitle.align`, then waits on `paiban_events` for this job's notification (`{type: 'task', id}`).
+2. `media` finishes, writes the `AlignResult` to `tasks.result`, sets `state` to `done` (or `failed`), and sends `NOTIFY`.
+3. `api` reads the result and returns it to the browser. If the job is `failed`, or no notification arrives within 60 seconds, it returns `ALIGN_FAILED`. When it times out, `api` marks that `tasks` row `failed` (`TIMEOUT`); even if `media` finishes later, its conditional update changes nothing and the result is discarded.
 
-這個工作不自動重試：使用者再按一次就好。`tasks.input` 只放 id 和選項，句子清單由 `media` 自己從 `cues.json` 讀。
+This job is not retried automatically: the user just presses again. `tasks.input` holds only the id and options; `media` reads the line list itself from `cues.json`.
 
-### 在測試素材上的結果
+### Results on the test fixtures
 
-`fixtures/` 的 92 秒片段，三份故意弄錯的字幕（26 句）：
+The 92-second clip in `fixtures/`, with three deliberately wrong subtitle files (26 lines):
 
-| 情境 | ffsubsync 單一位移 | ffsubsync 分段（原始） | 分段後重新對正 | 對齊核心 | 最後選中 |
+| Scenario | ffsubsync single offset | ffsubsync split (raw) | Split, then re-aligned | Sync core | Final choice |
 | --- | --- | --- | --- | --- | --- |
-| 整體晚 2.4 秒 | 最大誤差 54 ms | 250 ms（全部偏早） | 40 ms | 40 ms | 一段，×1，−2.36 秒 |
-| 影格率不同（25 → 23.976） | 50 ms | 247 ms | 43 ms | 44 ms | 一段，×1.04271，−0.79 秒 |
-| 剪輯版本不同（中間差 12 秒） | 12 秒（一個位移不可能對） | 254 ms，兩段 | 48 ms | 50 ms | 兩段，+1.25 / +13.24 秒 |
+| 2.4 seconds late overall | Max error 54 ms | 250 ms (all early) | 40 ms | 40 ms | One segment, ×1, −2.36 s |
+| Different frame rate (25 → 23.976) | 50 ms | 247 ms | 43 ms | 44 ms | One segment, ×1.04271, −0.79 s |
+| Different cut (12 seconds apart in the middle) | 12 s (a single offset cannot fit) | 254 ms, two segments | 48 ms | 50 ms | Two segments, +1.25 / +13.24 s |
 
-三種情境兩種方法都一致（`agree = true`）。前兩欄的原始數字在 `fixtures/expected.ffsubsync.json`，ffsubsync 的輸出檔在 `fixtures/ffsubsync/`，所以解析和比較的程式不用裝 ffsubsync 也能做單元測試。
+Both methods agree in all three scenarios (`agree = true`). The raw numbers for the first two columns are in `fixtures/expected.ffsubsync.json`, and ffsubsync's output files are in `fixtures/ffsubsync/`, so the parsing and comparison code can be unit-tested without installing ffsubsync.
 
-`reference/pipeline/align.ts` 印出來的是最後一欄（分段、速率、位移）加上分數和 `agree`，不是每一種方法各自的誤差。拿它驗證環境時，比對的是最後一欄：段數和速率相同，位移相差在 0.01 秒以內，`agree` 是 true。中間幾欄的誤差是 `packages/shared/src/sync-core/core.test.ts` 在測的。
+What `reference/pipeline/align.ts` prints is the last column (segments, rate, offset) plus the score and `agree`, not each method's error. When using it to verify an environment, compare against the last column: same number of segments and same rate, offsets within 0.01 seconds, `agree` is true. The errors in the middle columns are what `packages/shared/src/sync-core/core.test.ts` tests.
 
-`fixtures/film/film.json` 是一部 21.5 分鐘的合成影片（180 句）。對齊核心在三種情境都是 180 句全部落在 100 毫秒內；剪輯不同的那一種，落差是 40 秒，搜尋範圍 30 秒時找不到、60 秒時找得到。所以範圍定為 60 秒，和 ffsubsync 的預設上限相同。
+`fixtures/film/film.json` is a 21.5-minute synthetic film (180 lines). The sync core puts all 180 lines within 100 milliseconds in all three scenarios; in the different-cut scenario the gap is 40 seconds, which is not found with a 30-second search range and is found with 60 seconds. So the range is set to 60 seconds, the same as ffsubsync's default maximum.
 
-**92 秒的片段太短，分不出相近的速率**（例如 ×0.999 和 ×1）：兩者在片尾只差 0.09 秒。真實影片長度下差距是好幾秒，不會混淆。測試裡用「常見的速率優先」來處理這個平手。
+**The 92-second clip is too short to tell close rates apart** (for example ×0.999 and ×1): they differ by only 0.09 seconds at the end of the clip. At real film length the difference is several seconds, so they are not confused. The tests resolve this tie with "common rates first".
 
-### 效能
+### Performance
 
-對齊核心的成本是「速率數 × 句數 × 位移格數」。1,500 句、範圍 60 秒、解析度 10 毫秒、7 種速率，約 1.3 億次查表，估計 3 秒；允許分段時每種速率要保留一張「句數 × 位移格數」的表，約 72 MB。在伺服器上可以接受。需要更快時先用 40 毫秒的解析度粗找，再在最佳位置附近用 10 毫秒細找。
+The sync core's cost is "number of rates × number of lines × number of offset steps". 1,500 lines, a 60-second range, 10-millisecond resolution and 7 rates is about 130 million lookups, estimated at 3 seconds; when splitting is allowed, each rate keeps a "lines × offset steps" table, about 72 MB. That is acceptable on the server. If it needs to be faster, first search coarsely at 40-millisecond resolution, then finely at 10 milliseconds around the best position.
 
-**瀏覽器裡不跑整片的 `autoAlign`。** 瀏覽器只用到 `bestLinear`（吸附，範圍 1.5 秒）、`fitAnchors`、`applyDoc`、分數，這些都是毫秒等級。
+**The browser does not run whole-film `autoAlign`.** The browser uses only `bestLinear` (snap, 1.5-second range), `fitAnchors`, `applyDoc` and the score, all at the millisecond level.
 
-### 對齊分數
+### Sync score
 
-`totalScore`：所有句子顯示的時間裡，有多少比例落在偵測到的人聲上，0 到 1。
+`totalScore`: across the time all lines are displayed, the share that falls on detected speech, from 0 to 1.
 
-- **對得很準的字幕也不會是 100%。** 測試片段的正確字幕是 80%，因為字幕會比台詞早一點出現、晚一點消失。
-- 介面上的顏色門檻（70% 以上綠、55% 以上黃、以下紅；單句是 50% 和 25%）來自原型，**沒有在真實影片上校正過**。有配樂和音效的片，人聲偵測會把一些非人聲算進去，分數的絕對值會不同。門檻寫成共用常數，之後好調。
-- 分數是用來比較「同一部片的不同字幕」和「調整前後」的，不是絕對的品質指標。介面上的說明文字是：「字幕與人聲重疊的比例，只是輔助，最後以耳朵為準」。
+- **Even accurately synced subtitles never reach 100%.** The correct subtitles for the test clip score 80%, because subtitles appear a little before the dialogue and disappear a little after.
+- The color thresholds in the interface (green from 70%, yellow from 55%, red below; 50% and 25% for a single line) come from the prototype and **have not been calibrated on real films**. In films with music and sound effects, speech detection counts some non-speech as speech, so the absolute values will differ. The thresholds are shared constants so they are easy to adjust later.
+- The score is for comparing "different subtitles for the same film" and "before and after adjusting", not an absolute measure of quality. The explanatory text in the interface is: "How much the subtitles overlap speech. Only a guide; trust your ears".
 
-## 語音辨識
+## Speech recognition
 
-人聲偵測只知道「什麼時候有人在講話」，在配樂多的片子上會被音樂騙（階段 0：Tears of Steel 在五種情境下全部選錯，最多差 79 秒）。語音辨識知道「講了什麼」，拿來和字幕的句子配對，就有了不會被音樂騙的依據。
+Speech detection only knows "when someone is talking", and in films with lots of music it is fooled by the music (Phase 0: Tears of Steel picked wrong in all five scenarios, off by up to 79 seconds). Speech recognition knows "what was said"; matching it with the subtitle lines gives a basis that music cannot fool.
 
-### 辨識（`media` 的 `asr` 佇列）
+### Recognition (the `asr` queue in `media`)
 
-- 分析完成時，`align.asr` 開著而且片子有聲音，`asr_state` 設成 `pending`。辨識有自己的佇列，一次一部，所以要跑幾分鐘的辨識不會擋住別部片的分析。
-- **不辨識整部片。** 平均分布的 30 秒窗，每個等分的正中間一個；合計聽片長的 40%，最多 6 分鐘（兩小時的片子聽 12 個窗）。不依人聲偵測挑位置：在配樂多的片子上它會指向音樂（Tears of Steel 上這樣挑的三個窗什麼都沒聽到）。`asr/text.ts` 的 `pickWindows`。
-- 用 faster-whisper（`base` 模型、int8、CPU），裝在映像檔的 `/opt/asr`，模型在建置時下載，執行時不連外（`HF_HUB_OFFLINE=1`）。`media-scripts/asr.py`：ffmpeg 只解每個窗的那一段聲音；開 Whisper 自己的 VAD 過濾；用逐字的時間戳記，依句尾標點或 0.8 秒以上的停頓切成句子，每句的開始是第一個字的時間；從窗的最開頭就在講的句子丟掉（它其實更早開始）。語言由第一個有把握（機率 ≥ 0.7）的窗決定，之後的窗都用那個語言。
-- 結果是 `media/<id>/asr.json`（`{language, model, windows, segments: [{start, end, text}]}`），算進 `analysis_bytes`。失敗只記 `error.asr = 'ASR_FAILED'`，不重試；自動對齊照舊能用，只是少了這個依據。「重新分析」會把失敗或當初沒做的辨識重新排入。
-- 實測（Xeon X5650，沒有 AVX）：每 30 秒的窗約 6 秒（`base`）；`small` 約 20 秒，品質差不多，所以用 `base`。12 分鐘的片聽 10 個窗約 1 到 2 分鐘。
+- When analysis finishes, if `align.asr` is on and the film has sound, `asr_state` is set to `pending`. Recognition has its own queue, one film at a time, so a recognition run of several minutes does not block other films' analysis.
+- **The whole film is not recognized.** Evenly spread 30-second windows, one in the exact middle of each equal part; in total it listens to 40% of the duration, at most 6 minutes (a two-hour film gets 12 windows). Positions are not chosen by speech detection: in films with lots of music it points at the music (the three windows chosen that way on Tears of Steel heard nothing). `pickWindows` in `asr/text.ts`.
+- Uses faster-whisper (`base` model, int8, CPU), installed in the image at `/opt/asr`; the model is downloaded at build time, and nothing goes out at run time (`HF_HUB_OFFLINE=1`). `media-scripts/asr.py`: ffmpeg decodes only each window's stretch of audio; Whisper's own VAD filter is on; using word-level timestamps, it splits into lines at sentence-ending punctuation or pauses of 0.8 seconds or more, and each line starts at its first word's time; a line already being spoken at the very start of a window is dropped (it actually started earlier). The language is set by the first window that is confident (probability ≥ 0.7), and all later windows use that language.
+- The result is `media/<id>/asr.json` (`{language, model, windows, segments: [{start, end, text}]}`), counted in `analysis_bytes`. On failure it only records `error.asr = 'ASR_FAILED'` and does not retry; auto-align still works, just without this basis. "Analyze again" re-queues recognition that failed or was never done.
+- Measured (Xeon X5650, no AVX): about 6 seconds per 30-second window (`base`); `small` takes about 20 seconds with about the same quality, so `base` is used. A 12-minute film with 10 windows takes about 1 to 2 minutes.
 
-### 配對
+### Pairing
 
-把辨識出的句子和字幕的句子配成對（`Pair`：第幾句字幕、那句話在片中開始的時間）。只在「這句字幕可能出現的時間範圍」裡找：字幕本身的時間最多差 90 秒，速率是任何一種已知的比例（`sourceRange`）。
+Pair recognized lines with subtitle lines (`Pair`: which subtitle line, and the time in the film where that speech starts). Search only within "the time range where this subtitle line could appear": at most 90 seconds from the subtitle's own time, at any known ratio as the rate (`sourceRange`).
 
-- **字幕和聽到的語言相同**（`zh-Hant`、`zh-Hans`、`zh` 都算中文）：純文字比對，`asr/text.ts` 的 `textPairs`，不需要金鑰。連續最多三句辨識結果對最多兩句字幕（字幕一行常是兩三句，辨識也會把一句切開）；共同的字詞佔短的那邊的比例 ≥ 0.6，而且短的不能不到長的一半；兩邊的開頭都要在對方裡面（配對的時間是開頭的時間）；同一份字幕裡別處幾乎一樣像的話就不配（重複的台詞）。中文先把兩邊都轉成繁體字再比。
-- **語言不同**：交給語言模型（下一節）。沒有設定模型時不配對。
+- **The subtitles are in the same language as what was heard** (`zh-Hant`, `zh-Hans` and `zh` all count as Chinese): plain text matching, `textPairs` in `asr/text.ts`, no key needed. Up to three consecutive recognized lines can pair with up to two subtitle lines (a subtitle line often holds two or three sentences, and recognition also splits sentences); shared words must make up ≥ 0.6 of the shorter side, and the shorter side must be at least half the length of the longer; the beginning of each side must be contained in the other (the pair's time is the beginning's time); if something almost equally similar appears elsewhere in the same subtitle file, it is not paired (repeated dialogue). For Chinese, both sides are converted to Traditional characters before comparing.
+- **Different languages**: handed to a language model (next section). When no model is configured, no pairing is done.
 
-### 從配對得到對齊（`asr/fit.ts`）
+### Getting an alignment from the pairs (`asr/fit.ts`)
 
-1. 速率：在哪一種已知比例下，最多的配對有同一個位移。配錯的對落在隨便的地方，不會聚在一起，所以少數配錯的贏不了。
-2. 那個速率下，有相同位移的配對成一群（至少 3 對；第一群至少 4 對）；不屬於任何一群的是配錯的。每一群是剪輯之間的一段，各群在字幕裡必須一前一後、不能交錯，交錯的話小的那群丟掉。
-3. 兩段之間的斷點在兩群都沒釘住的那幾句之間，用人聲偵測和其他方法同一個目標函數決定。
-4. 每一段在人聲上 ±0.5 秒內重新對正（字幕通常比聲音早一點出現）。
+1. Rate: the known ratio under which the most pairs share the same offset. Wrong pairs land in random places and do not cluster, so a few wrong ones cannot win.
+2. At that rate, pairs with the same offset form a group (at least 3 pairs; the first group at least 4); pairs in no group are wrong. Each group is one segment between cuts; the groups must come one after another in the subtitles without interleaving, and if they interleave, the smaller group is dropped.
+3. The breakpoint between two segments lies among the lines that neither group pins down, and is decided with speech detection using the same objective function as the other methods.
+4. Each segment is re-aligned against speech within ±0.5 seconds (subtitles usually appear a little before the sound).
 
-這是一個候選，方法名稱 `asr`（文字配對）或 `asr-llm`（語言模型配對）。
+This is one candidate, with method name `asr` (text pairing) or `asr-llm` (language model pairing).
 
-### 配對當裁判（`pickWithPairs`）
+### Pairs as referee (`pickWithPairs`)
 
-所有候選（ffsubsync 兩種、對齊核心、辨識）一起比：認同最多配對的那個當標準，**其他候選只要反駁了它認同的配對就出局**（容許 5%，給偶爾配錯的）；接著，**有一段「辨識在那段時間聽到至少兩句、卻沒有一句配得上」的候選也出局**（只要還有別的候選留下）：人聲偵測在吵的段落會編出不存在的剪輯斷點，沒有聽到證據的斷點不採信；沒聽過的段落不評判。剩下的照原本的 `pickAlignment` 選。配對不到 4 對時完全照原本的方式選。`agree` 的定義不變。`AlignResult.heard` 回報聽到的語言、配了幾對、選中的結果認同幾對、配對方式，以及語言模型失敗的原因。
+All candidates (both ffsubsync modes, the sync core, recognition) are compared together: the one that agrees with the most pairs is the standard, and **any other candidate that contradicts the pairs the standard agrees with is out** (5% tolerance, for the occasional wrong pair); next, **a candidate with a segment where "recognition heard at least two lines in that time but none of them pair" is also out** (as long as some other candidate remains): in noisy stretches speech detection invents cut breakpoints that do not exist, and a breakpoint with no heard evidence is not trusted; stretches that were not listened to are not judged. The remaining candidates are chosen by the usual `pickAlignment`. With fewer than 4 pairs, the choice is made entirely the usual way. The definition of `agree` is unchanged. `AlignResult.heard` reports the language heard, how many pairs were made, how many the chosen result agrees with, the pairing method, and the reason the language model failed.
 
-**沒有配對時**（字幕是另一種語言、又沒設定語言模型），改用辨識出的句子「從什麼時候開始」當裁判（`timingHits`）：字幕的一句通常從一句話開始時出現，辨識又不會被配樂騙，所以不必懂任何一種語言。開頭落在辨識句子開頭 0.4 秒內的句子算一次命中；命中數明顯比最好的少（差超過 10%，至少 1）的候選出局。辨識到的句子少於 8 句時不評判。
+**When there are no pairs** (the subtitles are in another language and no language model is configured), the times at which recognized lines "start" serve as referee instead (`timingHits`): a subtitle line usually appears when a spoken line starts, and recognition is not fooled by music, so no language needs to be understood. A line whose start falls within 0.4 seconds of a recognized line's start counts as a hit; candidates with clearly fewer hits than the best (more than 10% fewer, at least 1) are out. When fewer than 8 lines were recognized, nothing is judged.
 
-Tears of Steel 的法文、德文、俄文官方字幕，各弄錯四種（晚 23.7 秒、晚 47 秒、影格率不同、原樣），沒有語言模型：改之前 12 次全部選到對齊核心編出來的分段（最多差 104 秒），改之後 12 次全部在 0.03 秒以內（正確的對齊命中 27 句裡的 11 到 13 句，錯的 2 到 9 句）。斷點落在辨識完全沒聽到的段落時，還是沒有一種方法找得到，選到的是錯得最少的那個（`apps/server/scripts/other-language-eval.mts`）。
+Tears of Steel's official French, German and Russian subtitles, each made wrong in four ways (23.7 seconds late, 47 seconds late, different frame rate, unchanged), with no language model: before the change, all 12 runs picked a segmentation invented by the sync core (off by up to 104 seconds); after the change, all 12 were within 0.03 seconds (the correct alignment hit 11 to 13 of 27 lines, wrong ones 2 to 9). When a breakpoint falls in a stretch recognition did not hear at all, no method can find it, and the one picked is the least wrong (`apps/server/scripts/other-language-eval.mts`).
 
-排名（`subtitle.rank`）只用文字配對，不問語言模型：一次排名最多三十條候選，就是三十次請求。
+Ranking (`subtitle.rank`) uses only text pairing and never asks a language model: one ranking can have up to thirty candidates, which would be thirty requests.
 
-### 在 Tears of Steel 上的結果
+### Results on Tears of Steel
 
-英文官方字幕當答案，照階段 0 的五種方式弄錯，再對齊（`apps/server/scripts/asr-eval.mts`，手動執行，影片和辨識結果不進 repo）：
+The official English subtitles as the answer, made wrong in the five Phase 0 ways, then aligned (`apps/server/scripts/asr-eval.mts`, run by hand; the video and recognition results are not in the repo):
 
-| 情境 | 配對（正確） | 選中 | 最大誤差 |
+| Scenario | Pairs (correct) | Chosen | Max error |
 | --- | --- | --- | --- |
-| 原樣 | 19（15） | asr，一段 | 0.03 秒 |
-| 晚 2.4 秒 | 19（15） | asr，一段 | 0.03 秒 |
-| 晚 23.7 秒 | 19（15） | asr，一段 | 0.03 秒 |
-| 影格率不同 | 20（15） | asr，×1.04271 | 0.03 秒 |
-| 剪輯不同（中間差 12 秒） | 19（15） | asr，兩段，斷點正好在第 38 句 | 0.03 秒 |
+| Unchanged | 19 (15) | asr, one segment | 0.03 s |
+| 2.4 seconds late | 19 (15) | asr, one segment | 0.03 s |
+| 23.7 seconds late | 19 (15) | asr, one segment | 0.03 s |
+| Different frame rate | 20 (15) | asr, ×1.04271 | 0.03 s |
+| Different cut (12 seconds apart in the middle) | 19 (15) | asr, two segments, breakpoint exactly at line 38 | 0.03 s |
 
-階段 0 同樣的五種情境都選了對齊核心的錯誤分段，最大誤差 37 到 79 秒。
+In Phase 0, all five of the same scenarios picked the sync core's wrong segmentation, with max errors of 37 to 79 seconds.
 
-**在完整產品流程裡（QA，2026-10-06）**：開發環境下載這部片、分析、辨識之後，上傳一份「晚 23.7 秒、在第 67 句前真的少了一段 12 秒」的英文字幕，在工作台按自動對齊：前 66 句全部對準，最後 10 句差 12 秒。原因是片子中後段很吵，10 個窗裡有兩個什麼都沒聽到，斷點之後只配到 1 句，不夠成為一段（要 3 句）。修正「沒聽到證據的分段不採信」之前，同一份字幕會選到對齊核心編出的分段，後 33 句差 77 秒。最後這 10 句要靠使用者用檢查點聽出來、用對齊點修。「正確」是配對的時間和官方字幕差不到 1 秒；官方字幕的時間本身只準到整秒或半秒。
+**In the full product flow (QA, 2026-10-06)**: after the dev environment downloaded, analyzed and recognized this film, English subtitles that were "23.7 seconds late, and really missing a 12-second stretch before line 67" were uploaded and auto-align was pressed in the workbench: the first 66 lines were all synced, and the last 10 lines were off by 12 seconds. The cause: the middle and later parts of the film are noisy, two of the 10 windows heard nothing, and after the breakpoint only 1 line was paired, not enough to form a segment (3 are needed). Before the "segments without heard evidence are not trusted" fix, the same subtitles picked a segmentation invented by the sync core, and the last 33 lines were off by 77 seconds. Those last 10 lines have to be caught by the user listening at checkpoints and fixed with anchors. "Correct" means the paired time is within 1 second of the official subtitles; the official subtitles' own times are only accurate to the whole or half second.
 
-## 語言模型
+## Language model
 
-字幕和片中的語言不同時（例如英文片配繁體中文字幕），用語言模型判斷「哪句辨識結果和哪句字幕是同一句話」。用哪個模型由 LLM 設定頁的設定檔決定（2026-10-07 起，負載平衡和備援見 [18-llm.md](18-llm.md)；原本在來源設定的 `align.llm` 已經搬過去）。各供應商怎麼呼叫：
+When the subtitles and the film are in different languages (for example, an English film with Traditional Chinese subtitles), a language model decides "which recognized line and which subtitle line are the same thing said". Which model is used is decided by the profiles on the LLM settings page (since 2026-10-07; load balancing and fallback in [18-llm.md](18-llm.md); `align.llm`, formerly in Sources, has moved there). How each provider is called:
 
-| 供應商 | 怎麼呼叫 |
+| Provider | How it is called |
 | --- | --- |
-| Claude（Anthropic） | Anthropic 官方 SDK，預設 `claude-opus-5-5`，effort `low`，回答用結構化輸出（JSON schema）限制。用 Opus 5.5 等支援的模型時開啟伺服器端的拒答備援（`fallbacks: "default"`） |
-| OpenAI、OpenRouter、OpenAI 相容的自架服務（vLLM、LM Studio、通義千問的相容模式） | `POST <服務網址>/chat/completions`，`response_format: json_object`，帶設定檔的 temperature 和最大輸出長度（OpenAI 用 `max_completion_tokens`）。伺服器回 400 時依序拿掉 `reasoning_effort`、`response_format`、`temperature` 再試，記住這個網址不支援。回答裡的 `<think>` 和 code fence 會去掉再解析 |
-| Ollama | `POST <服務網址>/api/chat`，`stream: false`，帶 `options.num_ctx`（長度上限）、`think: false`、回答的 JSON schema（`format`）。見 [18-llm.md](18-llm.md) 的「為什麼 Ollama 是自己一種」 |
-| Azure OpenAI | `POST <服務網址>/openai/deployments/<部署名稱>/chat/completions?api-version=…`，金鑰放 `api-key` 標頭 |
-| Azure AI Foundry | `POST <服務網址>/models/chat/completions?api-version=…`，帶模型名稱，金鑰放 `api-key` 標頭 |
+| Claude (Anthropic) | The official Anthropic SDK, default `claude-opus-5-5`, effort `low`, answer constrained with structured output (JSON schema). With supported models such as Opus 5.5, server-side refusal fallback is turned on (`fallbacks: "default"`) |
+| OpenAI, OpenRouter, self-hosted OpenAI-compatible services (vLLM, LM Studio, Qwen's compatible mode) | `POST <service URL>/chat/completions`, `response_format: json_object`, with the profile's temperature and maximum output length (OpenAI uses `max_completion_tokens`). When the server returns 400, drop `reasoning_effort`, `response_format`, `temperature` in that order and retry, remembering that this URL does not support it. `<think>` and code fences in the answer are stripped before parsing |
+| Ollama | `POST <service URL>/api/chat`, `stream: false`, with `options.num_ctx` (length limit), `think: false`, and the answer's JSON schema (`format`). See "Why Ollama is its own kind" in [18-llm.md](18-llm.md) |
+| Azure OpenAI | `POST <service URL>/openai/deployments/<deployment name>/chat/completions?api-version=…`, key in the `api-key` header |
+| Azure AI Foundry | `POST <service URL>/models/chat/completions?api-version=…`, with the model name, key in the `api-key` header |
 
-- **在 `api` 裡呼叫**，因為只有 `api` 有 `SECRET_KEY`、能讀出設定檔的金鑰。`POST /api/subtitles/:id/auto-align` 在排入工作前先配對（最多 45 秒），配好的對放進 `tasks.input.heard`，`media` 接著算。逾時或失敗時照樣排入，結果的 `heard.llmError` 說原因（`NOT_CONFIGURED`、`AUTH`、`RATE_LIMITED`、`REFUSED`、`BAD_RESPONSE`、`UNREACHABLE`、`TIMEOUT`）。
-- 每個聆聽窗一個請求，同時送出的數量是第一層設定檔的「同時請求數」加起來（最多 16）。每個請求是那個窗的辨識結果，加上時間上可能對得到的字幕句子（最多 300 句）。題目明說字幕的時間不可靠、看意思和順序；只回有把握的配對、不配語助詞和歌聲、每句最多用一次、保持順序。回答裡不在題目中的編號一律丟掉。部分窗失敗照樣用其他窗的配對。
-- 送出去的只有台詞文字和秒數，不送影片、聲音、片名或使用者資料。
-- 金鑰被拒（`AUTH`）就不再送剩下的窗。設定檔失敗時的冷卻和換設定檔由設定檔池處理（[18-llm.md](18-llm.md)），用量記在 `llm_usage`（用途「自動對齊」）。
-- 每個人每 10 分鐘最多按 20 次自動對齊（不論有沒有用到語言模型），超過回 `RATE_LIMITED`，帶要等幾秒；工作台說「自動對齊按得太頻繁了，請 N 分鐘後再試。」
+- **Called in `api`**, because only `api` has `SECRET_KEY` and can read a profile's key. `POST /api/subtitles/:id/auto-align` pairs before queuing the job (up to 45 seconds), puts the pairs in `tasks.input.heard`, and `media` continues the computation. On timeout or failure it is queued anyway, and the result's `heard.llmError` gives the reason (`NOT_CONFIGURED`, `AUTH`, `RATE_LIMITED`, `REFUSED`, `BAD_RESPONSE`, `UNREACHABLE`, `TIMEOUT`).
+- One request per listening window; the number sent at once is the sum of the first-tier profiles' "concurrent requests" (at most 16). Each request is that window's recognition result plus the subtitle lines that could match in time (at most 300 lines). The prompt states that subtitle times are unreliable and to go by meaning and order; to return only confident pairs, not to pair interjections or singing, to use each line at most once, and to keep the order. Any number in the answer that is not in the prompt is discarded. If some windows fail, the pairs from the other windows are still used.
+- Only dialogue text and seconds are sent; no video, audio, film title or user data.
+- If the key is rejected (`AUTH`), the remaining windows are not sent. Cooldown and switching profiles on failure are handled by the profile pool ([18-llm.md](18-llm.md)), and usage is recorded in `llm_usage` (purpose "Auto-align").
+- Each person can press auto-align at most 20 times every 10 minutes (whether or not a language model is used); beyond that it returns `RATE_LIMITED` with how many seconds to wait; the workbench says "Auto-align was pressed too often. Try again in N minutes."
 
-**實測（2026-10-06，Brian 提供的 Ollama 伺服器，Qwen 3.8 27B Q4_K_M）**：Tears of Steel 的法文、德文、俄文官方字幕，各弄錯五種（原樣、晚 2.4 秒、晚 23.7 秒、影格率不同、剪輯差 12 秒），英文辨識結果交給模型配對：15 次全部在 0.04 秒以內。每份字幕配出 21 到 23 對（16 到 20 對正確），比英文字幕的純文字比對（19 對、15 對正確）還多，因為模型看得懂意譯。一次對齊花在模型上約 25 秒（10 個窗、同時 3 個請求）。
+**Measured (2026-10-06, Ollama server provided by Brian, Qwen 3.8 27B Q4_K_M)**: Tears of Steel's official French, German and Russian subtitles, each made wrong in five ways (unchanged, 2.4 seconds late, 23.7 seconds late, different frame rate, cut 12 seconds apart), with the English recognition results handed to the model to pair: all 15 runs within 0.04 seconds. Each subtitle file produced 21 to 23 pairs (16 to 20 correct), more than plain text matching on the English subtitles (19 pairs, 15 correct), because the model understands paraphrase. One alignment spent about 25 seconds on the model (10 windows, 3 requests at a time).
 
-Qwen 3 這類推理模型預設會先「思考」再回答，這個工作用不到：送出時帶 `reasoning_effort: "none"` 關掉，同一題從 45 秒變成 3 秒、答案一樣。不認得這個欄位的服務回 400 時，自動不帶這個欄位再送一次，之後也不再帶。
+Reasoning models like Qwen 3 "think" before answering by default, which this job does not need: requests carry `reasoning_effort: "none"` to turn it off, which took the same question from 45 seconds to 3 seconds with the same answer. When a service that does not recognize this field returns 400, the request is automatically resent without the field, and the field is not sent again.
 
-**驗證到哪裡：** 沒有拿到 Claude 或通義千問雲端的金鑰，雲端模型的配對品質沒有測過。協定用本機的假伺服器測過（單元測試）。真的 Qwen（本機 Ollama 的 Qwen 2.5 3B）拿 Tears of Steel 一個窗的英文辨識結果對法文字幕：格式照規定回答、配對正確，但在這台沒有 AVX 的 CPU 上花了 283 秒，所以在這台機器上本機模型不實用，要用雲端的服務。
+**How far this is verified:** No keys for Claude or Qwen's cloud service were available, so the pairing quality of cloud models has not been tested. The protocol was tested against a local fake server (unit tests). A real Qwen (Qwen 2.5 3B on local Ollama) given one window of English recognition from Tears of Steel against French subtitles: it answered in the required format and paired correctly, but took 283 seconds on this CPU without AVX, so local models are not practical on this machine and a cloud service should be used.
 
-## 依另一條字幕對齊
+## Align by other subtitles
 
-同一部片已經有一條對準的字幕時，用它來對其他字幕（Brian，2026-10-06）。工作台的「依另一條字幕」選一條字幕、按「依這條對齊」，呼叫同一個端點，多帶 `referenceId`（`tasks.input.referenceId`）。程式在 `apps/server/src/subtitles/reference.ts` 和 `align.ts` 的 `computeReferenceAlignment`。
+When the same film already has a synced subtitle track, use it to sync other subtitles (Brian, 2026-10-06). In the workbench, "By other subtitles" picks a subtitle track; pressing "Align to these" calls the same endpoint with an extra `referenceId` (`tasks.input.referenceId`). The code is in `apps/server/src/subtitles/reference.ts` and `computeReferenceAlignment` in `align.ts`.
 
-**把參考字幕當成電影。** 參考字幕套上它目前的分段和逐句修改、去掉刪除的句子，這些句子的時間就是「有人說話的地方」，比偵測人聲準得多：
+**Treat the reference subtitles as the film.** The reference subtitles are given their current segments and per-line edits, with deleted lines removed; the times of these lines are "where someone is speaking", far more accurate than speech detection:
 
-- **時間**：每句變成一段「人聲」（重疊的合併），交給和自動對齊一樣的計算（ffsubsync 之外的內建比對，試所有常見速率和整片位移，可以分段）。一句在一邊拆成兩句、在另一邊是一句時，涵蓋的時間是一樣的，所以不受影響。
-- **文字**：兩條字幕的語言相同（例如兩份英文、或繁簡中文）時，參考字幕的句子被當成語音辨識的結果，用同一套文字配對（`sameLanguagePairs`：一句對兩句、兩句對一句都配得到），配對當裁判，和語音辨識那節一樣。語言不同時只用時間；**不用語言模型**：實測它要 45 到 60 秒，而只用時間就已經準到 0.5 秒以內。
-- **不需要聲音**：片子還沒分析完也能用。有人聲資料時，對齊分數照常用片子的人聲算；沒有時用參考字幕算。
+- **Timing**: each line becomes one stretch of "speech" (overlaps merged) and goes through the same computation as auto-align (the built-in matching besides ffsubsync, trying all common rates and whole-film offsets, splitting allowed). When one line is split into two on one side and is one line on the other, the time covered is the same, so it is unaffected.
+- **Text**: when both subtitle tracks are in the same language (for example two English files, or Traditional and Simplified Chinese), the reference lines are treated as speech recognition results and paired with the same text matching (`sameLanguagePairs`: one-to-two and two-to-one both pair), with pairs as referee, as in the speech recognition section. With different languages only timing is used; **no language model**: measured, it takes 45 to 60 seconds, while timing alone is already within 0.5 seconds.
+- **No audio needed**: works even before the film has finished analysis. With speech data, the sync score is computed against the film's speech as usual; without it, against the reference subtitles.
 
-**參考字幕本身沒對準時。** 結果一定跟著參考字幕走（使用者選了它）；但有人聲資料時，另外拿參考字幕去對片中的人聲（不分段）。它要移動超過 1 秒、而且貼合度因此提高 3 個百分點以上，就在 `reference.offBy` 回報差了幾秒，工作台提醒使用者。開發環境 QA 時真的遇到一條標成已確認、其實晚 23.7 秒的字幕被拿來當參考。
+**When the reference subtitles themselves are not synced.** The result always follows the reference subtitles (the user picked them); but when speech data exists, the reference subtitles are also aligned to the film's speech (no splitting). If they would move more than 1 second and the fit improves by 3 percentage points or more, `reference.offBy` reports how many seconds off they are, and the workbench warns the user. During dev environment QA, a subtitle track marked confirmed but actually 23.7 seconds late really was used as a reference.
 
-**和電影無關的句子。** 開頭結尾常有「字幕：某某」「www.…」這類句子：
+**Lines unrelated to the film.** The beginning and end often have lines like "字幕：某某" (Subtitles: so-and-so) or "www.…":
 
-1. 兩端各 10 句內、看起來像製作資訊的句子（網址、@、字幕、翻譯、校對、時間軸、subtitle、synced、opensubtitles、yify 等字）**不參與計算**，套用時跟著它所在的分段走。
-2. 計算出來的分段，最前或最後一段不到 4 句時併進旁邊的段：那麼短又在兩端，是製作資訊或雜訊，不是剪輯。
-3. 對齊之後，兩端各 10 句內、前後 1 秒都沒有參考句子、而且看起來像製作資訊或離參考字幕的每一句都超過 20 秒的句子，放在結果的 `extraLines`（句子的 `id`）。工作台**問使用者**要不要刪（一個可以復原的動作），不會自己刪。
+1. Lines within 10 lines of either end that look like credits (URLs, @, 字幕, 翻譯, 校對, 時間軸 (subtitles, translation, proofreading, timing), subtitle, synced, opensubtitles, yify and similar words) **do not take part in the computation**, and when applied they follow the segment they are in.
+2. In the computed segments, a first or last segment with fewer than 4 lines is merged into its neighbor: something that short at an end is credits or noise, not a cut.
+3. After aligning, lines within 10 lines of either end that have no reference line within 1 second before or after, and that look like credits or are more than 20 seconds from every reference line, are put in the result's `extraLines` (line `id`s). The workbench **asks the user** whether to delete them (an undoable action); it never deletes them on its own.
 
-**在測試素材上的結果**（`reference.test.ts`，以及手動的 `apps/server/scripts/reference-eval.mts`）：
+**Results on the test fixtures** (`reference.test.ts`, and the manual `apps/server/scripts/reference-eval.mts`):
 
-- 合成的 21.5 分鐘測試片，以 `truth` 當參考：影格率不同加兩句製作資訊、剪輯、每句拆成兩句、每兩句併成一句，都在 0.2 秒以內，兩句製作資訊都被找出來。
-- Tears of Steel 的英文字幕當參考，法文、德文、俄文字幕各弄錯四種（晚 2.4 秒、晚 47 秒、影格率不同、剪輯）加兩句製作資訊：12 次都在 0.03 秒以內。再把目標字幕的每句時間隨機抖動 ±0.4 秒、隨機拆句併句（`MESSY=1`）：都在 0.5 秒以內，製作資訊都被找出來，剪輯也找到。每次不到 1 秒。
+- The synthetic 21.5-minute test film with `truth` as the reference: different frame rate plus two credit lines, a cut, every line split in two, every two lines merged into one, all within 0.2 seconds, and both credit lines found.
+- Tears of Steel's English subtitles as the reference, French, German and Russian subtitles each made wrong in four ways (2.4 seconds late, 47 seconds late, different frame rate, cut) plus two credit lines: all 12 runs within 0.03 seconds. Then every line of the target subtitles randomly jittered by ±0.4 seconds, with random splits and merges (`MESSY=1`): all within 0.5 seconds, credit lines all found, and the cut also found. Each run under 1 second.
 
-## 封裝（`export.mux`）
+## Packing (`export.mux`)
 
-### 建立匯出時（`api`）
+### When an export is created (`api`)
 
-1. 驗證：每條字幕都是已確認的；恰好一條是預設軌；檔名合法。
-2. 估計大小：`media_files.size_bytes × 1.01 + 1 MB`（就是 `Workspace.exportNeedBytes`；算式只寫在 `packages/shared` 的 `exportNeedBytes()`，1 MB 是 1,048,576 位元組，乘完的小數無條件進位）。在交易裡 `storage_admit`。
-3. 通過後，**當場**把每條字幕套用同步文件並寫成最終的 SRT：`applyDoc` → `toSrt`，存在 `/data/exports/<id>/tracks/<n>.srt`（UTF-8）。這樣之後字幕被修改或刪除都不影響這次匯出。
-4. 建立 `exports`（`queued`）和 `tasks` 的列，`NOTIFY paiban_media`。更新這部片的 `last_used_at`。
+1. Validate: every subtitle track is confirmed; exactly one is the default track; the file name is valid.
+2. Estimate the size: `media_files.size_bytes × 1.01 + 1 MB` (this is `Workspace.exportNeedBytes`; the formula is written only in `exportNeedBytes()` in `packages/shared`, 1 MB is 1,048,576 bytes, and any fraction after multiplying is rounded up). `storage_admit` in a transaction.
+3. Once admitted, **right away** apply each subtitle track's sync doc and write the final SRT: `applyDoc` → `toSrt`, saved at `/data/exports/<id>/tracks/<n>.srt` (UTF-8). This way, later edits to or deletion of the subtitles do not affect this export.
+4. Create the `exports` (`queued`) and `tasks` rows, `NOTIFY paiban_media`. Update this film's `last_used_at`.
 
-`toSrt` 的規則：刪除的句子不輸出、負的時間夾到 0、每句至少 0.2 秒、依開始時間排序、從 1 重新編號。
+`toSrt` rules: deleted lines are not output, negative times are clamped to 0, each line lasts at least 0.2 seconds, lines are sorted by start time and renumbered from 1.
 
-### 工作本身（`media`）
+### The job itself (`media`)
 
 ```bash
 ffmpeg -v error -nostdin -y -progress pipe:1 -nostats \
@@ -411,141 +411,143 @@ ffmpeg -v error -nostdin -y -progress pipe:1 -nostats \
   -f matroska "$OUT.part" && mv "$OUT.part" "$OUT"
 ```
 
-每個選項的理由，都是實測過的：
+(`片名 (年份)` is a placeholder for "Title (Year)".)
 
-| 選項 | 理由 |
+The reason for each option, all tested:
+
+| Option | Reason |
 | --- | --- |
-| `-c copy` | 影像和聲音的封包雜湊和原檔完全相同，畫質不變，速度只受磁碟限制 |
-| `-map 0:V`（大寫） | 只取真正的影像軌。小寫的 `0:v` 會把封面圖也當成第二條影像軌封進去 |
-| `-map 0:a?` | 全部聲音軌；問號讓沒有聲音軌的來源也能封裝 |
-| 不映射原檔的字幕軌 | 原檔內嵌的字幕不帶過去，MKV 裡只有使用者確認過的 |
-| `-metadata title=` | 下載來的檔案，容器標題常是廣告字串 |
-| 預設軌排第一個並設 `default` | 播放器會自動顯示它 |
-| `.part` 再改名 | 看得到正式檔名的檔案一定是完整的 |
+| `-c copy` | Video and audio packet hashes are identical to the original, quality is unchanged, and speed is limited only by the disk |
+| `-map 0:V` (uppercase) | Takes only real video tracks. Lowercase `0:v` would also pack the cover art as a second video track |
+| `-map 0:a?` | All audio tracks; the question mark lets sources without an audio track be packed too |
+| The original file's subtitle tracks are not mapped | Subtitles embedded in the original are not carried over; the MKV contains only subtitles the user confirmed |
+| `-metadata title=` | In downloaded files, the container title is often an ad string |
+| Default track first, with `default` set | Players show it automatically |
+| `.part`, then rename | A file visible under its final name is always complete |
 
-語言標籤：
+Language tags:
 
-| 字幕的語言 | `language` | `title` |
+| Subtitle language | `language` | `title` |
 | --- | --- | --- |
-| `zh-Hant`、`zh` | `chi` | 繁體中文 |
+| `zh-Hant`, `zh` | `chi` | 繁體中文 |
 | `zh-Hans` | `chi` | 简体中文 |
 | `en` | `eng` | English |
-| 其他 | 對應的三字母碼（`jpn`、`kor`……），沒有對應的 `und` | 那個語言自己的名稱（日本語），沒有對應的寫原本的語言代碼 |
+| Other | The matching three-letter code (`jpn`, `kor`, …), `und` if there is none | The language's own name (日本語), or the original language code if there is none |
 
-ffmpeg 只能寫三個字母的語言碼，所以繁簡靠 `title` 區分。上面是介面用繁體中文的人匯出時的標題；介面用英文的人匯出時，標題是英文的語言名稱（Traditional Chinese、Simplified Chinese、English、Japanese……；`zh` 也是 Traditional Chinese），建立匯出時就寫進 `exports.tracks`（Brian，2026-10-08）。這些標題是寫進檔案裡的字串，不是介面文案。
+ffmpeg can only write three-letter language codes, so Traditional and Simplified are told apart by `title`. The above are the titles when someone with a Traditional Chinese interface exports; when someone with an English interface exports, the titles are English language names (Traditional Chinese, Simplified Chinese, English, Japanese, …; `zh` is also Traditional Chinese), written into `exports.tracks` when the export is created (Brian, 2026-10-08). These titles are strings written into the file, not interface copy.
 
-**時間**：原檔的聲音常有一點負的起始時間（AAC 的編碼延遲）。封裝成 MKV 時 ffmpeg 會把**所有**軌一起往後挪同樣的量（測試片段是 46 毫秒），字幕也一起挪，所以影像、聲音、字幕之間的相對時間不變。不需要、也不應該自己去補這個量。
+**Timing**: the original audio often has a slightly negative start time (AAC encoder delay). When packing into MKV, ffmpeg shifts **all** tracks later by the same amount (46 milliseconds for the test clip), subtitles included, so the relative timing of video, audio and subtitles is unchanged. There is no need to compensate for this amount yourself, and you should not.
 
-**做完之後檢查一次**：用 ffprobe 看輸出檔（還是 `.part` 的時候，檢查過才改名），影像軌數（不算封面圖，和 `0:V` 一樣）、聲音軌數要和原檔相同，字幕軌數要等於要求的數量。不對就當成失敗（`VERIFY_FAILED`）。
+**Check once when done**: use ffprobe on the output file (while it is still `.part`; rename only after the check): the number of video tracks (not counting cover art, same as `0:V`) and audio tracks must match the original, and the number of subtitle tracks must equal the number requested. Otherwise it counts as a failure (`VERIFY_FAILED`).
 
-**佇列**：封裝在 `media` 裡是獨立的一條佇列，同時只跑一個，和預覽資產、分析互不等待。進度從 `-progress` 的 `out_time_us` 除以片長算，每 2 秒最多寫一次 `exports.progress` 和 `tasks.progress`，並 `NOTIFY`（`export`）。完成和失敗的通知帶片名、版本、檔名（失敗另帶代碼），`link` 指向那部片工作區的匯出分頁。
+**Queue**: packing is a separate queue in `media`, running only one at a time, and it does not wait on preview assets or analysis, nor they on it. Progress is computed from `-progress`'s `out_time_us` divided by the duration, writing `exports.progress` and `tasks.progress` at most every 2 seconds, with `NOTIFY` (`export`). Completion and failure notifications carry the film title, version and file name (plus the code on failure), and `link` points to the Export tab of that film's workspace.
 
-### 結束的四種情況
+### Four ways it ends
 
-| 情況 | 處理 |
+| Case | Handling |
 | --- | --- |
-| 電影在途中被移除 | `torrent` 在刪除的交易裡把這筆匯出標成 `failed`（`SOURCE_MISSING`）、預留歸零、通知建立者。封裝工作在下一次檢查時發現自己那一列不再是 `running`：終止 ffmpeg，刪掉 `.part` 和 `tracks/`。不會再試 |
-| 完成 | `state = 'done'`、寫入實際的 `size_bytes`、`reserved_bytes` 歸零、刪掉 `tracks/`、通知建立者（`export.completed`） |
-| 失敗（兩次嘗試都失敗之後） | 刪掉 `.part` 和 `tracks/`，`state = 'failed'`、`error_code`、`reserved_bytes` 歸零，通知建立者（`export.failed`）。第一次失敗時 `tracks/` 和預留量都留著，給第二次嘗試用 |
-| 被取消（`cancel_requested`） | 終止 ffmpeg，刪掉 `.part` 和 `tracks/`，刪掉 `exports` 那一列 |
+| The film is removed midway | `torrent`, in the deletion transaction, marks this export `failed` (`SOURCE_MISSING`), sets the reservation to zero and notifies the creator. At its next check the packing job finds its row is no longer `running`: kills ffmpeg, deletes `.part` and `tracks/`. Not retried |
+| Done | `state = 'done'`, write the actual `size_bytes`, set `reserved_bytes` to zero, delete `tracks/`, notify the creator (`export.completed`) |
+| Failed (after both attempts fail) | Delete `.part` and `tracks/`, `state = 'failed'`, `error_code`, set `reserved_bytes` to zero, notify the creator (`export.failed`). After the first failure, `tracks/` and the reservation are kept for the second attempt |
+| Cancelled (`cancel_requested`) | Kill ffmpeg, delete `.part` and `tracks/`, delete the `exports` row |
 
-失敗的代碼（`ExportErrorCode`）：
+Failure codes (`ExportErrorCode`):
 
-| 代碼 | 意思 |
+| Code | Meaning |
 | --- | --- |
-| `SOURCE_MISSING` | 來源的影片檔不見了，或這部電影在封裝途中被刪除 |
-| `MUX_FAILED` | ffmpeg 失敗 |
-| `VERIFY_FAILED` | 做完之後的檢查沒過 |
-| `DISK_FULL` | 磁碟寫滿了 |
+| `SOURCE_MISSING` | The source video file is gone, or the film was deleted during packing |
+| `MUX_FAILED` | ffmpeg failed |
+| `VERIFY_FAILED` | The check after completion did not pass |
+| `DISK_FULL` | The disk is full |
 
-失敗的匯出留在清單上讓人看到原因，使用者可以刪掉它，或直接重新建立一個。它不能「重試」：當初暫存的字幕軌已經清掉，字幕也可能在那之後改過。
+A failed export stays on the list so people can see why; the user can delete it or simply create a new one. It cannot be "retried": the temporarily saved subtitle tracks have already been cleaned up, and the subtitles may have changed since.
 
-## 工作的共通規矩
+## Common rules for jobs
 
-- **看得到的工作在 `tasks` 有一列**：分析、預覽資產、對齊、排名、匯出、重新計算。開始、進度、結束都更新它，並 `NOTIFY`（`task`）。誰建立這一列，見下面的表。
-- **先認領。** 處理函式一開始用帶條件的更新，把對應的列從「等待中」改成「進行中」（同時確認那個下載的 `want` 不是 `remove`）。改不到就直接結束：這件事已經有人在做，或已經不需要了。
-- **執行中每 2 秒確認一次**：對應的列還在、狀態還是「進行中」、那個下載的 `want` 不是 `remove`、匯出的 `cancel_requested` 不是 true。不成立就終止子程序、清掉自己的半成品、把自己那一列 `tasks` 標成 `cancelled`（還沒被標的話）、結束。
-- **寫出檔案前再確認一次。** 建立資料夾、把 `.part` 改名之前再看一次同樣的條件。
-- **做完的那一筆更新要帶條件。** 把狀態改成完成時，條件寫在同一個敘述裡：那一列還在、狀態還是它認領時的「進行中」、那個下載的 `want` 不是 `remove`。改不到就表示東西在途中被刪了、正在被刪、或被取消了：把自己剛寫出來的檔案刪掉（它建立的資料夾空了也一併刪掉），結束。這一條讓「刪除」不需要等任何工作停下來（[03-data-model.md](03-data-model.md)）。
-- 子程序一律用陣列形式的參數啟動，不經過 shell。檔案路徑都來自資料庫，不來自請求。
-- 大的產出（預覽影片、聲音檔、匯出檔）先寫 `.part`，完成才改名。字幕和候選的小檔案在工作目錄裡備好再整個資料夾搬過去（[02-architecture.md](02-architecture.md) 的「磁碟配置」）。
-- **失敗的工作自動再試一次，總共兩次。** 第一次失敗：清掉自己的半成品，那一列回到「等待中」，預留量和 `tracks/` 都不動；同一列 `tasks` 也回到 `queued`，`attempts` 加 1。下一次對帳會把它重新排進去。第二次也失敗（`attempts` 已經是 1）才算真的失敗：狀態改成 `failed`、記下錯誤代碼、釋出預留量。程式被重啟不算失敗，不加 `attempts`。這個計數是一列 `tasks` 一個：預覽資產的工作不管是聲音檔還是預覽影片失敗，都是整個工作再試一次（已經做好的那一樣不會重做）。
-- **不自動再試的：**
-  - 前景的對齊（`subtitle.align`）、字幕的查詢和抓檔：使用者自己再按一次比較快。
-  - 排名裡的一條候選（`subtitle.rank`）：失敗就記成失敗，排名繼續做下一條。
-  - 探測的結果是「讀不了」（`PROBE_FAILED`）或「沒有聲音軌」（`NO_AUDIO`）：再試也一樣，直接記下來。只需要探測的工作沒有 `tasks` 的列，也就沒有計數；它失敗一次就是失敗。
-  - 來源的電影已經不在的匯出（`SOURCE_MISSING`）。
-- **`media` 程式啟動時**：清空 `/data/tmp/work`；刪掉 `/data/media` 和 `/data/exports` 底下殘留的 `*.part`（那是上次沒寫完的半成品，不是任何人的檔案）；把停在「進行中」的東西改回「等待中」（下一節的表）；做一次對帳。
+- **Visible jobs have a row in `tasks`**: analysis, preview assets, alignment, ranking, export, recount. Start, progress and end all update it, with `NOTIFY` (`task`). Who creates the row: see the table below.
+- **Claim first.** At the start, the handler uses a conditional update to change the corresponding row from "waiting" to "running" (also checking that the download's `want` is not `remove`). If it updates nothing, finish right away: someone is already doing this, or it is no longer needed.
+- **Check every 2 seconds while running**: the corresponding row still exists, its state is still "running", the download's `want` is not `remove`, and the export's `cancel_requested` is not true. If any fails, kill the child process, clean up its own partial output, mark its own `tasks` row `cancelled` (if not already marked) and finish.
+- **Check again before writing files.** Check the same conditions again before creating folders or renaming `.part`.
+- **The final update must be conditional.** When setting the state to done, put the conditions in the same statement: the row still exists, its state is still the "running" it claimed, and the download's `want` is not `remove`. If it updates nothing, the thing was deleted midway, is being deleted, or was cancelled: delete the files it just wrote (and the folders it created, if now empty) and finish. This rule means "delete" never has to wait for any job to stop ([03-data-model.md](03-data-model.md)).
+- Child processes are always started with arguments as an array, never through a shell. File paths always come from the database, never from the request.
+- Large outputs (preview video, audio file, export) are written to `.part` first and renamed when complete. Small files for subtitles and candidates are prepared in the work directory and the whole folder is moved over ("Disk layout" in [02-architecture.md](02-architecture.md)).
+- **A failed job is retried once automatically, two attempts in total.** First failure: clean up its own partial output, the row returns to "waiting", the reservation and `tracks/` are left alone; the same `tasks` row also returns to `queued`, with `attempts` incremented by 1. The next reconciliation queues it again. Only when the second attempt also fails (`attempts` is already 1) is it really failed: the state becomes `failed`, the error code is recorded and the reservation is released. A program restart does not count as a failure and does not increment `attempts`. The counter is one per `tasks` row: whether the audio file or the preview video fails, the whole preview asset job is retried once (whichever one is already done is not redone).
+- **Not retried automatically:**
+  - Foreground alignment (`subtitle.align`), subtitle lookups and fetches: it is faster for the user to press again.
+  - A single candidate in a ranking (`subtitle.rank`): a failure is recorded as a failure, and ranking moves on to the next one.
+  - A probe result of "cannot read" (`PROBE_FAILED`) or "no audio track" (`NO_AUDIO`): retrying gives the same result, so it is recorded directly. A probe-only job has no `tasks` row and so no counter; one failure is a failure.
+  - An export whose source film no longer exists (`SOURCE_MISSING`).
+- **When the `media` program starts**: empty `/data/tmp/work`; delete leftover `*.part` under `/data/media` and `/data/exports` (partial output from last time, not anyone's files); move anything stuck in "running" back to "waiting" (table in the next section); run one reconciliation.
 
-### 誰建立 `tasks` 的列
+### Who creates the `tasks` rows
 
-| 種類 | 誰、什麼時候 | `subject` |
+| Kind | Who, and when | `subject` |
 | --- | --- | --- |
-| `analyze`、`preview` | `media`，在對帳時替那一列排入工作的同時 | 片名、版本 |
-| `export` | `api`，建立匯出的時候 | 片名、檔名 |
-| `align` | `api`，收到「自動對齊」的請求時 | 片名、字幕的語言 |
-| `rank` | `api`，收到「全部自動對齊並排名」的請求時 | 片名 |
-| `rescan` | `api`，收到「重新計算用量」的請求時 | （空） |
+| `analyze`, `preview` | `media`, during reconciliation, at the same time it queues the job for that row | Film title, version |
+| `export` | `api`, when the export is created | Film title, file name |
+| `align` | `api`, when it receives an "Auto-align" request | Film title, subtitle language |
+| `rank` | `api`, when it receives an "Auto-align and rank all" request | Film title |
+| `rescan` | `api`, when it receives a "Recount usage" request | (empty) |
 
-`input` 記下這個工作是對誰做的（影片、字幕、匯出的 id，或排名的那批候選），對帳和重試都靠它。
+`input` records what the job is for (the id of the video, subtitle or export, or the batch of candidates for a ranking); reconciliation and retries rely on it.
 
-一列 `tasks` 變成 `cancelled` 的時機：它的對象被刪除或被取消了。電影被移除（`torrent` 在刪除的那個交易裡標；還沒做完的匯出是例外，它們的 `tasks` 標成 `failed`，見「結束的四種情況」）、預覽檔被管理員刪掉、匯出被取消或在排隊時被刪掉（`api` 標），或者工作自己發現對象不在了。
+When a `tasks` row becomes `cancelled`: its subject was deleted or cancelled. The film was removed (`torrent` marks it in the deletion transaction; unfinished exports are the exception, their `tasks` are marked `failed`, see "Four ways it ends"), the preview file was deleted by an administrator, the export was cancelled or deleted while queued (`api` marks it), or the job itself found its subject gone.
 
-## 對帳
+## Reconciliation
 
-`media` 在三個時機做對帳：啟動時、收到 `NOTIFY paiban_media` 時、每 60 秒。正在被刪除的片（`want = 'remove'`）一律跳過。
+`media` reconciles at three times: at startup, on receiving `NOTIFY paiban_media`, and every 60 seconds. Films being deleted (`want = 'remove'`) are always skipped.
 
-**啟動時，先把上次停在半路的東西復原**（只在啟動時做一次，在第一次對帳之前）：
+**At startup, first restore whatever stopped halfway last time** (done only once at startup, before the first reconciliation):
 
-| 上次停在 | 改成 |
+| Stopped at | Changed to |
 | --- | --- |
-| `media_files` 的 `probe_state`、`analysis_state`、`audio_state`、`proxy_state` 是 `running` | `pending` |
-| `exports.state = 'running'` | `queued`。但 `cancel_requested` 已經是 true 的（取消到一半被重啟）直接收掉：刪 `tracks/`、刪那一列、它的 `tasks` 標成 `cancelled` |
+| `media_files` with `probe_state`, `analysis_state`, `audio_state` or `proxy_state` `running` | `pending` |
+| `exports.state = 'running'` | `queued`. But one whose `cancel_requested` is already true (restarted midway through cancelling) is wrapped up directly: delete `tracks/`, delete the row, mark its `tasks` `cancelled` |
 | `subtitle_candidates.align_state = 'running'` | `queued` |
-| `tasks.state = 'running'`，種類是 `analyze`、`preview`、`export`、`rank`、`rescan` | `queued` |
-| `tasks` 裡還沒結束的 `align` | `failed`：等它的那個請求早就不在了 |
+| `tasks.state = 'running'`, kind `analyze`, `preview`, `export`, `rank`, `rescan` | `queued` |
+| Unfinished `align` in `tasks` | `failed`: the request waiting for it is long gone |
 
-**每次對帳做四件事：**
+**Each reconciliation does four things:**
 
-1. **替等待中的列排入工作。** 同一列已經有排隊中或進行中的工作就不再排。要建立 `tasks` 的那兩種，只在沒有還沒結束的同一種工作時才建立新的一列；有的話（第一次失敗之後回到 `queued` 的那一列）就沿用它。
+1. **Queue jobs for waiting rows.** If the same row already has a queued or running job, do not queue again. For the two kinds that create `tasks`, create a new row only when there is no unfinished job of the same kind; if there is one (the row that returned to `queued` after a first failure), reuse it.
 
-   | 情況 | 排入 |
+   | Case | Queue |
    | --- | --- |
-   | `probe_state = 'pending'`；或 `probe_state = 'ready'` 而且 `analysis_state = 'pending'` | `media.analyze`。`analysis_state` 是 `pending` 時建立一列 `analyze` 的 `tasks`；只需要探測時不建立 |
-   | `probe_state = 'ready'`，而且 `audio_state` 或 `proxy_state` 是 `pending` | `media.preview`，建立一列 `preview` 的 `tasks` |
+   | `probe_state = 'pending'`; or `probe_state = 'ready'` and `analysis_state = 'pending'` | `media.analyze`. When `analysis_state` is `pending`, create an `analyze` row in `tasks`; when only probing is needed, do not |
+   | `probe_state = 'ready'`, and `audio_state` or `proxy_state` is `pending` | `media.preview`, creating a `preview` row in `tasks` |
    | `exports.state = 'queued'` | `export.mux` |
-   | `rescan` 的 `tasks` 是 `queued` | `storage.rescan` |
-   | 還沒結束的排名裡，檔案已經抓好（`fetch_state = 'ready'`）而 `align_state = 'queued'` 的候選 | `subtitle.rank` |
+   | A `rescan` in `tasks` is `queued` | `storage.rescan` |
+   | In an unfinished ranking, candidates whose file has been fetched (`fetch_state = 'ready'`) and whose `align_state = 'queued'` | `subtitle.rank` |
 
-2. **結算排名。** 每一個還沒結束的 `rank`：看它那一批候選裡**現在還存在的**，數有結果的（`align_state` 是 `done` 或 `failed`，或 `fetch_state` 是 `failed`），更新進度；還存在的都有結果就標成 `done`。途中被使用者移除、或被新的搜尋結果取代的候選不算在內，否則排名會永遠等一條已經不存在的候選。`subtitle.rank` 的工作每做完一條候選也呼叫同一段邏輯，所以進度是即時的；移除候選和重新搜尋也會 `NOTIFY paiban_media`；對帳本身只是保底。
+2. **Settle rankings.** For each unfinished `rank`: among its batch of candidates, look at those that **still exist**, count those with a result (`align_state` is `done` or `failed`, or `fetch_state` is `failed`), and update progress; when all that still exist have a result, mark it `done`. Candidates removed by the user midway, or replaced by new search results, are not counted, otherwise the ranking would wait forever for a candidate that no longer exists. Each `subtitle.rank` job also calls the same logic after each candidate, so progress is live; removing candidates and searching again also send `NOTIFY paiban_media`; reconciliation itself is just the safety net.
 
-3. **處理卡住的候選。** `fetch_state = 'fetching'` 超過 10 分鐘的，改成 `failed`（`DOWNLOAD_FAILED`）；它如果在等排名，`align_state` 也改成 `failed`。
+3. **Handle stuck candidates.** Those with `fetch_state = 'fetching'` for more than 10 minutes are changed to `failed` (`DOWNLOAD_FAILED`); if it is waiting for a ranking, its `align_state` is also changed to `failed`.
 
-4. **收掉沒有對象的工作。** `tasks` 還沒結束、但它的對象已經不存在的，標成 `cancelled`。`export` 的工作看的是那一筆匯出還在不在 `queued` 或 `running`。
+4. **Wrap up jobs with no subject.** Unfinished `tasks` whose subject no longer exists are marked `cancelled`. For `export` jobs, what is checked is whether that export is still `queued` or `running`.
 
-對帳本身不刪任何檔案，也不依時間刪任何東西；第 3 項改的是狀態，不是檔案。
+Reconciliation itself deletes no files, and deletes nothing based on time; item 3 changes state, not files.
 
-## 手動重試
+## Manual retry
 
-系統狀態頁上失敗的工作有「重試」（`POST /api/admin/tasks/:id/retry`）。它做的事依種類不同：
+Failed jobs on the System status page have "Retry" (`POST /api/admin/tasks/:id/retry`). What it does depends on the kind:
 
-| 種類 | 重試做什麼 |
+| Kind | What retry does |
 | --- | --- |
-| `analyze` | 把 `analysis_state` 設回 `pending`，和 `POST /api/media/:id/analyze` 相同 |
-| `preview` | 和 `POST /api/media/:id/proxy` 相同：失敗的資產設回 `pending`。預留量在失敗時已經釋出，所以**要重新通過 admission** |
-| `rescan` | 再排一次 |
-| `align`、`rank`、`export` | 不能重試（`Task.retryable` 是 false，介面不顯示按鈕）。對齊由使用者在工作台再按一次；排名在字幕分頁按「重新排名」；匯出重新建立一個 |
+| `analyze` | Sets `analysis_state` back to `pending`, same as `POST /api/media/:id/analyze` |
+| `preview` | Same as `POST /api/media/:id/proxy`: failed assets are set back to `pending`. The reservation was released on failure, so **it must pass admission again** |
+| `rescan` | Queued once more |
+| `align`, `rank`, `export` | Cannot be retried (`Task.retryable` is false, and the interface shows no button). Alignment: the user presses again in the workbench; ranking: press "Rank again" on the Subtitles tab; export: create a new one |
 
-重試會產生一列新的 `tasks`；原本失敗的那一列留著當紀錄。分析和預覽資產的新工作是 `media` 在下一次對帳時建立的，所以端點回的是原本那一列（不變）；新的那一列隨 `admin` 事件出現在系統狀態頁。
+A retry creates a new `tasks` row; the original failed row is kept as a record. New analysis and preview asset jobs are created by `media` at the next reconciliation, so the endpoint returns the original row (unchanged); the new row appears on the System status page with an `admin` event.
 
-## 還沒驗證的
+## Not yet verified
 
-| 項目 | 風險 |
+| Item | Risk |
 | --- | --- |
-| 真實電影的人聲偵測品質（配樂、音效、多人同時講話） | 分數和自動對齊的準確度都取決於它。階段 0 要用一部合法的真實影片試 |
-| 兩種對齊方法在真實電影上的準確度 | 同上 |
-| 分數門檻 | 見上 |
-| 2160p HEVC 在目標機器上的轉檔速度 | 可能很慢。只影響預覽檔多久能用，不影響能不能同步 |
-| YTS 的 MP4 能不能在瀏覽器直接播（`moov` 的位置、5.1 聲道的 AAC） | 不能的話那些檔案也要走預覽檔。階段 0 第 7 項用開放電影做出來的類似檔案確認；真的 YTS 檔案要等 Brian 實際使用時才會遇到 |
-| 用 `mkvpropedit` 補上 BCP 47 語言標籤（`zh-TW`） | 沒試過，列為可選的改進 |
-| pg-boss 12 的去重鍵、重試、並行設定的確切寫法 | 這份文件只描述需要的行為。做法以它的文件為準 |
+| Speech detection quality on real films (music, sound effects, several people talking at once) | The accuracy of the score and auto-align depends on it. Phase 0 should try it with a legally obtained real film |
+| Accuracy of both alignment methods on real films | Same as above |
+| Score thresholds | See above |
+| 2160p HEVC transcoding speed on the target machine | May be very slow. Only affects how soon the preview file is available, not whether syncing is possible |
+| Whether YTS MP4s play directly in the browser (`moov` position, 5.1-channel AAC) | If not, those files also need a preview file. Phase 0 item 7 checks this with similar files made from open movies; real YTS files will only be encountered when Brian actually uses it |
+| Adding a BCP 47 language tag (`zh-TW`) with `mkvpropedit` | Not tried; listed as an optional improvement |
+| The exact way to configure dedup keys, retries and concurrency in pg-boss 12 | This document only describes the required behavior. Its documentation is authoritative for how to do it |

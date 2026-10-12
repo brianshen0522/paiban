@@ -57,7 +57,7 @@ const worker = new TorrentWorker({
   home: homeCountry(process.env.TZ),
 });
 await worker.recover();
-// Magnet links someone is adding by hand: their metadata is fetched here (docs/06, "手動加入").
+// Magnet links someone is adding by hand: their metadata is fetched here (docs/06, "Adding by hand").
 const inspector = new Inspector(pool, engine, config, log);
 await inspector.recover();
 const stopHeartbeat = startHeartbeat(pool, 'torrent', () => ({

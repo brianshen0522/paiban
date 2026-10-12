@@ -1,81 +1,81 @@
-# 部署
+# Deployment
 
-從零裝起拍板、日常更新、備份和搬家。所有指令都在 repo 的根目錄執行。
+Installing Paiban (拍板) from scratch, routine updates, backups and moving. All commands are run from the repo's root directory.
 
-## 需要什麼
+## What you need
 
-| 項目 | 需求 |
+| Item | Requirement |
 | --- | --- |
-| 機器 | x86-64 的 Linux（ARM 還沒驗證過）。CPU 至少 2 核；語音辨識在 2010 年的 Xeon X5650 上每部片約 1 到 3 分鐘，新一點的 CPU 快很多 |
-| 記憶體 | 4 GB 以上。轉檔和語音辨識同時跑時約用 2 GB |
-| 磁碟 | 放電影的地方（`DATA_PATH`）要夠大，而且整個是**同一個檔案系統**（下載完成時檔案是搬過去的，不是複製）。映像檔本身約 3 GB |
-| 軟體 | Docker 與 Compose v2（`docker compose version` 能執行） |
-| 網路 | 能連到 YTS、字幕來源和（有設定的話）語言模型的服務。BitTorrent 的連入埠能開最好，不開也能下載，只是比較慢 |
+| Machine | x86-64 Linux (ARM hasn't been verified). At least 2 CPU cores; speech recognition takes about 1 to 3 minutes per film on a 2010 Xeon X5650, and much less on newer CPUs |
+| Memory | 4 GB or more. Transcoding and speech recognition running at the same time use about 2 GB |
+| Disk | The place for films (`DATA_PATH`) must be big enough, and all on **one file system** (finished downloads are moved there, not copied). The image itself is about 3 GB |
+| Software | Docker and Compose v2 (`docker compose version` runs) |
+| Network | Can reach YTS, the subtitle sources and (if configured) the language model services. Best if the BitTorrent incoming port can be opened; downloads work without it, just slower |
 
-## 第一次安裝
+## First install
 
 ```bash
 cp deploy/.env.example deploy/.env
-openssl rand -hex 24      # 貼到 POSTGRES_PASSWORD
-openssl rand -base64 32   # 貼到 SECRET_KEY
-# 編輯 deploy/.env：PUBLIC_URL、BOOTSTRAP_ADMIN_USERNAME、BOOTSTRAP_ADMIN_PASSWORD，其他照需要改
+openssl rand -hex 24      # paste into POSTGRES_PASSWORD
+openssl rand -base64 32   # paste into SECRET_KEY
+# Edit deploy/.env: PUBLIC_URL, BOOTSTRAP_ADMIN_USERNAME, BOOTSTRAP_ADMIN_PASSWORD; change the rest as needed
 
-mkdir -p deploy/data      # 一定要先建好，否則 Docker 會用 root 建立，服務寫不進去
+mkdir -p deploy/data      # must be created first, otherwise Docker creates it as root and the services can't write to it
 docker compose -f deploy/docker-compose.yml build
 docker compose -f deploy/docker-compose.yml up -d
-docker compose -f deploy/docker-compose.yml ps    # 五個容器都是 Up，api 是 healthy
+docker compose -f deploy/docker-compose.yml ps    # all five containers are Up, and api is healthy
 ```
 
-打開 `PUBLIC_URL`，用 `BOOTSTRAP_ADMIN_USERNAME` / `BOOTSTRAP_ADMIN_PASSWORD` 登入，**馬上到「個人設定」改密碼**。之後可以把那兩行從 `.env` 刪掉（只在使用者資料表是空的時候才會用到）。
+Open `PUBLIC_URL`, sign in with `BOOTSTRAP_ADMIN_USERNAME` / `BOOTSTRAP_ADMIN_PASSWORD`, and **go to "Profile" right away to change the password**. Afterwards you can delete those two lines from `.env` (they are only used when the users table is empty).
 
-`deploy/.env` 有密碼和金鑰，不要進版本控制（`.gitignore` 已經排除），也不要貼到任何地方。
+`deploy/.env` holds passwords and keys. Keep it out of version control (`.gitignore` already excludes it), and don't paste it anywhere.
 
-### 登入之後要設定的
+### What to set up after signing in
 
-管理員選單的「來源設定」：
+"Sources" in the admin menu:
 
-1. **YTS 網址**：填目前能用的網域，按「測試」。YTS 常換網域，搜尋頁壞了先來這裡看。
-2. **TMDB 金鑰**（免費申請）：JustSubtitles 和射手網的搜尋需要。
-3. **射手網 token**（要中文字幕的話）。
-4. **自動對齊**：語音辨識預設開著。字幕和片中語言不同（例如英文片配中文字幕）時要用語言模型，選 Claude 或 OpenAI 相容的服務（通義千問、Ollama…），填金鑰，按「測試模型」確認。不設定也能用，只是不同語言的字幕只能靠人聲偵測對齊。
+1. **YTS address**: enter a domain that currently works and press "Test". YTS changes domains often; if the Search page breaks, look here first.
+2. **TMDB key** (free to get): needed for searching JustSubtitles and Assrt (Shooter).
+3. **Assrt token** (if you want Chinese subtitles).
+4. **Language models**: speech recognition is on by default. When the subtitles and the film are in different languages (e.g. an English film with Chinese subtitles), auto-align needs a language model, and so does subtitle translation: in "LLM settings", add a profile (OpenAI, Anthropic, Azure, OpenRouter, Ollama or a self-hosted OpenAI-compatible service), enter the key if it has one, and press "Test" to check (see [18-llm.md](18-llm.md)). Everything else works without it; subtitles in a different language can then only be aligned by speech detection, and nothing can be translated.
 
-「下載設定」看一下同時下載數、限速和做種方式；「儲存空間管理」設定容量上限。
+Take a look at concurrent downloads, speed limits and seeding in "Download settings"; set the storage limit in "Storage management".
 
-邀請其他人：「使用者與邀請」產生邀請連結，傳給對方自己註冊。
+Inviting others: "Users & invites" makes an invite link; send it to the person so they can register themselves.
 
-## `.env` 的每一項
+## Every item in `.env`
 
-| 變數 | 必填 | 說明 |
+| Variable | Required | Description |
 | --- | --- | --- |
-| `POSTGRES_PASSWORD` | 是 | 資料庫密碼。只用英數字（它會被放進連線網址） |
-| `SECRET_KEY` | 是 | 加密管理員輸入的金鑰。之後改掉的話，已存的金鑰都要重新輸入 |
-| `PUBLIC_URL` | 是 | 大家在瀏覽器打的網址，邀請和重設密碼的連結用它。網站只接受從這個網址（或請求本身的主機）送來的寫入 |
-| `BOOTSTRAP_ADMIN_USERNAME`、`BOOTSTRAP_ADMIN_PASSWORD` | 第一次 | 第一個管理員。使用者資料表是空的時候才建立 |
-| `SITE_ADDRESS` | | `:80`：純 HTTP。填網域名稱：Caddy 自己申請、更新憑證（見下面的 HTTPS） |
-| `HTTP_PORT`、`HTTPS_PORT` | | 對外的埠，預設 8080、8443 |
-| `DATA_PATH` | | 電影、預覽檔、字幕、匯出放在主機的哪裡，預設 `./data`（相對於 `deploy/`） |
-| `STORAGE_LIMIT_GB` | | 容量上限的**初始值**。之後在儲存空間管理改，這一項不再讀 |
-| `STORAGE_RESERVE_GB` | | 磁碟上永遠留下的空間，預設 2 |
-| `TORRENT_PORT`、`TORRENT_DHT_PORT` | | BitTorrent 的連入埠，預設 51413（TCP 和 UDP）、51414（UDP） |
-| `PUID`、`PGID` | | 擁有 `DATA_PATH` 的使用者和群組（`id` 看得到），預設 1000 |
-| `TZ` | | 時區，預設 `Asia/Taipei` |
-| `LOG_LEVEL` | | `debug`、`info`、`warn`、`error`，預設 `info` |
-| `TMDB_KEY`、`ASSRT_TOKEN`、`SUBDL_KEY` | | 只給開發時手動檢查來源的腳本用。網站本身用的金鑰在管理頁輸入，不讀這幾項 |
+| `POSTGRES_PASSWORD` | Yes | Database password. Letters and digits only (it goes into the connection URL) |
+| `SECRET_KEY` | Yes | Encrypts the keys administrators enter. If you change it later, all stored keys must be entered again |
+| `PUBLIC_URL` | Yes | The address everyone types in the browser; invite and reset-password links use it. The site only accepts writes sent from this address (or the request's own host) |
+| `BOOTSTRAP_ADMIN_USERNAME`, `BOOTSTRAP_ADMIN_PASSWORD` | First time | The first administrator. Created only when the users table is empty |
+| `SITE_ADDRESS` | | `:80`: plain HTTP. A domain name: Caddy obtains and renews certificates itself (see HTTPS below) |
+| `HTTP_PORT`, `HTTPS_PORT` | | Public ports, default 8080, 8443 |
+| `DATA_PATH` | | Where on the host films, preview files, subtitles and exports go, default `./data` (relative to `deploy/`) |
+| `STORAGE_LIMIT_GB` | | The **initial value** of the storage limit. Change it later in Storage management; this item isn't read again |
+| `STORAGE_RESERVE_GB` | | Space always left free on the disk, default 2 |
+| `TORRENT_PORT`, `TORRENT_DHT_PORT` | | BitTorrent incoming ports, default 51413 (TCP and UDP), 51414 (UDP) |
+| `PUID`, `PGID` | | The user and group that own `DATA_PATH` (shown by `id`), default 1000 |
+| `TZ` | | Time zone, default `Asia/Taipei` |
+| `LOG_LEVEL` | | `debug`, `info`, `warn`, `error`, default `info` |
+| `TMDB_KEY`, `ASSRT_TOKEN`, `SUBDL_KEY` | | Only for the scripts that check sources by hand during development. The keys the site itself uses are entered on the admin pages; these items aren't read |
 
-## 開埠
+## Opening ports
 
-| 埠 | 協定 | 給誰 | 必要嗎 |
+| Port | Protocol | For whom | Required? |
 | --- | --- | --- | --- |
-| `HTTP_PORT`（8080） | TCP | 使用者的瀏覽器 | 是 |
-| `HTTPS_PORT`（8443） | TCP | 同上，用 Caddy 自己的 HTTPS 時 | 看做法 |
-| `TORRENT_PORT`（51413） | TCP、UDP | BitTorrent 的其他用戶 | 不必，但會快很多 |
-| `TORRENT_DHT_PORT`（51414） | UDP | DHT | 不必 |
+| `HTTP_PORT` (8080) | TCP | Users' browsers | Yes |
+| `HTTPS_PORT` (8443) | TCP | Same, when using Caddy's own HTTPS | Depends on the setup |
+| `TORRENT_PORT` (51413) | TCP, UDP | Other BitTorrent users | No, but much faster |
+| `TORRENT_DHT_PORT` (51414) | UDP | DHT | No |
 
-路由器上把這些埠轉到這台機器。「下載設定」的「連線」會顯示最近 24 小時有沒有外部連入。
+Forward these ports to this machine on the router. "Connection" in "Download settings" shows whether there were incoming connections from outside in the last 24 hours.
 
-## HTTPS 的兩種做法
+## Two ways to do HTTPS
 
-**一、讓 Caddy 自己來**（機器直接對外、有網域名稱）：
+**1. Let Caddy do it** (the machine faces the internet directly and has a domain name):
 
 ```
 SITE_ADDRESS=films.example.net
@@ -84,9 +84,9 @@ HTTP_PORT=80
 HTTPS_PORT=443
 ```
 
-網域的 DNS 要指到這台機器，80 和 443 要能從外面連到（憑證的驗證用）。
+The domain's DNS must point to this machine, and 80 and 443 must be reachable from outside (for certificate validation).
 
-**二、前面已經有反向代理**（Nginx、Traefik、Cloudflare Tunnel、群暉的反向代理…）：
+**2. There is already a reverse proxy in front** (Nginx, Traefik, Cloudflare Tunnel, Synology's reverse proxy…):
 
 ```
 SITE_ADDRESS=:80
@@ -94,9 +94,9 @@ PUBLIC_URL=https://films.example.net
 HTTP_PORT=8080
 ```
 
-前面的代理把 `https://films.example.net` 轉到 `http://這台機器:8080`。要保留 `Host` 標頭，而且**不要緩衝回應**（即時更新用的是 server-sent events；Nginx 要 `proxy_buffering off;`），上傳字幕要允許 25 MB 的請求。
+The proxy in front forwards `https://films.example.net` to `http://this-machine:8080`. It must keep the `Host` header and **must not buffer responses** (live updates use server-sent events; Nginx needs `proxy_buffering off;`), and must allow 25 MB requests for subtitle uploads.
 
-## 更新
+## Updating
 
 ```bash
 git pull
@@ -104,23 +104,23 @@ docker compose -f deploy/docker-compose.yml build
 docker compose -f deploy/docker-compose.yml up -d
 ```
 
-資料庫的結構在 `api` 啟動時自動更新（`apps/server/migrations/`，只會往前加）。下載程式在自己的容器裡，更新網站時進行中的下載會在重啟後接著下載；轉檔、辨識之類的背景工作會從頭再做一次。
+The database structure is updated automatically when `api` starts (`apps/server/migrations/`, which only ever add). The downloader runs in its own container; downloads in progress while the site is updated continue after the restart; background jobs such as transcoding and recognition start over from the beginning.
 
-## 備份
+## Backups
 
-要備份的是**資料庫和 `DATA_PATH` 兩樣，而且要同一個時間點**：只備其中一樣，還原後會對不起來（資料庫說有的檔案不在，或磁碟上的檔案沒人認得）。
+What needs backing up is **the database and `DATA_PATH`, both, from the same point in time**: back up only one and they won't match after a restore (files the database says exist are missing, or files on disk that nothing knows about).
 
 ```bash
 cd deploy
-docker compose stop torrent media                      # 停住會寫檔的服務，網站可以繼續開著
+docker compose stop torrent media                      # stop the services that write files; the site can stay up
 docker compose exec -T postgres pg_dump -U paiban -Fc paiban > paiban-$(date +%F).dump
-tar -C . -cf paiban-data-$(date +%F).tar data          # DATA_PATH 是別的地方的話改這裡
+tar -C . -cf paiban-data-$(date +%F).tar data          # change this if DATA_PATH is somewhere else
 docker compose start torrent media
 ```
 
-電影本身很大；不想備份電影的話，可以只備份資料庫加 `data/subtitles`、`data/exports`。之後用「儲存空間管理」的「重新計算」，系統會列出缺少的檔案（不會刪任何東西），那些電影再下載一次。
+The films themselves are big; if you don't want to back them up, you can back up only the database plus `data/subtitles` and `data/exports`. Afterwards, "Recount usage" in "Storage management" lists the missing files (it doesn't delete anything), and those films can be downloaded again.
 
-### 還原
+### Restoring
 
 ```bash
 cd deploy
@@ -133,29 +133,29 @@ docker compose exec -T postgres pg_restore -U paiban -d paiban < paiban-2026-10-
 docker compose up -d
 ```
 
-## 搬到另一台機器
+## Moving to another machine
 
-1. 在舊機器做一次上面的備份。
-2. 新機器裝好 Docker，把 repo 和 `deploy/.env` 複製過去（**`SECRET_KEY` 要一樣**，不然管理頁的金鑰要重新輸入）。`PUBLIC_URL` 變了就改。
-3. 照「還原」做。`DATA_PATH` 的擁有者要是 `PUID:PGID`（`chown -R 1000:1000 deploy/data`）。
-4. 登入後到「儲存空間管理」按「重新計算」，確認沒有缺少的檔案。
+1. Make a backup on the old machine as above.
+2. Install Docker on the new machine and copy the repo and `deploy/.env` over (**`SECRET_KEY` must be the same**, otherwise the keys on the admin pages must be entered again). Change `PUBLIC_URL` if it changed.
+3. Follow "Restoring". The owner of `DATA_PATH` must be `PUID:PGID` (`chown -R 1000:1000 deploy/data`).
+4. After signing in, go to "Storage management", press "Recount usage", and check that no files are missing.
 
-## 檢查和記錄
+## Checks and logs
 
 ```bash
 docker compose -f deploy/docker-compose.yml ps
-docker compose -f deploy/docker-compose.yml logs -f --tail=100 api      # 或 torrent、media、proxy
+docker compose -f deploy/docker-compose.yml logs -f --tail=100 api      # or torrent, media, proxy
 curl -s http://localhost:8080/api/health                                 # {"ok":true}
 ```
 
-管理員的「系統狀態」頁顯示四個服務是否在運作、背景任務和磁碟。記錄裡不會有密碼、金鑰或字幕內容。
+The administrators' "System status" page shows whether the four services are running, plus background tasks and the disk. Logs never contain passwords, keys or subtitle content.
 
-## 常見問題
+## Common questions
 
-| 狀況 | 原因和做法 |
+| Situation | Cause and fix |
 | --- | --- |
-| 從別台電腦打開網站，登入時說「發生錯誤」 | `PUBLIC_URL` 和實際打的網址不同，而且中間有代理改了 `Host`。把 `PUBLIC_URL` 改成大家實際用的網址 |
-| 服務一直重啟，記錄說 permission denied | `DATA_PATH` 被 Docker 用 root 建立了。`sudo chown -R 1000:1000 deploy/data`（換成你的 `PUID:PGID`） |
-| 搜尋頁說 YTS 連不上 | YTS 又換網域了。到「來源設定」改網址 |
-| 自動對齊結果寫「語言模型：金鑰被拒絕」 | 到「來源設定」的「自動對齊」重新輸入金鑰，按「測試模型」 |
-| 語音辨識一直顯示進行中 | 慢的 CPU 上每部片要幾分鐘，一次只辨識一部，其他片子排在後面。`docker compose logs media` 看得到 `speech recognised` 或失敗的原因。失敗不影響其他功能，只是自動對齊少一個依據 |
+| Opening the site from another computer, signing in says "Something went wrong" | `PUBLIC_URL` differs from the address actually typed, and a proxy in between changed `Host`. Change `PUBLIC_URL` to the address people actually use |
+| A service keeps restarting, and the log says permission denied | Docker created `DATA_PATH` as root. `sudo chown -R 1000:1000 deploy/data` (with your `PUID:PGID`) |
+| The Search page says it can't reach YTS | YTS changed domains again. Change the address in "Sources" |
+| The auto-align result says "Language model: Key rejected" | Edit the profile in "LLM settings", enter the key again and press "Test" |
+| Speech recognition keeps showing in progress | On a slow CPU each film takes a few minutes, and only one film is recognized at a time; the others wait in line. `docker compose logs media` shows `speech recognised` or the reason for failure. A failure doesn't affect other features; auto-align just has one less thing to go on |

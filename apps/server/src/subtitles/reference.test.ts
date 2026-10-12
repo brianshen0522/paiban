@@ -8,7 +8,7 @@ import { extraLines, referenceLines, referenceOffBy, referenceSpeech, referenceT
 type Cue = SyncCore.Cue;
 
 /**
- * Aligning one subtitle to another (docs/08, "依另一條字幕對齊") on the 21.5-minute synthetic film:
+ * Aligning one subtitle to another (docs/08, "Align by other subtitles") on the 21.5-minute synthetic film:
  * `truth` plays as the reference, aligned; the other subtitle is wrong in the usual ways and also
  * carries the things real subtitles do: credits at the start, lines split or joined differently.
  */

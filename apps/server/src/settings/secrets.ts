@@ -9,7 +9,7 @@ import { ApiError } from '../http/errors.js';
 import { parse, requireAdmin } from '../http/guards.js';
 
 /**
- * The three keys an administrator types in (docs/12-auth.md, "金鑰"; docs/13-settings.md, "金鑰"):
+ * The three keys an administrator types in (docs/12-auth.md, "Keys"; docs/13-settings.md, "Keys"):
  * AES-256-GCM with a key derived from SECRET_KEY, a random 12-byte nonce per value, the name as
  * associated data so a value cannot be moved to another name. Only the api has SECRET_KEY. The
  * API says whether a key is set and never what it is; values never reach a log.

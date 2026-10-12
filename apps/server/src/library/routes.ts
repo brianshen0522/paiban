@@ -53,7 +53,7 @@ const ListQuery = z.object({ scope: z.enum(['mine', 'all']).default('mine') });
 
 export function libraryRoutes(app: FastifyInstance, deps: Deps): void {
   /**
-   * Finished films the caller holds, analysing ones included (docs/11-pages.md, "片庫"); with
+   * Finished films the caller holds, analysing ones included (docs/11-pages.md, "Library (06, 25, 30)"); with
    * `scope=all`, every finished film on the site, for everyone (Brian, 2026-10-09).
    */
   app.get('/api/library', async (req): Promise<LibraryItem[]> => {
@@ -71,7 +71,7 @@ export function libraryRoutes(app: FastifyInstance, deps: Deps): void {
     return libraryItems(deps.pool, rows, user.id);
   });
 
-  /** Everything the workspace needs at once (docs/04-api.md, "片庫"). It never starts the analysis. */
+  /** Everything the workspace needs at once (docs/04-api.md, "Library"). It never starts the analysis. */
   app.get('/api/library/:torrentId', async (req): Promise<Workspace> => {
     const user = requireUser(req);
     const { torrentId } = parse(z.object({ torrentId: z.uuid() }), req.params);

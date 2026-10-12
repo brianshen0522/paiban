@@ -1,5 +1,5 @@
 /**
- * Workbench shortcuts (docs/09-sync-workbench.md, "快捷鍵"). Pure: the component turns a
+ * Workbench shortcuts (docs/09-sync-workbench.md, "Keyboard shortcuts"). Pure: the component turns a
  * KeyboardEvent into a KeyInput and runs what comes back.
  */
 

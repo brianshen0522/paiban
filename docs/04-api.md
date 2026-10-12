@@ -1,267 +1,266 @@
 # 04 API
 
-每個端點的請求和回應**形狀**寫在 `packages/shared/src/contracts/api.ts`（用 TypeScript 7 的 strict 模式檢查過）。這份文件說明每個端點的**行為**：誰能呼叫、做了什麼、會回哪些錯誤。兩邊要一起改；真的對不上時，行為以這份文件為準，形狀以合約為準。
+The request and response **shapes** of every endpoint are in `packages/shared/src/contracts/api.ts` (checked in TypeScript 7 strict mode). This document explains each endpoint's **behavior**: who may call it, what it does, and which errors it returns. The two are changed together; when they truly don't match, this document wins for behavior and the contract wins for shape.
 
-## 共通規則
+## Common rules
 
-- 所有端點都在 `/api` 底下，JSON，UTF-8。
-- 大小一律是整數位元組；時間是 ISO 8601 的 UTC 字串；片長、字幕時間是秒（浮點數）。把位元組變成「1.6 GB」是前端的事。
-- **API 不產生給人看的句子。** 它回代碼和資料（片名、檔名、版本名稱、數字），介面上的中文由前端依代碼組出來。唯一的自由文字是 `ApiError.message` 和 `Torrent.error.message`，都是英文，給 log 和管理員看，不直接顯示。
-- 登入狀態靠 cookie（細節在 [12-auth.md](12-auth.md)）。
-- 除了下面標「公開」的端點，其他都要登入；沒登入回 `401 UNAUTHENTICATED`。
-- 標「管理員」的端點，成員呼叫回 `403 FORBIDDEN`。
-- 標「持有人」的端點，呼叫者必須是那部片的持有人，否則回 `403 NOT_HOLDER`。**管理員也一樣**：他要處理別人的片，先把那個版本加入自己的片庫（`POST /api/torrents`）。字幕和影片的端點依它所屬的那部片檢查。管理員比成員多的只有三樣：`/api/admin/…`、全站的下載與匯出清單（`scope=all`）、任何人的匯出檔。
-- 正在被刪除的下載（`want = 'remove'`）對所有端點來說已經不存在：回 `404 NOT_FOUND`，清單裡也不列出。
-- 會改變資料的請求（`POST`、`PUT`、`PATCH`、`DELETE`）必須帶 `X-Requested-With: paiban` 標頭，並檢查 `Origin` 和 `PUBLIC_URL` 同源（或等於請求的 `Host`）；少了就回 `403 FORBIDDEN`。這是防跨站請求用的。有內容的請求另外要帶 `Content-Type: application/json`（上傳是 `multipart/form-data`）；沒有內容的請求（例如暫停、刪除）不需要 `Content-Type`。
-- `GET` 不改變資料。有兩個例外，都只是紀錄，不是使用者的資料：`sessions.last_seen_at` 和 `torrents.last_used_at`。
-- 請求內容不符合 schema 回 `422 VALIDATION`，`details.fields` 指出哪個欄位、什麼原因（原因是代碼，不是句子）。
-- 錯誤回應的形狀固定是 `ApiError`。
+- All endpoints are under `/api`, JSON, UTF-8.
+- Sizes are always integer bytes; times are ISO 8601 UTC strings; film lengths and subtitle times are seconds (floating point). Turning bytes into "1.6 GB" is the frontend's job.
+- **The API doesn't produce sentences for people to read.** It returns codes and data (film titles, file names, version names, numbers), and the frontend builds the interface text from the codes. The only free text is `ApiError.message` and `Torrent.error.message`, both in English, for logs and administrators, never shown directly.
+- Sign-in state is kept in a cookie (details in [12-auth.md](12-auth.md)).
+- Except for endpoints marked "Public" below, all require sign-in; without it they return `401 UNAUTHENTICATED`.
+- Endpoints marked "Administrator" return `403 FORBIDDEN` when a member calls them.
+- For endpoints marked "Holder", the caller must be a holder of that film, otherwise they return `403 NOT_HOLDER`. **Administrators too**: to work on someone else's film, they first add that version to their own library (`POST /api/torrents`). Subtitle and video endpoints are checked against the film they belong to. Administrators have only three things more than members: `/api/admin/…`, the site-wide download and export lists (`scope=all`), and anyone's exports.
+- A download being deleted (`want = 'remove'`) no longer exists for any endpoint: they return `404 NOT_FOUND`, and lists leave it out.
+- Requests that change data (`POST`, `PUT`, `PATCH`, `DELETE`) must carry the `X-Requested-With: paiban` header, and `Origin` is checked to be same-origin with `PUBLIC_URL` (or equal to the request's `Host`); otherwise they return `403 FORBIDDEN`. This is for cross-site request protection. Requests with a body must also carry `Content-Type: application/json` (uploads use `multipart/form-data`); requests without a body (for example pause, delete) don't need `Content-Type`.
+- `GET` doesn't change data. There are two exceptions, both only records, not users' data: `sessions.last_seen_at` and `torrents.last_used_at`.
+- A request body that doesn't match the schema returns `422 VALIDATION`, with `details.fields` saying which field and why (the reason is a code, not a sentence).
+- Error responses always have the shape `ApiError`.
 
-## 端點
+## Endpoints
 
-### 健康檢查
+### Health check
 
-| 端點 | 權限 | 行為 |
+| Endpoint | Access | Behavior |
 | --- | --- | --- |
-| `GET /api/health` | 公開 | 資料庫連得上就回 `{ok: true}`。給 compose 的 healthcheck 用，不透露其他資訊 |
+| `GET /api/health` | Public | Returns `{ok: true}` if the database is reachable. For compose's healthcheck; reveals nothing else |
 
-### 登入與帳號
+### Sign-in and accounts
 
-| 端點 | 權限 | 行為 |
+| Endpoint | Access | Behavior |
 | --- | --- | --- |
-| `POST /api/auth/login` | 公開 | 帳號不分大小寫。成功就建立 session 並設 cookie。帳密錯誤一律回 `INVALID_CREDENTIALS`，不區分是帳號還是密碼錯；帳號停用回 `ACCOUNT_DISABLED`；嘗試太多次回 `RATE_LIMITED` |
-| `POST /api/auth/logout` | 登入 | 刪除目前的 session |
-| `GET /api/auth/me` | 登入 | 目前的使用者、站名、上傳大小上限、檢查點數量、全站同時下載數。前端啟動時呼叫它來判斷有沒有登入 |
-| `GET /api/invites/:code` | 公開 | 註冊頁用來先檢查邀請碼。`INVITE_NOT_FOUND`、`INVITE_EXPIRED`、`INVITE_USED` |
-| `POST /api/auth/register` | 公開 | 用邀請碼建立帳號並直接登入。邀請碼在同一個交易裡標成已使用。`USERNAME_TAKEN`、三種邀請碼錯誤、`VALIDATION` |
-| `GET /api/auth/reset/:token` | 公開 | 檢查重設連結還有沒有效，回傳帳號名稱給頁面顯示。`RESET_INVALID` |
-| `POST /api/auth/reset/:token` | 公開 | 設定新密碼，連結失效，這個帳號的所有 session 全部登出 |
-| `PATCH /api/me` | 登入 | 改顯示名稱或偏好。`prefs.langs` 至少要有一個；`prefs.locale` 是介面語言，`'zh-TW'`、`'en'` 或 `null`（跟隨瀏覽器）；`prefs.posterRegion` 是海報的國家（`TW`、`HK`、`CN`、`US`、`JP`、`KR`，`null` 跟隨介面語言） |
-| `POST /api/me/password` | 登入 | 要帶目前的密碼（錯了回 `WRONG_PASSWORD`）。成功後其他裝置全部登出 |
-| `GET /api/me/sessions` | 登入 | 登入中的裝置。作業系統和瀏覽器的名稱從登入時的 User-Agent 推出來，推不出來是 null |
-| `DELETE /api/me/sessions/:id` | 登入 | 登出那台裝置。不能用來登出目前這台（用 logout）；硬要的話回 `VALIDATION` |
+| `POST /api/auth/login` | Public | Username is case-insensitive. On success, creates a session and sets the cookie. Wrong credentials always return `INVALID_CREDENTIALS`, without saying whether the username or the password was wrong; a disabled account returns `ACCOUNT_DISABLED`; too many attempts return `RATE_LIMITED` |
+| `POST /api/auth/logout` | Signed in | Deletes the current session |
+| `GET /api/auth/me` | Signed in | The current user, site name, upload size limit, number of checkpoints, site-wide concurrent downloads. The frontend calls it on startup to tell whether it is signed in |
+| `GET /api/invites/:code` | Public | Used by the registration page to check the invite code first. `INVITE_NOT_FOUND`, `INVITE_EXPIRED`, `INVITE_USED` |
+| `POST /api/auth/register` | Public | Creates an account with an invite code and signs in directly. The invite code is marked used in the same transaction. `USERNAME_TAKEN`, the three invite code errors, `VALIDATION` |
+| `GET /api/auth/reset/:token` | Public | Checks whether the reset link is still valid and returns the account name for the page to show. `RESET_INVALID` |
+| `POST /api/auth/reset/:token` | Public | Sets the new password, invalidates the link, and signs out all of this account's sessions |
+| `PATCH /api/me` | Signed in | Changes the display name or preferences. `prefs.langs` must have at least one entry; `prefs.locale` is the interface language, `'zh-TW'`, `'en'` or `null` (follow the browser); `prefs.posterRegion` is the poster country (`TW`, `HK`, `CN`, `US`, `JP`, `KR`; `null` follows the interface language) |
+| `POST /api/me/password` | Signed in | Must include the current password (`WRONG_PASSWORD` if wrong). On success, all other devices are signed out |
+| `GET /api/me/sessions` | Signed in | Signed-in devices. The operating system and browser names are derived from the User-Agent at sign-in; null when they can't be derived |
+| `DELETE /api/me/sessions/:id` | Signed in | Signs out that device. Can't be used to sign out the current one (use logout); trying anyway returns `VALIDATION` |
 
-### 搜尋
+### Search
 
-| 端點 | 權限 | 行為 |
+| Endpoint | Access | Behavior |
 | --- | --- | --- |
-| `GET /api/yts/movies` | 登入 | 轉呼叫 YTS 的 `list_movies`。沒有 `q` 時就是「最新上架」。每頁 24 部。結果快取 10 分鐘。還沒設定 YTS 的網址回 `YTS_NOT_CONFIGURED`，連不上回 `YTS_UNREACHABLE`，回應看不懂回 `YTS_BAD_RESPONSE`。每一部標上呼叫者有沒有（`mine`） |
-| `GET /api/yts/movies/:ytsId` | 登入 | 電影資料加上每個版本。簡介有兩份：`summary`（TMDB 的中文簡介，沒有時是 YTS 的英文簡介）和 `summaryEn`（YTS 的英文簡介，給英文介面）。每個版本附上：能不能直接播、要預留多少預覽空間、總共需要多少、現在放不放得下、系統裡是不是已經有人下載。同時回目前的用量。YTS 連不上而這部片有先前存下來的資料時照常回傳，`stale` 是 true，`fetchedAt` 是那份資料的時間；沒有存過才回 `YTS_UNREACHABLE` |
-| `GET /api/yts/movies/:ytsId/poster` | 登入 | 由伺服器向 TMDB（沒有時向 YTS）取海報再回傳。`region` 是哪一國的海報（`TW`、`HK`、`CN`、`US`、`JP`、`KR`，預設 `TW`；見 [05-yts.md](05-yts.md)「海報」）。片庫裡的電影從 `/data/posters` 讀。取不到回 404，前端改畫佔位海報 |
-| `GET /api/tmdb/suggest?q=` | 登入 | 打字時的建議（Brian，2026-10-06）：向 TMDB 搜尋電影（`language=zh-TW`，中文和原文片名都比對），最多 8 部，`{items: TmdbSuggestion[], available}`。沒有 TMDB 金鑰、或 TMDB 出錯時 `available: false`、清單是空的（不擋搜尋）。`q` 1 到 100 字。結果快取一天 |
-| `GET /api/tmdb/:tmdbId/yts` | 登入 | 點了建議之後：向 TMDB 要這部片的 IMDb 編號（`/3/movie/<id>/external_ids`，快取一個月），再用這個編號查 YTS（`query_term` 認得 IMDb 編號，結果快取一小時）。`{ytsId, imdbCode}`；YTS 沒有這部片時 `ytsId` 是 null，TMDB 也不知道 IMDb 編號時兩個都是 null |
-| `GET /api/tmdb/poster/:file` | 登入 | 建議清單的小海報，由伺服器向 `image.tmdb.org/t/p/w92/…` 取（D30）。檔名只接受 TMDB 海報路徑的樣子（`[\w-]+.jpg` 之類），其他回 `VALIDATION` |
+| `GET /api/yts/movies` | Signed in | Forwards to YTS's `list_movies`. Without `q`, it is "Recently added". 24 films per page. Results are cached for 10 minutes. Returns `YTS_NOT_CONFIGURED` when the YTS URL isn't set yet, `YTS_UNREACHABLE` when it can't connect, `YTS_BAD_RESPONSE` when the response can't be understood. Each film is marked with whether the caller has it (`mine`) |
+| `GET /api/yts/movies/:ytsId` | Signed in | Film data plus every version. There are two synopses: `summary` (TMDB's Chinese synopsis, or YTS's English synopsis when there is none) and `summaryEn` (YTS's English synopsis, for the English interface). Each version comes with: whether it plays directly, how much preview space to reserve, the total needed, whether it fits right now, and whether someone on the system has already downloaded it. Current usage is returned too. When YTS can't be reached and previously stored data exists for this film, it is returned as usual with `stale` true and `fetchedAt` the time of that data; only when nothing was stored does it return `YTS_UNREACHABLE` |
+| `GET /api/yts/movies/:ytsId/poster` | Signed in | The server fetches the poster from TMDB (or YTS when there is none) and returns it. `region` is which country's poster (`TW`, `HK`, `CN`, `US`, `JP`, `KR`, default `TW`; see "Posters" in [05-yts.md](05-yts.md)). Films in the library are read from `/data/posters`. Returns 404 when it can't be fetched, and the frontend draws a placeholder poster instead |
+| `GET /api/tmdb/suggest?q=` | Signed in | Suggestions while typing (Brian, 2026-10-06): searches TMDB for films (`language=zh-TW`, matching both Chinese and original titles), at most 8, `{items: TmdbSuggestion[], available}`. With no TMDB key, or when TMDB errors, `available: false` and the list is empty (search isn't blocked). `q` is 1 to 100 characters. Results are cached for a day |
+| `GET /api/tmdb/:tmdbId/yts` | Signed in | After a suggestion is clicked: asks TMDB for the film's IMDb id (`/3/movie/<id>/external_ids`, cached for a month), then looks it up on YTS by that id (`query_term` understands IMDb ids; results cached for an hour). `{ytsId, imdbCode}`; `ytsId` is null when YTS doesn't have the film, and both are null when TMDB doesn't know the IMDb id either |
+| `GET /api/tmdb/poster/:file` | Signed in | Small posters for the suggestion list, fetched by the server from `image.tmdb.org/t/p/w92/…` (D30). The file name is accepted only in the form of a TMDB poster path (something like `[\w-]+.jpg`); anything else returns `VALIDATION` |
 
-細節在 [05-yts.md](05-yts.md)。
+Details are in [05-yts.md](05-yts.md).
 
-### 下載
+### Downloads
 
-| 端點 | 權限 | 行為 |
+| Endpoint | Access | Behavior |
 | --- | --- | --- |
-| `POST /api/torrents` | 登入 | 見下方「接受下載」 |
-| `GET /api/torrents` | 登入 | `scope=mine`（預設）回自己持有的全部下載，不論狀態；`scope=all` 回全站的，只有管理員能用 |
-| `GET /api/torrents/:id` | 持有人 | |
-| `POST /api/torrents/:id/pause` | 持有人 | 只有 `queued`、`downloading` 能暫停，其他回 `TORRENT_STATE`。空間繼續保留 |
-| `POST /api/torrents/:id/resume` | 持有人 | 只有 `paused` 能繼續。回到佇列尾端 |
-| `POST /api/torrents/:id/retry` | 持有人 | 只有 `failed` 能重試。重新檢查空間：需求是完整大小加預覽預留，扣掉已經在磁碟上的殘留；不夠回 `STORAGE_LIMIT`。通過後回到佇列尾端，從已下載的部分接續 |
-| `POST /api/torrents/:id/hold` | 登入 | 加入別人已經下載的片（全站片庫的「加入我的片庫」）。不再問 YTS（這一列當初就是從 YTS 的結果或手動加入建立的）、不檢查空間、不佔空間（D21）。已經是持有人就直接回現況。正在刪除或不存在回 `NOT_FOUND`。回 `Torrent`，寫操作紀錄 `torrent.join` |
-| `DELETE /api/torrents/:id/hold` | 持有人 | 把自己從持有人移除。還有別人持有：`{deleted: false, freedBytes: 0}`。自己是最後一位：整部片連同字幕、預覽檔和**這部片的所有匯出檔**排入刪除（Brian，2026-10-06），`{deleted: true, freedBytes}`，`freedBytes` 含匯出檔。別人建立的匯出檔，建立者會收到 `item.deleted` |
+| `POST /api/torrents` | Signed in | See "Admitting a download" below |
+| `GET /api/torrents` | Signed in | `scope=mine` (default) returns all downloads the caller holds, whatever their status; `scope=all` returns the whole site's, administrators only |
+| `GET /api/torrents/:id` | Holder | |
+| `POST /api/torrents/:id/pause` | Holder | Only `queued` and `downloading` can be paused; others return `TORRENT_STATE`. The space stays reserved |
+| `POST /api/torrents/:id/resume` | Holder | Only `paused` can be resumed. Goes back to the end of the queue |
+| `POST /api/torrents/:id/retry` | Holder | Only `failed` can be retried. Space is checked again: the need is the full size plus the preview reservation, minus the leftovers already on disk; if not enough, returns `STORAGE_LIMIT`. Once it passes, it goes back to the end of the queue and continues from what was already downloaded |
+| `POST /api/torrents/:id/hold` | Signed in | Joins a film someone else has already downloaded ("Add to my library" in "All films"). Doesn't ask YTS again (the row was originally created from a YTS result or by adding by hand), doesn't check space, takes no space (D21). If the caller is already a holder, returns the current state. Being deleted or nonexistent returns `NOT_FOUND`. Returns `Torrent` and writes the activity log entry `torrent.join` |
+| `DELETE /api/torrents/:id/hold` | Holder | Removes the caller from the holders. Others still hold it: `{deleted: false, freedBytes: 0}`. The caller was the last holder: the whole film, together with its subtitles, preview files and **all of this film's exports**, is queued for deletion (Brian, 2026-10-06), `{deleted: true, freedBytes}`, where `freedBytes` includes the exports. For exports someone else created, the creator receives `item.deleted` |
+| `POST /api/torrents/inspect` | Signed in | First step of adding a torrent by hand (D26; [06-torrent-worker.md](06-torrent-worker.md), "Adding by hand (Brian, 2026-10-09; D26)"). JSON `{magnet}`, or multipart with one field `file` (.torrent, at most 4 MB). Returns `TorrentInspection` (201): a magnet link is usually `pending`, and the next endpoint must be polled. If it can't be understood, returns `TORRENT_INVALID` with `details.reason` `BAD_MAGNET` or `BAD_TORRENT`. 30 times per person per hour; beyond that, returns `RATE_LIMITED`. When the torrent is already on the site, `existing` is that download |
+| `GET /api/torrents/inspect/:id` | Creator | That entry's current state: `pending`, `ready` (`file` is the file that will be downloaded, `skippedFiles` is the number of files not downloaded, `version` and `guess` are the version and film title guessed from the name), `failed` (`errorCode`: `NO_METADATA`, `NO_VIDEO_FILE`, `UNSAFE_PATH`, `BAD_TORRENT`). Someone else's returns `NOT_FOUND` |
+| `POST /api/torrents/manual` | Creator | `{inspectionId, tmdbId}`. Still `pending` returns `TORRENT_STATE`; `failed` returns `TORRENT_INVALID`; older than 24 hours returns `NOT_FOUND`. Fetches the film from TMDB (no key returns `TMDB_NOT_CONFIGURED`, unreachable returns `TMDB_UNREACHABLE`, no such film returns `VALIDATION`). If the same info hash is already on the site, joins as a holder (`joined: true`, no space check); otherwise in a transaction `storage_admit(file size + preview reservation)`, returning `STORAGE_LIMIT` if not enough, and creates the film (if needed), the download and the holder. Returns `{torrent, joined}` (201 for new, 200 for joined) and writes the activity log entry `torrent.manual` or `torrent.join` |
+| `GET /api/movies/:id/poster` | Signed in | The TMDB poster of a film added by hand, `region` as above; fetched posters are stored in `/data/posters`. Returns 404 when there is none, and the frontend draws a placeholder poster |
 
-| `POST /api/torrents/inspect` | 登入 | 手動加入種子的第一步（D26；[06-torrent-worker.md](06-torrent-worker.md)「手動加入」）。JSON `{magnet}`，或 multipart 一個欄位 `file`（.torrent，最大 4 MB）。回 `TorrentInspection`（201）：磁力連結通常是 `pending`，要輪詢下一個端點。看不懂回 `TORRENT_INVALID`，`details.reason` 是 `BAD_MAGNET` 或 `BAD_TORRENT`。每人每小時 30 次，超過回 `RATE_LIMITED`。種子已經在網站上時 `existing` 是那個下載 |
-| `GET /api/torrents/inspect/:id` | 建立的人 | 那一筆的現況：`pending`、`ready`（`file` 是會下載的檔案、`skippedFiles` 是不下載的檔案數、`version` 和 `guess` 是從名稱推測的版本與片名）、`failed`（`errorCode`：`NO_METADATA`、`NO_VIDEO_FILE`、`UNSAFE_PATH`、`BAD_TORRENT`）。別人的回 `NOT_FOUND` |
-| `POST /api/torrents/manual` | 建立的人 | `{inspectionId, tmdbId}`。還在 `pending` 回 `TORRENT_STATE`；`failed` 回 `TORRENT_INVALID`；超過 24 小時回 `NOT_FOUND`。向 TMDB 取這部片（沒有金鑰回 `TMDB_NOT_CONFIGURED`，連不上回 `TMDB_UNREACHABLE`，沒有這部片回 `VALIDATION`）。同一個 info hash 已經在網站上就加入持有人（`joined: true`，不檢查空間）；否則在交易裡 `storage_admit(檔案大小 + 預覽預留)`，不夠回 `STORAGE_LIMIT`，建立電影（需要的話）、下載、持有人。回 `{torrent, joined}`（新的 201、加入 200），寫操作紀錄 `torrent.manual` 或 `torrent.join` |
-| `GET /api/movies/:id/poster` | 登入 | 手動加入的電影的 TMDB 海報，`region` 同上；抓到的存在 `/data/posters`。沒有回 404，前端畫佔位海報 |
+**Admitting a download** (`POST /api/torrents`), in order:
 
-**接受下載**（`POST /api/torrents`），依序：
+1. If the YTS URL isn't set yet, return `YTS_NOT_CONFIGURED`. Use `ytsId` to get the film's data from YTS (or the cache) and confirm `infoHash` is in its list of versions. If not, return `HASH_NOT_FROM_YTS`. **Size, quality and codec always come from what the server looked up; no other value in the request is used.**
+2. In a transaction, find the row for this info hash and lock it:
+   - Exists, but is being deleted (`want = 'remove'`): return `TORRENT_STATE`. The interface asks the user to try again later.
+   - Exists: add the caller as a holder and return `{torrent, joined: true}`. No space check. If it is `failed`, it isn't retried automatically; after joining, the user can press retry themselves.
+3. Doesn't exist: compute the need (video size + preview reservation). The preview reservation is computed from the settings **at that time**, and whether to make a preview video and at what resolution is decided along with it (D40). Call `storage_admit` in the same transaction. If not enough, return `STORAGE_LIMIT`, with `details` carrying the need, the remaining space, the shortfall, and how much of it is for the preview. If the disk itself doesn't have enough free space, return `DISK_FULL`.
+4. Passed: create the film (if missing), the download and the holder, return `{torrent, joined: false}`, and notify `torrent`.
 
-1. 還沒設定 YTS 的網址回 `YTS_NOT_CONFIGURED`。用 `ytsId` 向 YTS（或快取）取這部片的資料，確認 `infoHash` 在它的版本清單裡。不在就回 `HASH_NOT_FROM_YTS`。**大小、畫質、編碼一律用伺服器這邊查到的，不採用請求裡的任何其他值。**
-2. 在交易裡找這個 info hash 的列並鎖住它：
-   - 存在，但正在被刪除（`want = 'remove'`）：回 `TORRENT_STATE`。介面請使用者稍後再試。
-   - 存在：把呼叫者加入持有人，回 `{torrent, joined: true}`。不檢查空間。如果它是 `failed`，不自動重試；加入之後他可以自己按重試。
-3. 不存在：算出需求（影片大小 + 預覽預留）。預覽預留依**當時**的設定算，要不要轉預覽影片、轉成什麼解析度也一併定下來（D40）。在同一個交易裡呼叫 `storage_admit`。不夠回 `STORAGE_LIMIT`，`details` 帶需求、剩餘、差額、其中預覽佔多少。磁碟本身的可用空間不夠回 `DISK_FULL`。
-4. 通過：建立電影（沒有的話）、下載、持有人，回 `{torrent, joined: false}`，通知 `torrent`。
+### Library
 
-### 片庫
-
-| 端點 | 權限 | 行為 |
+| Endpoint | Access | Behavior |
 | --- | --- | --- |
-| `GET /api/library` | 登入 | 自己持有且已經下載完成的片（包含還在分析的），每一筆帶字幕與匯出的數量、已確認字幕的語言（`confirmedLanguages`）和「下一步」。篩選在前端做。`scope=all` 回全站所有下載完成的片，每個登入的人都能用（Brian，2026-10-09，「全站片庫」）；`torrent.mine` 說呼叫者有沒有持有 |
-| `GET /api/library/:torrentId` | 持有人 | 工作區一次要用到的東西：這部片、它的字幕、它的匯出檔、目前用量、匯出一次需要多少空間。還沒下載完成的回 `MEDIA_NOT_READY`。**它不會啟動分析**：自動分析關掉時，前端看到 `analysis` 是 `none`，自己呼叫一次 `POST /api/media/:id/analyze` |
+| `GET /api/library` | Signed in | Films the caller holds that have finished downloading (including those still being analyzed), each with the number of subtitles and exports, the languages of confirmed subtitles (`confirmedLanguages`) and the "next step". Filtering is done in the frontend. `scope=all` returns every finished film on the site, available to everyone signed in (Brian, 2026-10-09, "All films"); `torrent.mine` says whether the caller holds it |
+| `GET /api/library/:torrentId` | Holder | Everything the workspace needs in one go: the film, its subtitles, its exports, current usage, and how much space one export needs. Not yet finished downloading returns `MEDIA_NOT_READY`. **It doesn't start analysis**: when automatic analysis is off, the frontend sees `analysis` as `none` and calls `POST /api/media/:id/analyze` once itself |
 
-### 影片
+### Videos
 
-`:id` 是 `media_files.id`。
+`:id` is `media_files.id`.
 
-| 端點 | 權限 | 行為 |
+| Endpoint | Access | Behavior |
 | --- | --- | --- |
-| `GET /api/media/:id` | 持有人 | 各項資產的狀態、最近的錯誤、預覽檔佔多少、補做預覽檔要多少，以及工作台該用哪個來源（見 [09-sync-workbench.md](09-sync-workbench.md)） |
-| `GET /api/media/:id/original` | 持有人 | 原始檔。支援 Range |
-| `GET /api/media/:id/proxy` | 持有人 | 預覽檔。沒有就 404 |
-| `GET /api/media/:id/audio` | 持有人 | 聲音檔。沒有就 404 |
-| `GET /api/media/:id/peaks` | 持有人 | 波形的二進位檔。分析在等待或進行中回 `MEDIA_NOT_READY`；分析結束了但沒有這個檔案（失敗，或從來沒要求過）回 404 |
-| `GET /api/media/:id/speech` | 持有人 | 人聲區段。同上 |
-| `POST /api/media/:id/analyze` | 持有人 | 排入分析：`analysis` 是 `none` 或 `failed` 時把它設成 `pending`（探測失敗過的話，連探測也重做）。已經在等待、進行中或完成就直接回現況 |
-| `POST /api/media/:id/proxy` | 持有人 | 要求預覽資產。能直接播的檔案直接回現況。否則把聲音檔和預覽影片當中是 `none` 或 `failed` 的都設成 `pending`（預覽影片的解析度用現在的設定），兩者的預留量加起來過一次 admission，不夠回 `STORAGE_LIMIT`。探測失敗過的話，連探測也重做。沒有缺的就直接回現況 |
+| `GET /api/media/:id` | Holder | The state of each asset, the latest errors, how much the preview file takes, how much making the preview file afterwards would need, and which source the workbench should use (see [09-sync-workbench.md](09-sync-workbench.md)) |
+| `GET /api/media/:id/original` | Holder | The original file. Supports Range |
+| `GET /api/media/:id/proxy` | Holder | The preview file. 404 if there is none |
+| `GET /api/media/:id/audio` | Holder | The audio file. 404 if there is none |
+| `GET /api/media/:id/peaks` | Holder | The waveform binary. Returns `MEDIA_NOT_READY` while analysis is waiting or in progress; 404 when analysis is over but the file doesn't exist (failed, or never requested) |
+| `GET /api/media/:id/speech` | Holder | Speech regions. Same as above |
+| `POST /api/media/:id/analyze` | Holder | Queues analysis: when `analysis` is `none` or `failed`, sets it to `pending` (if the probe failed before, the probe is redone too). If already waiting, in progress or done, returns the current state |
+| `POST /api/media/:id/proxy` | Holder | Requests the preview assets. A file that plays directly returns the current state. Otherwise sets whichever of the audio file and preview video is `none` or `failed` to `pending` (the preview video's resolution uses the current settings), and the two reservations go through admission together; if not enough, returns `STORAGE_LIMIT`. If the probe failed before, the probe is redone too. If nothing is missing, returns the current state |
 
-串流端點的要求：支援 `Range`、`If-Range`、`HEAD`，回 `Accept-Ranges: bytes`，`Cache-Control: private, no-store`。`Content-Type` 依容器：`video/mp4`、`video/x-matroska`、`video/webm`；聲音檔是 `audio/mp4`。檔案路徑只從資料庫來，不接受請求裡的任何路徑片段。
+Requirements for streaming endpoints: support `Range`, `If-Range`, `HEAD`, return `Accept-Ranges: bytes`, `Cache-Control: private, no-store`. `Content-Type` depends on the container: `video/mp4`, `video/x-matroska`, `video/webm`; the audio file is `audio/mp4`. File paths come only from the database; no path fragment from the request is accepted.
 
-### 字幕
+### Subtitles
 
-`:id` 在 `/api/torrents/:id/...` 是下載的 id，在 `/api/subtitles/:id` 是字幕的 id，在 `/api/candidates/:id` 是候選的 id。
+`:id` is the download's id in `/api/torrents/:id/...`, the subtitle's id in `/api/subtitles/:id`, and the candidate's id in `/api/candidates/:id`.
 
-| 端點 | 權限 | 行為 |
+| Endpoint | Access | Behavior |
 | --- | --- | --- |
-| `GET /api/torrents/:id/candidates` | 持有人 | 各來源的狀態、候選清單、排名是否進行中、字幕庫的搜尋連結 |
-| `POST /api/torrents/:id/subtitle-search` | 持有人 | 替每個啟用的來源排入一次查詢，**立刻回傳**（各來源是 `running`；回應在任何來源開始跑之前讀出，所以一定是 `running`，即使像沒有 token 的射手網那樣馬上就結束的來源也一樣）。每個來源完成時發 `candidates` 事件。帶 `provider` 時只查那一個。有還沒過期的快取就用快取；`refresh: true` 略過快取（「重新搜尋」和「重試」都帶它） |
-| `POST /api/torrents/:id/candidates/rank` | 持有人 | 把所選語言的候選（最多 30 條）都抓下來並自動對齊一次，依分數排名。選了繁體中文時，這部片所有中文的候選都算在內。立刻回傳，進度靠 `candidates` 事件。沒有人聲資料（分析還沒好，或分析失敗了）回 `MEDIA_NOT_READY`；介面在這種情況下本來就把按鈕停用並說明原因。已經有一次排名在跑就直接回現況，不重複啟動 |
-| `POST /api/torrents/:id/uploads` | 持有人 | 上傳一個字幕檔或壓縮檔，上限 20 MB。副檔名不對回 `UNSUPPORTED_FILE`，太大回 `UPLOAD_TOO_LARGE`。檔案一收到，清單上就多一條「處理中」的候選；內容在背景處理，讀不了的話那條候選變成失敗並帶原因（`fetchError`） |
-| `POST /api/candidates/:id/add` | 持有人 | 把候選加入這部片。還沒抓檔的先抓，**最多等 30 秒**。抓不到回 `CANDIDATE_UNAVAILABLE`，`details.reason` 是原因：候選的 `fetchError`，或 `TIMEOUT`（背景還在抓，晚一點再按一次）。`convertToTraditional` 沒給就用呼叫者的偏好。內容和既有字幕完全相同回 `SUBTITLE_DUPLICATE` |
-| `DELETE /api/candidates/:id` | 持有人 | 把一條候選從清單拿掉，連同它抓下來的檔案。主要用來清掉失敗的上傳。已經加入的字幕不受影響 |
-| `GET /api/torrents/:id/subtitles` | 持有人 | 這部片已加入的字幕 |
-| `GET /api/subtitles/:id` | 持有人 | 字幕、句子清單、同步文件 |
-| `PUT /api/subtitles/:id/doc` | 持有人 | 儲存同步文件。`rev` 和資料庫裡的不一樣就回 `REVISION_CONFLICT`，`details` 帶目前的 `rev`、`doc` 和最後修改的人。`segments` 或 `edits` 和資料庫裡的不同時，狀態變回草稿；只動到對齊點或檢查點不會。每次儲存都重算分數，並通知其他持有人的畫面。帶 `reason`（`auto-align` 或 `reset`）時另外存一份歷史 |
-| `POST /api/subtitles/:id/auto-align` | 持有人 | 算出建議的分段並回傳，**不會改動儲存的文件**（由前端套用後再存，這樣才能復原）。沒有人聲資料回 `MEDIA_NOT_READY`。字幕和片中語言不同、而且設定了語言模型時，先用語言模型配對辨識結果（最多 45 秒，見 08 的「語言模型」）。工作通常 1 到 5 秒，端點等它完成才回應；兩種方法都失敗、或 60 秒內沒有結果，回 `ALIGN_FAILED`。結果的 `heard` 說語音辨識貢獻了什麼。帶 `referenceId`（同一部片的另一條字幕）時改成依那條字幕對齊：不需要人聲資料、不用語言模型，結果的 `reference` 說怎麼對的，`extraLines` 列出建議刪除的句子（見 08 的「依另一條字幕對齊」）；不是同一部片的另一條字幕回 `VALIDATION`（`fields.referenceId`）。每人每 10 分鐘最多 20 次，超過回 `RATE_LIMITED`（`details.retryAfterSeconds`） |
-| `POST /api/subtitles/:id/confirm` | 持有人 | `rev` 要是最新的（不是的話回 `REVISION_CONFLICT`）。還有檢查點沒通過時，要帶 `force: true` 才接受（前端會先問使用者）；沒帶就回 `VALIDATION`，`details.fields` 是 `{force: 'CHECKPOINTS_PENDING'}`。成功後狀態是已確認，存一份歷史，通知其他持有人 |
-| `GET /api/subtitles/:id/file` | 持有人 | 下載字幕檔（SRT、UTF-8）。`synced=true` 是套用同步文件之後的版本，否則是原始時間 |
-| `DELETE /api/subtitles/:id` | 持有人 | 刪掉這條字幕和它的同步結果。已經匯出的 MKV 不受影響 |
-| `POST /api/subtitles/:id/translate` | 持有人 | 開始翻譯這條字幕（[18-llm.md](18-llm.md)）：`{targetLanguage, mode: 'plain' | 'bilingual'}`，回 `Translation`（`running`）。沒有可用的設定檔回 `LLM_NOT_CONFIGURED`；同一條字幕、同一個目標語言和形式已經在翻回 `TRANSLATION_RUNNING`；超過每人每小時的次數回 `RATE_LIMITED`（`retryAfterSeconds`） |
-| `GET /api/torrents/:id/translations` | 持有人 | 這部片最近 30 筆翻譯 |
-| `POST /api/translations/:id/cancel` | 持有人 | 取消進行中的翻譯；已翻好的段落保留，不寫出字幕 |
-| `POST /api/translations/:id/resume` | 持有人 | 失敗或取消的翻譯從斷掉的那一段繼續；不算次數 |
+| `GET /api/torrents/:id/candidates` | Holder | Each source's status, the candidate list, whether ranking is in progress, and Zimuku's search link |
+| `POST /api/torrents/:id/subtitle-search` | Holder | Queues one query for each enabled source and **returns immediately** (each source is `running`; the response is read before any source starts running, so it is always `running`, even for a source that finishes right away, such as Assrt (Shooter) without a token). Sends a `candidates` event as each source finishes. With `provider`, only that one is queried. Uses the cache when there is an unexpired one; `refresh: true` skips the cache ("Search again" and "Retry" both send it) |
+| `POST /api/torrents/:id/candidates/rank` | Holder | Fetches all candidates in the chosen languages (at most 30), auto-aligns each once, and ranks them by score. When Traditional Chinese is chosen, all of the film's Chinese candidates are included. Returns immediately; progress comes through `candidates` events. With no speech data (analysis isn't ready yet, or it failed), returns `MEDIA_NOT_READY`; in that case the interface already disables the button and explains why. If a ranking is already running, returns the current state without starting another |
+| `POST /api/torrents/:id/uploads` | Holder | Uploads one subtitle file or archive, limit 20 MB. A wrong extension returns `UNSUPPORTED_FILE`, too large returns `UPLOAD_TOO_LARGE`. As soon as the file is received, a "Processing…" candidate appears on the list; the content is processed in the background, and if it can't be read, that candidate becomes failed with a reason (`fetchError`) |
+| `POST /api/candidates/:id/add` | Holder | Adds the candidate to the film. If it hasn't been fetched, it is fetched first, **waiting at most 30 seconds**. If it can't be fetched, returns `CANDIDATE_UNAVAILABLE` with `details.reason` as the reason: the candidate's `fetchError`, or `TIMEOUT` (still fetching in the background; press again a bit later). When `convertToTraditional` isn't given, the caller's preference is used. Content identical to existing subtitles returns `SUBTITLE_DUPLICATE` |
+| `DELETE /api/candidates/:id` | Holder | Removes a candidate from the list, along with the file it fetched. Mainly for clearing failed uploads. Subtitles already added aren't affected |
+| `GET /api/torrents/:id/subtitles` | Holder | The film's added subtitles |
+| `GET /api/subtitles/:id` | Holder | The subtitles, the list of lines, the sync doc |
+| `PUT /api/subtitles/:id/doc` | Holder | Saves the sync doc. If `rev` differs from the one in the database, returns `REVISION_CONFLICT`, with `details` carrying the current `rev`, `doc` and the person who last changed it. When `segments` or `edits` differ from those in the database, the status goes back to draft; touching only anchors or checkpoints doesn't. Every save recomputes the score and notifies the other holders' screens. With `reason` (`auto-align` or `reset`), a history entry is saved as well |
+| `POST /api/subtitles/:id/auto-align` | Holder | Computes the suggested segments and returns them **without changing the stored doc** (the frontend applies them and then saves, so it can be undone). With no speech data, returns `MEDIA_NOT_READY`. When the subtitles and the film are in different languages and a language model is set up, the language model first matches the recognition results (at most 45 seconds; see "Language model" in 08). The job usually takes 1 to 5 seconds, and the endpoint waits for it before responding; when both methods fail, or there is no result within 60 seconds, returns `ALIGN_FAILED`. The result's `heard` says what speech recognition contributed. With `referenceId` (other subtitles of the same film), it aligns by those subtitles instead: no speech data needed, no language model used; the result's `reference` says how it was aligned, and `extraLines` lists the lines suggested for deletion (see "Align by other subtitles" in 08); anything that isn't other subtitles of the same film returns `VALIDATION` (`fields.referenceId`). At most 20 times per person per 10 minutes; beyond that, returns `RATE_LIMITED` (`details.retryAfterSeconds`) |
+| `POST /api/subtitles/:id/confirm` | Holder | `rev` must be the latest (otherwise returns `REVISION_CONFLICT`). While some checkpoints haven't passed, it is accepted only with `force: true` (the frontend asks the user first); without it, returns `VALIDATION` with `details.fields` as `{force: 'CHECKPOINTS_PENDING'}`. On success the status is confirmed, a history entry is saved, and the other holders are notified |
+| `GET /api/subtitles/:id/file` | Holder | Downloads the subtitle file (SRT, UTF-8). `synced=true` is the version with the sync doc applied; otherwise the original timing |
+| `DELETE /api/subtitles/:id` | Holder | Deletes these subtitles and their sync result. MKVs already exported aren't affected |
+| `POST /api/subtitles/:id/translate` | Holder | Starts translating these subtitles ([18-llm.md](18-llm.md)): `{targetLanguage, mode: 'plain' | 'bilingual'}`, returns `Translation` (`running`). No usable profile returns `LLM_NOT_CONFIGURED`; the same subtitles already being translated into the same target language and form returns `TRANSLATION_RUNNING`; exceeding the per-person hourly count returns `RATE_LIMITED` (`retryAfterSeconds`) |
+| `GET /api/torrents/:id/translations` | Holder | The film's 30 most recent translations |
+| `POST /api/translations/:id/cancel` | Holder | Cancels a running translation; parts already translated are kept, and no subtitles are written out |
+| `POST /api/translations/:id/resume` | Holder | A failed or cancelled translation continues from the part where it stopped; doesn't count toward the limit |
 
-來源的細節在 [07-subtitle-providers.md](07-subtitle-providers.md)，同步文件在 [09-sync-workbench.md](09-sync-workbench.md)。
+Source details are in [07-subtitle-providers.md](07-subtitle-providers.md), and the sync doc is in [09-sync-workbench.md](09-sync-workbench.md).
 
-### 匯出
+### Export
 
-| 端點 | 權限 | 行為 |
+| Endpoint | Access | Behavior |
 | --- | --- | --- |
-| `POST /api/torrents/:id/exports` | 持有人 | 至少一條字幕，而且每一條都要是**這部片的**已確認字幕（否則 `NO_CONFIRMED_SUBTITLE`）；恰好一條是預設軌、同一條不能選兩次（否則 `VALIDATION`，`details.fields.tracks` 是 `ONE_DEFAULT` 或 `DUPLICATE`）；檔名要通過檢查（否則 `INVALID_FILENAME`，`details.fields.fileName` 是 `EXTENSION`、`CHARACTERS` 或 `TOO_LONG`）；下載還沒完成回 `MEDIA_NOT_READY`。要通過 admission（否則 `STORAGE_LIMIT` 或 `DISK_FULL`）。成功回 `201` 和那個 `Export`。預設軌在檔案裡排第一條，其他照請求的順序 |
-| `GET /api/exports` | 登入 | `scope=mine`（預設）回自己建立的；`scope=all` 回全站的，只有管理員能用（成員回 `FORBIDDEN`）。新的在前。儲存空間頁用它列出「我建立的匯出檔」：電影被刪掉之後，匯出檔只剩這裡可以下載。某一部片的匯出檔在 `GET /api/library/:torrentId` 裡。已經要求取消、正在等 `media` 停下來的不列出 |
-| `GET /api/exports/:id/file` | 那部片的持有人、建立者或管理員 | 下載 MKV。支援 Range，帶 `Content-Disposition: attachment`（`filename` 是 ASCII 的替代名，`filename*=UTF-8''…` 是原本的檔名）。還沒完成的、或呼叫者看不到的，回 `NOT_FOUND` |
-| `DELETE /api/exports/:id` | 建立者或管理員 | 完成或失敗的：刪檔、刪列。還在排隊的：直接刪（連同 `tracks/`，它的 `tasks` 標成 `cancelled`）。進行中的：要求取消，`media` 停下來之後刪。回釋出的大小（完成的是檔案大小，排隊或進行中的是預留量，失敗的是 0）。那部片的其他持有人回 `FORBIDDEN`；看不到它的人回 `NOT_FOUND` |
+| `POST /api/torrents/:id/exports` | Holder | At least one subtitle track, and every one must be a confirmed subtitle **of this film** (otherwise `NO_CONFIRMED_SUBTITLE`); exactly one is the default track, and the same one can't be picked twice (otherwise `VALIDATION`, with `details.fields.tracks` as `ONE_DEFAULT` or `DUPLICATE`); the file name must pass the checks (otherwise `INVALID_FILENAME`, with `details.fields.fileName` as `EXTENSION`, `CHARACTERS` or `TOO_LONG`); a download that isn't finished returns `MEDIA_NOT_READY`. Must pass admission (otherwise `STORAGE_LIMIT` or `DISK_FULL`). On success, returns `201` and the `Export`. The default track comes first in the file, and the others follow the order of the request |
+| `GET /api/exports` | Signed in | `scope=mine` (default) returns those the caller created; `scope=all` returns the whole site's, administrators only (members get `FORBIDDEN`). Newest first. The Storage page uses it to list "Exports I made": after the film is deleted, this is the only place its exports can still be downloaded. A single film's exports are in `GET /api/library/:torrentId`. Those already asked to cancel and waiting for `media` to stop are not listed |
+| `GET /api/exports/:id/file` | Holders of that film, the creator, or an administrator | Downloads the MKV. Supports Range, with `Content-Disposition: attachment` (`filename` is an ASCII fallback name, `filename*=UTF-8''…` is the original file name). Unfinished ones, or ones the caller can't see, return `NOT_FOUND` |
+| `DELETE /api/exports/:id` | Creator or administrator | Done or failed: delete the file and the row. Still queued: delete directly (along with `tracks/`; its `tasks` marked `cancelled`). In progress: request cancellation, deleted after `media` stops. Returns the size freed (the file size for done ones, the reservation for queued or in-progress ones, 0 for failed ones). Other holders of the film get `FORBIDDEN`; people who can't see it get `NOT_FOUND` |
 
-細節在 [08-media-pipeline.md](08-media-pipeline.md)。
+Details are in [08-media-pipeline.md](08-media-pipeline.md).
 
-### 儲存空間、通知、即時更新
+### Storage, notifications, live updates
 
-| 端點 | 權限 | 行為 |
+| Endpoint | Access | Behavior |
 | --- | --- | --- |
-| `GET /api/storage` | 登入 | 全站用量（所有人看到的數字相同），加上呼叫者自己持有的項目（影片、下載中的預留、失敗的殘留、預覽檔）。自己建立的匯出檔另外從 `GET /api/exports` 拿 |
-| `GET /api/notifications` | 登入 | 最近 50 則和未讀數 |
-| `POST /api/notifications/read` | 登入 | 標成已讀 |
-| `GET /api/events` | 登入 | Server-Sent Events，見下方 |
+| `GET /api/storage` | Signed in | Site-wide usage (everyone sees the same numbers), plus the items the caller holds (videos, reservations for downloads in progress, leftovers from failed downloads, preview files). The caller's own exports come separately from `GET /api/exports` |
+| `GET /api/notifications` | Signed in | The latest 50 and the unread count |
+| `POST /api/notifications/read` | Signed in | Marks them read |
+| `GET /api/events` | Signed in | Server-Sent Events, see below |
 
-### 管理
+### Admin
 
-全部限管理員。
+All administrators only.
 
-| 端點 | 行為 |
+| Endpoint | Behavior |
 | --- | --- |
-| `GET /api/admin/overview` | 總覽頁的全部資料：用量、下載數、使用者數、背景工作、需要處理的事、各來源狀況、最近的操作 |
-| `GET /api/admin/users` | 每位使用者，含持有幾部、幾個下載進行中、獨自持有幾個項目 |
-| `PATCH /api/admin/users/:id` | 改角色或停用。不能對自己做（回 `FORBIDDEN`）；不能讓系統沒有任何啟用中的管理員（`LAST_ADMIN`）。停用會立刻登出他的所有裝置 |
-| `POST /api/admin/users/:id/reset-link` | 產生一次性的重設連結，30 分鐘有效。連結只在這次回應裡出現 |
-| `DELETE /api/admin/users/:id` | 移除帳號。他持有的檔案不動（見 [03-data-model.md](03-data-model.md)）。不能移除自己（`FORBIDDEN`）；同樣受 `LAST_ADMIN` 限制 |
+| `GET /api/admin/overview` | All data for the Overview page: usage, number of downloads, number of users, background tasks, things that need attention, source status, recent activity |
+| `GET /api/admin/users` | Every user, including how many films they hold, how many downloads are in progress, and how many items they hold alone |
+| `PATCH /api/admin/users/:id` | Changes role or disables. Can't be done to oneself (returns `FORBIDDEN`); can't leave the system without any active administrator (`LAST_ADMIN`). Disabling immediately signs out all their devices |
+| `POST /api/admin/users/:id/reset-link` | Generates a one-time reset link, valid for 30 minutes. The link appears only in this response |
+| `DELETE /api/admin/users/:id` | Removes the account. Files they hold are left alone (see [03-data-model.md](03-data-model.md)). Can't remove oneself (`FORBIDDEN`); also subject to `LAST_ADMIN` |
 | `GET /api/admin/invites` | |
-| `POST /api/admin/invites` | 有效期 1、3 或 7 天 |
-| `DELETE /api/admin/invites/:id` | 撤銷（還沒用的）或清除（已用或過期的） |
-| `GET /api/admin/storage` | 用量、磁碟資訊、**所有**項目（由大到小）、最近一次重新計算發現的孤兒與遺失（`findings`）、那一次重新計算的工作 |
-| `PUT /api/admin/storage/limit` | 見 [10-storage.md](10-storage.md) 的驗證規則。低於目前用量是允許的 |
-| `POST /api/admin/storage/rescan` | 排入一次重新計算，立刻回傳那個工作。已經有一次在跑就回那一個。做完時發 `admin` 事件（`storage`），頁面再抓一次 `GET /api/admin/storage`。**只更新數字和回報，不刪任何東西** |
-| `DELETE /api/admin/storage/items/:kind/:id` | 強制刪除一個項目，不論誰持有。`movie`、`reserved`、`partial` 用下載的 id，連同這部片的所有匯出檔一起刪；`preview` 用影片的 id（只刪預覽影片和聲音檔）；`export` 用匯出的 id；`orphan` 用那一筆發現的 id（刪掉那個資料夾）。受影響的人會收到通知 |
-| `GET /api/admin/settings` | 全部設定，加上唯讀資訊（哪些金鑰已設定、連入埠、磁碟）和各個來源最近的狀況 |
-| `PATCH /api/admin/settings` | 只送要改的部分。任何一項不合法就整個拒絕（`SETTING_INVALID`），`details.fields` 指出是哪一項 |
-| `PUT /api/admin/secrets/:name` | 寫入一把金鑰。之後不會再顯示 |
-| `DELETE /api/admin/secrets/:name` | 清除 |
-| `POST /api/admin/sources/:id/test` | 實際連一次那個來源。**一律回 200**：連不上是測試的結果，不是這個端點的錯誤。回 `{ok, code, data, ms}`，並更新那個來源的狀況 |
-| `GET /api/admin/llm` | LLM 設定頁：設定檔（含冷卻狀態，不含金鑰）、最近 50 筆用量、`translatePerHour` |
-| `POST /api/admin/llm/profiles` | 新增設定檔。`key` 有值才存；欄位不對回 `VALIDATION`（`baseUrl`：`REQUIRED`、`URL_FORMAT`；`model`：`REQUIRED`） |
-| `PUT /api/admin/llm/profiles/:id` | 修改。`key` 不帶是不變、`null` 是清除、字串是換新；存了之後清掉它的冷卻 |
-| `DELETE /api/admin/llm/profiles/:id` | 刪除 |
-| `POST /api/admin/llm/models` | 用表單的網址和金鑰（沒填時用 `profileId` 存著的）向服務要模型清單。要不到回 `VALIDATION`，`fields.model` 是原因（`AUTH`、`UNREACHABLE`…） |
-| `POST /api/admin/llm/test` | 用表單目前的值（存了沒存都可以）送一題小翻譯，回 `LlmCheck`；記一筆用途「測試」的用量 |
+| `POST /api/admin/invites` | Valid for 1, 3 or 7 days |
+| `DELETE /api/admin/invites/:id` | Revokes (unused ones) or clears (used or expired ones) |
+| `GET /api/admin/storage` | Usage, disk info, **all** items (largest first), orphans and missing files found by the latest recalculation (`findings`), and that recalculation's job |
+| `PUT /api/admin/storage/limit` | See the validation rules in [10-storage.md](10-storage.md). Going below current usage is allowed |
+| `POST /api/admin/storage/rescan` | Queues one recalculation and immediately returns that job. If one is already running, returns that one. When done, sends an `admin` event (`storage`), and the page fetches `GET /api/admin/storage` again. **It only updates numbers and reports; it deletes nothing** |
+| `DELETE /api/admin/storage/items/:kind/:id` | Force deletes one item, whoever holds it. `movie`, `reserved`, `partial` use the download's id and delete all of this film's exports along with it; `preview` uses the video's id (deletes only the preview video and audio file); `export` uses the export's id; `orphan` uses the finding's id (deletes that folder). Affected people receive notifications |
+| `GET /api/admin/settings` | All settings, plus read-only info (which keys are set, the incoming port, the disk) and each source's latest status |
+| `PATCH /api/admin/settings` | Send only the parts to change. If any item is invalid, the whole thing is rejected (`SETTING_INVALID`), with `details.fields` saying which |
+| `PUT /api/admin/secrets/:name` | Writes a key. It is never shown again |
+| `DELETE /api/admin/secrets/:name` | Clears it |
+| `POST /api/admin/sources/:id/test` | Actually connects to that source once. **Always returns 200**: failing to connect is the test's result, not this endpoint's error. Returns `{ok, code, data, ms}` and updates that source's status |
+| `GET /api/admin/llm` | LLM settings page: profiles (including cooldown state, excluding keys), the latest 50 usage records, `translatePerHour` |
+| `POST /api/admin/llm/profiles` | Adds a profile. `key` is stored only if it has a value; wrong fields return `VALIDATION` (`baseUrl`: `REQUIRED`, `URL_FORMAT`; `model`: `REQUIRED`) |
+| `PUT /api/admin/llm/profiles/:id` | Edits. `key` omitted means unchanged, `null` means clear, a string means replace; saving clears its cooldown |
+| `DELETE /api/admin/llm/profiles/:id` | Deletes |
+| `POST /api/admin/llm/models` | Asks the service for its model list using the form's URL and key (falling back to those stored in `profileId` when not filled in). If it can't get one, returns `VALIDATION` with `fields.model` as the reason (`AUTH`, `UNREACHABLE`…) |
+| `POST /api/admin/llm/test` | Sends one small translation using the form's current values (saved or not), returns `LlmCheck`, and records one usage entry with the purpose "test" |
 | `PUT /api/admin/llm/settings` | `{translatePerHour}` |
-| `GET /api/admin/system` | 各服務的心跳、最近 50 個背景工作、磁碟資訊 |
-| `POST /api/admin/tasks/:id/retry` | 重跑一個失敗的工作。只適用於分析、預覽資產、重新計算（`Task.retryable`）；預覽資產要重新通過 admission，不夠回 `STORAGE_LIMIT`。對齊、排名、匯出不能這樣重跑（回 `VALIDATION`）：對齊和排名由使用者再按一次，匯出重新建立一個 |
-| `GET /api/admin/audit` | 操作紀錄，每頁 50 筆，用 `before` 往前翻 |
+| `GET /api/admin/system` | Each service's heartbeat, the latest 50 background tasks, disk info |
+| `POST /api/admin/tasks/:id/retry` | Reruns a failed job. Only for analysis, preview assets and recalculation (`Task.retryable`); preview assets must pass admission again, and return `STORAGE_LIMIT` if not enough. Alignment, ranking and export can't be rerun this way (returns `VALIDATION`): alignment and ranking are pressed again by the user, and an export is created anew |
+| `GET /api/admin/audit` | Activity log, 50 per page, paging back with `before` |
 
-## 即時更新
+## Live updates
 
-`GET /api/events` 是一條 Server-Sent Events 連線。每則訊息是一個 `ServerEvent` 的 JSON。
+`GET /api/events` is one Server-Sent Events connection. Each message is the JSON of one `ServerEvent`.
 
-- 連線建立後先送一則註解（`: ok`），之後每 25 秒送一次心跳註解，避免中間的代理把連線關掉。
-- 事件只送給有權看到那筆資料的人：下載、候選、字幕的事件送給持有人（管理員的下載頁勾了「顯示所有人的下載」時靠重新抓清單更新，不另外推送）；匯出的事件送給那部片的持有人和建立者；`usage` 送給所有人；`notification` 只送給當事人；`admin` 只送給管理員。
-- 兩個例外：`torrent.removed` 和 `export.removed` 送給所有人。通知到的時候那一列和它的持有人名單已經不在了，沒辦法再查該送給誰；事件裡只有一個 id，不透露任何內容，用戶端手上沒有那個 id 就忽略。
-- **進度的頻率**：同一個下載每秒最多一則 `torrent` 事件。`torrent` 程式每 2 秒把進度寫進資料庫一次，所以畫面大約每 2 秒更新一次。
-- 事件是「提醒」，不是唯一的資料來源。斷線重連後，前端重新抓一次目前畫面需要的資料，不依賴補送。
+- After the connection opens, one comment (`: ok`) is sent first, then a heartbeat comment every 25 seconds, so proxies in between don't close the connection.
+- Events go only to people allowed to see that data: download, candidate and subtitle events go to holders (when an administrator's Downloads page has "Show everyone's downloads" checked, it updates by refetching the list, with no separate push); export events go to the film's holders and the creator; `usage` goes to everyone; `notification` goes only to the person concerned; `admin` goes only to administrators.
+- Two exceptions: `torrent.removed` and `export.removed` go to everyone. By the time the notification arrives, the row and its list of holders are already gone, so there's no way to look up who to send it to; the event carries only an id and reveals no content, and a client that doesn't have that id ignores it.
+- **Progress frequency**: at most one `torrent` event per second for the same download. The `torrent` program writes progress to the database every 2 seconds, so the screen updates roughly every 2 seconds.
+- Events are "reminders", not the only source of data. After reconnecting, the frontend refetches the data the current screen needs, without relying on replays.
 
-前端的做法：收到事件就更新 TanStack Query 的快取（帶完整資料的事件直接寫入，只帶 id 的就讓對應的查詢失效）。
+What the frontend does: on receiving an event, it updates the TanStack Query cache (events carrying full data are written directly; events carrying only an id invalidate the matching queries).
 
-### 伺服器之間的通知
+### Notifications between servers
 
-`api` 靠 `LISTEN paiban_events` 得知其他服務做了什麼。`NOTIFY` 的內容只有 `{type, id}`，資料由 `api` 自己查。`api` 自己造成的變動（例如儲存同步文件）不經過這裡，直接發事件。
+`api` learns what the other services did through `LISTEN paiban_events`. A `NOTIFY` payload is only `{type, id}`; `api` looks up the data itself. Changes `api` makes itself (for example saving a sync doc) don't go through here; it sends the events directly.
 
-| `type` | `id` | 誰發 | `api` 收到後 |
+| `type` | `id` | Sent by | What `api` does on receipt |
 | --- | --- | --- | --- |
-| `torrent` | 下載 | torrent、media | 讀出那個下載（含影片各項資產的狀態）→ `torrent` 事件。分析和預覽檔的進度也是走這一則 |
-| `torrent.removed` | 下載 | torrent | `torrent.removed` 事件 |
-| `candidates` | 下載 | media | `candidates` 事件。`api` 自己處理的查詢工作做完時直接發這個事件，不繞一圈 |
-| `export` | 匯出 | media、torrent | `export` 事件。`torrent` 只在一種情況發：電影被移除，它把還沒做完的匯出標成失敗的時候 |
-| `export.removed` | 匯出 | media | `export.removed` 事件 |
-| `task` | 工作 | media、torrent | 叫醒正在等這個工作結果的請求；`admin` 事件（`tasks`） |
-| `notification` | 通知 | torrent、media | `notification` 事件，送給那則通知的對象 |
-| `usage` | （空） | torrent、media | 重算用量 → `usage` 事件 |
-| `storage` | （空） | media | 重新計算做完了：`admin` 事件（`storage`）和 `usage` 事件 |
+| `torrent` | download | torrent, media | Reads the download (including the state of each video asset) → `torrent` event. Analysis and preview file progress also go through this one |
+| `torrent.removed` | download | torrent | `torrent.removed` event |
+| `candidates` | download | media | `candidates` event. When query jobs that `api` handles itself finish, it sends this event directly, without a round trip |
+| `export` | export | media, torrent | `export` event. `torrent` sends it in only one case: when the film is removed and it marks unfinished exports failed |
+| `export.removed` | export | media | `export.removed` event |
+| `task` | task | media, torrent | Wakes up requests waiting for this job's result; `admin` event (`tasks`) |
+| `notification` | notification | torrent, media | `notification` event, sent to the notification's recipient |
+| `usage` | (empty) | torrent, media | Recomputes usage → `usage` event |
+| `storage` | (empty) | media | Recalculation is done: `admin` event (`storage`) and `usage` event |
 
-會改變用量的動作（完成、失敗、刪除、預覽檔做好、匯出完成）除了自己的那一則，都再發一則 `usage`。服務的心跳不經過通知；系統狀態頁開著的時候每 10 秒重新抓一次。
+Actions that change usage (completion, failure, deletion, preview file done, export done) send an extra `usage` besides their own message. Service heartbeats don't go through notifications; the System status page refetches every 10 seconds while open.
 
-## 錯誤碼
+## Error codes
 
-| 代碼 | HTTP | 什麼時候 | 介面怎麼處理 |
+| Code | HTTP | When | How the interface handles it |
 | --- | --- | --- | --- |
-| `UNAUTHENTICATED` | 401 | 沒登入或 session 失效 | 回登入頁，登入後回到原本的頁面 |
-| `INVALID_CREDENTIALS` | 401 | 帳號或密碼不對 | 登入表單裡顯示「帳號或密碼不正確。」 |
-| `FORBIDDEN` | 403 | 不是管理員；或少了防跨站的標頭 | 「這一頁只有管理員能看。」 |
-| `ACCOUNT_DISABLED` | 403 | 帳號被停用 | 「這個帳號已被停用，請聯絡管理員。」 |
-| `NOT_HOLDER` | 403 | 不是這部片的持有人 | 當成找不到頁面 |
-| `NOT_FOUND` | 404 | | 「找不到這個頁面。它可能已經被刪除。」 |
-| `INVITE_NOT_FOUND` | 404 | | 邀請碼欄位下方：「找不到這個邀請碼，請確認有沒有打錯。」 |
-| `INVITE_EXPIRED` | 410 | | 「這個邀請碼已經過期，請管理員再給你一個新的。」 |
-| `INVITE_USED` | 410 | | 「這個邀請碼已經用過了。」 |
-| `RESET_INVALID` | 410 | 重設連結過期或用過 | 請對方找管理員再產生一次 |
-| `USERNAME_TAKEN` | 409 | | 帳號欄位下方：「這個帳號已經有人用了。」 |
-| `LAST_ADMIN` | 409 | 會讓系統沒有管理員 | 說明至少要留一位管理員 |
-| `STORAGE_LIMIT` | 409 | 超過容量上限 | 在按鈕旁邊說明需要多少、剩多少、差多少，給「前往儲存空間」 |
-| `DISK_FULL` | 507 | 磁碟本身沒空間了（上限還沒到） | 同上，另外說明這是磁碟的問題，請管理員處理 |
-| `TORRENT_STATE` | 409 | 這個狀態不能做這個動作；或這個版本正在被刪除 | 重新整理那一列，通常不需要訊息。下載時遇到：「這個版本正在刪除中，請稍後再試。」 |
-| `MEDIA_NOT_READY` | 409 | 下載還沒完成；或需要的分析資料還沒有（還在分析，或分析失敗了） | 顯示進度、「稍後再試」，或說明分析失敗並給「重新分析」 |
-| `SUBTITLE_DUPLICATE` | 409 | 內容相同的字幕已經加入過 | 「這條字幕已經加入過了。」 |
-| `REVISION_CONFLICT` | 409 | 別人先存了 | 見 [09-sync-workbench.md](09-sync-workbench.md) 的「兩個人同時改」 |
-| `LLM_NOT_CONFIGURED` | 409 | 沒有啟用的 LLM 設定檔 | 翻譯視窗說「管理員還沒有設定語言模型」，管理員多一個前往 LLM 設定的連結 |
-| `TRANSLATION_RUNNING` | 409 | 同一筆翻譯已經在進行 | 翻譯視窗說明 |
-| `YTS_NOT_CONFIGURED` | 409 | 還沒有設定 YTS 的網址 | 搜尋頁的引導，見 [11-pages.md](11-pages.md) |
-| `UPLOAD_TOO_LARGE` | 413 | | 說明上限 |
-| `UNSUPPORTED_FILE` | 415 | | 「不支援這種檔案。請上傳 .srt、.ass、.vtt，或 .zip、.rar、.7z 壓縮檔。」 |
-| `VALIDATION` | 422 | 欄位不合法 | 在各欄位下方顯示，焦點移到第一個錯的欄位 |
-| `WRONG_PASSWORD` | 422 | 改密碼時目前的密碼不對 | 「目前的密碼不正確。」 |
-| `HASH_NOT_FROM_YTS` | 422 | info hash 不在那部片的版本清單裡 | 正常操作不會遇到。重新整理電影頁 |
-| `TORRENT_INVALID` | 422 | 手動加入的磁力連結或 .torrent 檔不能用；`details.reason`：`BAD_MAGNET`、`BAD_TORRENT`、`NO_VIDEO_FILE`、`UNSAFE_PATH`、`NO_METADATA` | 視窗裡說明原因 |
-| `TMDB_NOT_CONFIGURED` | 409 | 手動加入要選 TMDB 的電影，但沒有 TMDB 金鑰 | 請管理員到「來源設定」設定 |
-| `TMDB_UNREACHABLE` | 502 | 連不上 TMDB | 稍後再試 |
-| `CANDIDATE_UNAVAILABLE` | 422 | 候選字幕的檔案抓不到或讀不了 | 依 `details.reason` 說明，見 [11-pages.md](11-pages.md) |
-| `NO_CONFIRMED_SUBTITLE` | 422 | 匯出時沒選字幕，或選了還沒確認的 | 「至少要選一條已確認的字幕。還沒有的話，先去同步。」 |
-| `INVALID_FILENAME` | 422 | | 檔名欄位下方說明規則 |
-| `SETTING_INVALID` | 422 | | 在對應的欄位下方顯示 |
-| `RATE_LIMITED` | 429 | 登入嘗試太多次 | 說明要等多久 |
-| `ALIGN_FAILED` | 500 | 自動對齊的兩種方法都失敗，或逾時 | 訊息列：「自動對齊沒有成功。可以再試一次，或用對齊點手動對。」 |
-| `YTS_UNREACHABLE` | 502 | 連不上 YTS | 搜尋頁的錯誤狀態，見 [11-pages.md](11-pages.md) |
-| `YTS_BAD_RESPONSE` | 502 | YTS 回了看不懂的東西（很可能是冒牌站） | 同上，另外提醒檢查網址 |
-| `INTERNAL` | 500 | 沒預料到的錯誤 | 「發生錯誤，請再試一次。」log 裡要有完整資訊 |
+| `UNAUTHENTICATED` | 401 | Not signed in, or the session expired | Go to the sign-in page, and back to the original page after signing in |
+| `INVALID_CREDENTIALS` | 401 | Wrong username or password | Show "Wrong username or password." in the sign-in form |
+| `FORBIDDEN` | 403 | Not an administrator; or the cross-site header is missing | "Only administrators can see this page." |
+| `ACCOUNT_DISABLED` | 403 | The account is disabled | "This account has been disabled. Contact an administrator." |
+| `NOT_HOLDER` | 403 | Not a holder of this film | Treat as page not found |
+| `NOT_FOUND` | 404 | | "This page doesn't exist. It may have been deleted." |
+| `INVITE_NOT_FOUND` | 404 | | Under the invite code field: "Can't find this invite code. Check for typos." |
+| `INVITE_EXPIRED` | 410 | | "This invite code has expired. Ask an administrator for a new one." |
+| `INVITE_USED` | 410 | | "This invite code has already been used." |
+| `RESET_INVALID` | 410 | The reset link expired or was used | Ask them to have an administrator generate one again |
+| `USERNAME_TAKEN` | 409 | | Under the username field: "This username is taken." |
+| `LAST_ADMIN` | 409 | Would leave the system without an administrator | Explain that at least one administrator must remain |
+| `STORAGE_LIMIT` | 409 | Over the storage limit | Next to the button, explain how much is needed, how much is left, and the shortfall, with "Go to Storage" |
+| `DISK_FULL` | 507 | The disk itself is out of space (the limit hasn't been reached) | Same as above, and also explain that this is a disk problem for an administrator to handle |
+| `TORRENT_STATE` | 409 | This action can't be done in this state; or this version is being deleted | Refresh that row; usually no message needed. When hit while downloading: "This version is being deleted. Try again in a moment." |
+| `MEDIA_NOT_READY` | 409 | The download isn't finished; or the analysis data needed isn't there yet (still analyzing, or analysis failed) | Show progress, "try again later", or explain that analysis failed and offer "Analyze again" |
+| `SUBTITLE_DUPLICATE` | 409 | Subtitles with the same content were already added | "These subtitles have already been added." |
+| `REVISION_CONFLICT` | 409 | Someone else saved first | See "Two people editing at once" in [09-sync-workbench.md](09-sync-workbench.md) |
+| `LLM_NOT_CONFIGURED` | 409 | No enabled LLM profile | The translation window says "An administrator hasn't set up a language model"; administrators get an extra link to LLM settings |
+| `TRANSLATION_RUNNING` | 409 | The same translation is already running | Explained in the translation window |
+| `YTS_NOT_CONFIGURED` | 409 | The YTS URL isn't set yet | Guidance on the Search page, see [11-pages.md](11-pages.md) |
+| `UPLOAD_TOO_LARGE` | 413 | | Explain the limit |
+| `UNSUPPORTED_FILE` | 415 | | "This file type isn't supported. Upload .srt, .ass or .vtt, or a .zip, .rar or .7z archive." |
+| `VALIDATION` | 422 | Invalid field | Show under each field, and move focus to the first wrong field |
+| `WRONG_PASSWORD` | 422 | The current password is wrong when changing the password | "The current password is wrong." |
+| `HASH_NOT_FROM_YTS` | 422 | The info hash isn't in that film's list of versions | Doesn't happen in normal use. Refresh the film page |
+| `TORRENT_INVALID` | 422 | The magnet link or .torrent file added by hand can't be used; `details.reason`: `BAD_MAGNET`, `BAD_TORRENT`, `NO_VIDEO_FILE`, `UNSAFE_PATH`, `NO_METADATA` | Explain the reason in the window |
+| `TMDB_NOT_CONFIGURED` | 409 | Adding by hand needs a TMDB film to be chosen, but there is no TMDB key | Ask an administrator to set it in "Sources" |
+| `TMDB_UNREACHABLE` | 502 | Can't reach TMDB | Try again later |
+| `CANDIDATE_UNAVAILABLE` | 422 | A candidate subtitle's file couldn't be fetched or read | Explain according to `details.reason`, see [11-pages.md](11-pages.md) |
+| `NO_CONFIRMED_SUBTITLE` | 422 | No subtitles chosen when exporting, or unconfirmed ones chosen | "Pick at least one confirmed subtitle. If there aren't any, sync first." |
+| `INVALID_FILENAME` | 422 | | Explain the rules under the file name field |
+| `SETTING_INVALID` | 422 | | Show under the matching field |
+| `RATE_LIMITED` | 429 | Too many sign-in attempts | Explain how long to wait |
+| `ALIGN_FAILED` | 500 | Both auto-align methods failed, or it timed out | Message bar: "Auto-align didn't work. Try again, or align by hand with anchors." |
+| `YTS_UNREACHABLE` | 502 | Can't reach YTS | The Search page's error state, see [11-pages.md](11-pages.md) |
+| `YTS_BAD_RESPONSE` | 502 | YTS returned something that can't be understood (quite possibly an impostor site) | Same as above, plus a reminder to check the URL |
+| `INTERNAL` | 500 | Unexpected error | "Something went wrong. Try again." The log must have the full details |
 
-不會變成 HTTP 錯誤的失敗：
+Failures that don't become HTTP errors:
 
-- 字幕搜尋時個別來源的失敗，寫在那個來源的 `ProviderStatus.error` 裡，其他來源照常回傳。
-- 候選字幕抓檔失敗，寫在 `Candidate.fetchError`。
-- 分析、預覽資產的失敗，寫在 `MediaStatus.errors`（每種資產一格）。
-- 下載的失敗，寫在 `Torrent.error`。
-- 管理頁測試來源的結果，寫在回應的 `ok` 和 `code`。
+- Failures of individual sources during subtitle search are written in that source's `ProviderStatus.error`; other sources return as usual.
+- Failures fetching a candidate subtitle's file are written in `Candidate.fetchError`.
+- Failures of analysis and preview assets are written in `MediaStatus.errors` (one slot per asset).
+- Download failures are written in `Torrent.error`.
+- The result of testing a source on the admin page is written in the response's `ok` and `code`.

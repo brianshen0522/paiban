@@ -1,306 +1,306 @@
-# 10 儲存空間規則
+# 10 Storage rules
 
-Brian 的原話（D7）：不要做定期刪除；管理員可以在系統裡設定一個容量上限；達到上限就無法載入新的影片；必須手動刪除才能再下載。匯出檔要不要算，他交給我決定，我定的是「算」（D8）。
+Brian's own words (D7): no scheduled deletion; an administrator can set a storage limit in the system; once the limit is reached, no new films can be loaded; files must be deleted by hand before downloading again. Whether exports count, he left to me; I decided they "count" (D8).
 
-這份文件把這幾句話變成精確的規則。資料庫那一面在 `db/schema.sql` 的 `storage_usage` 和 `storage_admit`，有測試（`db/schema.test.mjs`）。
+This document turns those sentences into precise rules. The database side is `storage_usage` and `storage_admit` in `db/schema.sql`, with tests (`db/schema.test.mjs`).
 
-## 五條規則
+## Five rules
 
-1. **系統不自動刪除任何檔案。** 沒有排程、沒有保存期限、沒有「空間不夠時清掉最舊的」。每一次刪除都是某個人按下去的。
-2. **全站一個上限**，由管理員設定。沒有每人配額。
-3. **會讓用量超過上限的事不能開始。** 包含：下載新的影片、重試失敗的下載、匯出 MKV、事後要求轉預覽檔。
-4. **一開始就佔滿。** 下載被接受的那一刻，就以完整大小（加上預覽檔的預留）計入用量。不會發生「下載到一半才發現放不下」。
-5. **共用的影片只算一次。** 同一個版本不論幾個人持有都只有一份檔案；全部的人都移除才會刪除。
+1. **The system never deletes any file automatically.** No schedules, no retention periods, no "clear the oldest when space runs out". Every deletion is something a person pressed.
+2. **One limit for the whole site**, set by an administrator. No per-user quotas.
+3. **Nothing that would push usage over the limit can start.** That covers: downloading a new film, retrying a failed download, exporting an MKV, and requesting a preview file afterwards.
+4. **Take it all up front.** The moment a download is admitted, its full size (plus the preview reservation) counts toward usage. "Halfway through the download it turns out not to fit" never happens.
+5. **A shared film counts once.** One version has only one copy of its files no matter how many people hold it; it's deleted only when everyone has removed it.
 
-## 用量怎麼算
+## How usage is counted
 
-用量是五類的總和。介面上的色條和圖例就是這五類（顏色見 [17-ui.md](17-ui.md)）。
+Usage is the sum of five categories. The color bar and legend in the interface are exactly these five (colors in [17-ui.md](17-ui.md)).
 
-| 類別 | 介面上的名稱 | 包含什麼 |
+| Category | Name in the interface | What it includes |
 | --- | --- | --- |
-| `movies` | 影片 | 已完成的下載在磁碟上的實際大小，加上它們的字幕、候選字幕和分析資料。海報不算 |
-| `previews` | 預覽檔 | 預覽影片和聲音檔的實際大小；還在做的，算它的預留量 |
-| `reserved` | 下載中預留 | 還沒完成的下載（排隊、下載中、暫停）：完整大小加上預覽預留 |
-| `partial` | 失敗下載的殘留 | 失敗的下載留在磁碟上的實際大小 |
-| `exports` | 匯出的 MKV | 已完成的：實際大小；進行中的：預留量 |
+| `movies` | Videos | The actual on-disk size of finished downloads, plus their subtitles, candidate subtitles and analysis data. Posters don't count |
+| `previews` | Preview files | The actual size of preview videos and audio files; for ones still being made, their reserved amount |
+| `reserved` | Reserved for downloads | Unfinished downloads (queued, downloading, paused): full size plus the preview reservation |
+| `partial` | Left over from failed downloads | The actual size failed downloads left on disk |
+| `exports` | Exported MKVs | Finished: actual size; in progress: the reserved amount |
 
 ```
-已用 = movies + previews + reserved + partial + exports
-剩餘 = max(0, 上限 − 已用)
-超過 = 已用 > 上限
+used      = movies + previews + reserved + partial + exports
+remaining = max(0, limit − used)
+over      = used > limit
 ```
 
-介面上的 GB 是 1024³ 位元組，和 YTS 顯示的大小一致。API 一律傳位元組。
+GB in the interface means 1024³ bytes, matching the sizes YTS shows. The API always sends bytes.
 
-## 接受與拒絕（admission）
+## Admission and refusal (admission)
 
-每個會增加用量的動作，都在一個資料庫交易裡先問 `storage_admit(需求, 釋出)`，通過才寫入。函式裡有鎖，同時進來的請求會一個一個判斷。
+Every action that increases usage first asks `storage_admit(need, freed)` inside a database transaction, and writes only if it passes. The function takes a lock, so concurrent requests are judged one at a time.
 
-| 動作 | 需求 | 同時釋出 |
+| Action | Need | Freed at the same time |
 | --- | --- | --- |
-| 下載新的版本 | 影片大小 + 預覽預留 | |
-| 手動加入種子 | 最大的影片檔的大小 + 預覽預留（檔名不像 x264、8-bit 的 `.mp4` / `.m4v` 都先預留預覽） | 種子裡其他檔案不下載，不算 |
-| 重試失敗的下載 | 影片大小（YTS 列的和種子實際的取大的）+ 預覽預留 | 它的殘留大小 |
-| 拿到種子資訊後發現比 YTS 列的大 | 差額。64 MB 以內不檢查，直接記下實際大小 | |
-| 下載完才發現不能直接播 | 預覽預留（依當時的設定） | |
-| 片長比預估的長，預留要增加 | 差額。不通過就放棄預覽影片，只留聲音檔 | |
-| 事後要求預覽檔（工作台的「轉預覽檔」，或管理員重試失敗的預覽工作） | 缺的那幾樣資產的預留 | |
-| 匯出 MKV | 影片檔大小 × 1.01 + 1 MB | |
+| Download a new version | Film size + preview reservation | |
+| Add a torrent by hand | Size of the largest video file + preview reservation (`.mp4` / `.m4v` files whose names don't look like x264, 8-bit all get a preview reservation up front) | The torrent's other files aren't downloaded and don't count |
+| Retry a failed download | Film size (the larger of what YTS lists and the torrent's actual size) + preview reservation | Its leftover size |
+| Torrent info turns out larger than YTS listed | The difference. Within 64 MB, no check; just record the actual size | |
+| Turns out not to play directly after downloading | Preview reservation (by the settings at that time) | |
+| Runtime longer than estimated, reservation must grow | The difference. If it doesn't pass, give up on the preview video and keep only the audio file | |
+| Preview file requested afterwards (the workbench's "Make preview file", or an administrator retrying a failed preview job) | Reservation for the missing assets | |
+| Export an MKV | Video file size × 1.01 + 1 MB | |
 
-判斷式：`已用 − 釋出 + 需求 ≤ 上限`。**剛好等於上限是允許的。**
+The test: `used − freed + need ≤ limit`. **Exactly equal to the limit is allowed.**
 
-失敗的工作（預覽資產、匯出）會自動再試一次；那一次沿用原本的預留，不重新做 admission。預留只在最後真的失敗時釋出。
+Failed jobs (preview assets, exports) are retried once automatically; that retry keeps the original reservation without a new admission. The reservation is released only when it finally fails for good.
 
-不需要 admission 的：加入別人已經下載的版本、暫停、繼續、加入字幕（字幕很小，加入後才計入；見下方「小檔案」）。
+No admission needed for: adding a version someone else has already downloaded, pausing, resuming, adding subtitles (subtitles are small and count after being added; see "Small files" below).
 
-拒絕時回 `STORAGE_LIMIT`，帶著需求、剩餘、差額、其中多少是預覽預留。介面要用這四個數字寫出完整的句子，例如：
+On refusal, return `STORAGE_LIMIT` with the need, remaining, shortfall, and how much of it is preview reservation. The interface must use these four numbers to write a complete sentence, for example:
 
-> 空間不足。這個版本 5.9 GB，加上預覽檔約 600 MB，目前剩 5.6 GB，還差 900 MB。先刪掉不需要的影片或匯出檔，再回來下載。
+> Not enough space. This version is 5.9 GB, plus about 600 MB for the preview file; 5.6 GB is left, so 900 MB more is needed. Delete films or exports you don't need first, then come back to download.
 
-### 磁碟本身的空間
+### Space on the disk itself
 
-上限是邏輯上的數字。磁碟可能和別的東西共用，所以每次 admission 另外檢查實體空間：
+The limit is a logical number. The disk may be shared with other things, so every admission also checks physical space:
 
 ```
-可用     = /data 所在檔案系統目前的可用空間
-還沒寫入 = 每個還沒完成的下載(排隊、下載中、暫停)還沒抓下來的量
-         + 還沒做完的預覽預留(下載列上的和影片列上的)
-         + 排隊中和進行中匯出的預留
-新增寫入 = 需求 − 這次會沿用的、已經在磁碟上的量
-通過條件 :可用 − 還沒寫入 ≥ 新增寫入 + 系統保留(STORAGE_RESERVE_GB,預設 2 GB)
+available     = free space currently on the filesystem holding /data
+not yet written = the amount each unfinished download (queued, downloading, paused) hasn't fetched yet
+                + preview reservations not yet done (on download rows and on media rows)
+                + reservations of queued and running exports
+newly written = need − the amount already on disk that this action will reuse
+passes if     : available − not yet written ≥ newly written + system reserve (STORAGE_RESERVE_GB, default 2 GB)
 ```
 
-「還沒抓下來的量」是 `max(size_bytes, length_bytes) − downloaded_bytes`。暫停和排隊中的下載也要算：它們遲早會把那些空間寫滿。「這次會沿用的」只有重試時不是 0：失敗下載的殘留已經佔著磁碟，重試是接著寫，不是從頭再佔一次。
+"The amount not fetched yet" is `max(size_bytes, length_bytes) − downloaded_bytes`. Paused and queued downloads count too: sooner or later they'll fill that space. "The amount this action will reuse" is non-zero only for a retry: the failed download's leftovers already occupy the disk, and a retry continues writing rather than taking the space again from scratch.
 
-不通過回 `DISK_FULL`。這和超過上限是兩回事：介面要說明「是磁碟本身滿了，請管理員處理」。
+If it doesn't pass, return `DISK_FULL`. That's a different thing from being over the limit: the interface must say "the disk itself is full; ask an administrator to deal with it".
 
-## 預覽預留
+## Preview reservation
 
-瀏覽器不能直接播的版本需要預覽資產（聲音檔和預覽影片，見 [08-media-pipeline.md](08-media-pipeline.md)）。它們的大小在下載前不知道，所以用**轉檔的位元率上限**來預留，保證不會超過：
+Versions the browser can't play directly need preview assets (an audio file and a preview video, see [08-media-pipeline.md](08-media-pipeline.md)). Their size isn't known before downloading, so the reservation uses **the transcoding bitrate caps**, guaranteeing it won't be exceeded:
 
-| 資產 | 每秒片長預留 | 依據 |
+| Asset | Reserved per second of runtime | Basis |
 | --- | --- | --- |
-| 聲音檔 | 16,320 位元組 | 128 kbps × 1.02 |
-| 預覽影片 480p | 88,740 位元組 | (600 + 96) kbps × 1.02 |
-| 預覽影片 720p | 203,490 位元組 | (1500 + 96) kbps × 1.02 |
+| Audio file | 16,320 bytes | 128 kbps × 1.02 |
+| Preview video 480p | 88,740 bytes | (600 + 96) kbps × 1.02 |
+| Preview video 720p | 203,490 bytes | (1500 + 96) kbps × 1.02 |
 
-1.02 是容器的額外負擔。
-
-```
-預覽預留(片長秒數) =
-  能直接播                → 0
-  不能直接播、自動轉檔開   → (聲音檔 + 所選解析度的預覽影片) × 片長
-  不能直接播、自動轉檔關   → 聲音檔 × 片長
-```
-
-片長用 YTS 的 `runtime`（分鐘）；它是 0 時用 120 分鐘。探測出實際片長後重算（變多而放不下時怎麼辦，見 [08-media-pipeline.md](08-media-pipeline.md) 的「探測」）。
-
-**這個計畫在接受下載的那一刻定下來**（D40）：預留多少、要不要轉預覽影片、轉成什麼解析度，都記在那個下載上（`preview_reserve_bytes`、`preview_proxy_res`），下載完成時原樣搬到影片那一列。之後管理員改了「自動轉預覽檔」或解析度，只影響之後才接受的下載。這樣預留的空間和實際會做的事永遠對得起來：不會發生「預留了 480p 的量，完成時卻照新設定轉 720p」。
-
-| 例子 | 預留 | 實際通常是 |
-| --- | --- | --- |
-| 96 分鐘，480p | 0.56 GB | 約 0.3 GB |
-| 120 分鐘，480p | 0.70 GB | 約 0.4 GB |
-| 120 分鐘，720p | 1.47 GB | 約 0.7 GB |
-| 120 分鐘，自動轉檔關（只有聲音檔） | 0.11 GB | 約 0.08 GB |
-
-資產完成時改記實際大小，多留的自動釋出；失敗時整筆預留釋出。
-
-原型顯示的數字比較小（「480p，每 2 小時約 340 MB」），那是典型大小。正式版的介面兩個都要講：設定頁寫典型大小，並註明「下載前會先多留一些，轉完再釋出」；電影頁被擋下時用預留的數字。設定頁的選項照原型寫（「480p（每 2 小時約 340 MB）」「720p（每 2 小時約 800 MB）」，下面一行「預覽檔只用來對字幕，會算在容量上限裡。」），再加一句預留的說明。
-
-另一個和原型不同的地方：自動轉檔關掉時，原型完全不預留；正式版仍然預留聲音檔的量，因為聲音檔照樣會做（只有聲音的模式要用它）。
-
-## 把上限調低
-
-管理員可以把上限設成低於目前用量（D22）。這時：
-
-- **不刪任何東西。**
-- 所有人的下載和匯出被擋下，直到用量降到上限以下。
-- 進行中的下載繼續（它們早就計入了）。
-- 每一頁頂端的用量指示變紅；儲存空間頁顯示：「已超過容量上限。用量降到上限以下之前，所有人都不能下載或匯出。不會有任何檔案被自動刪除。」
-
-### 上限的驗證
-
-介面上以 GB 為單位輸入整數。
-
-| 輸入 | 結果 | 介面上的說明 |
-| --- | --- | --- |
-| 不是 1 以上的整數 | 拒絕 | 上限要填 1 以上的整數（GB）。 |
-| 超過磁碟能給的 | 拒絕 | 超過磁碟能提供的空間。上限最多 30 GB。 |
-| 還沒改動 | | 磁碟共 32 GB，系統保留 2 GB；上限最多可以設到 30 GB。 |
-| 低於目前用量 | **允許**，按鈕變成「仍要儲存」 | 低於目前用量 22.3 GB。儲存後不會刪除任何檔案，但在用量降到 12 GB 以下之前，所有人都不能下載或匯出。 |
-| 其他 | 允許 | 儲存後還能放 3.7 GB。 |
-
-磁碟能給的上限：
+1.02 is the container overhead.
 
 ```
-最大上限 = (已用 − 還沒寫入) + 可用 − 系統保留
+preview reservation(runtime seconds) =
+  plays directly                          → 0
+  doesn't play directly, auto-convert on  → (audio file + preview video at the chosen resolution) × runtime
+  doesn't play directly, auto-convert off → audio file × runtime
 ```
 
-也就是「這個網站已經放在磁碟上的」加上「磁碟還空著的」，扣掉保留。磁碟專門給這個網站用的話，它大約就是磁碟大小減保留。
+Runtime uses YTS's `runtime` (minutes); when it's 0, use 120 minutes. Recompute once the actual runtime is probed (for what happens when it grows and no longer fits, see [08-media-pipeline.md](08-media-pipeline.md), "1. Probe").
 
-「還沒改動」那一句和原型略有不同：原型寫「…，所以上限最多 30 GB」，那是假設整顆磁碟都給這個網站用。磁碟和別的東西共用時，最大上限不等於磁碟大小減保留，所以正式版不寫「所以」。三個數字來自 `DiskInfo`（`totalBytes`、`reserveBytes`、`maxLimitBytes`）。
+**This plan is fixed the moment the download is admitted** (D40): how much to reserve, whether to make a preview video, and at what resolution are all recorded on that download (`preview_reserve_bytes`, `preview_proxy_res`) and carried over unchanged to the media row when the download finishes. If an administrator later changes "auto-convert preview files" or the resolution, it only affects downloads admitted after that. That way the reserved space and what will actually be done always match: "reserved for 480p, but on completion converted to 720p under the new setting" never happens.
 
-儲存之後的提示：「上限已改成 26 GB。」；改完之後用量超過上限時，後面加「目前超過上限，下載與匯出會被擋下。」；數字沒變就按儲存是「上限沒有變。」
-
-`STORAGE_LIMIT_GB` 這個環境變數只在第一次啟動、設定表裡還沒有上限時寫入一次。**沒有設定上限時，任何東西都不能開始**（`storage_admit` 回不通過）。
-
-## 刪除
-
-所有刪除都由人發起。介面在按下去之前要說清楚會發生什麼、釋出多少。文案在原型裡都有，照用。
-
-| 誰 | 動作 | 結果 |
+| Example | Reserved | Usually actual |
 | --- | --- | --- |
-| 持有人 | 從片庫移除，還有別人持有 | 只是不在他的片庫了。檔案不動，**不釋出空間**。確認訊息要講明這一點 |
-| 持有人 | 從片庫刪除整部片（他是最後一位） | 影片、預覽檔、這部片的字幕和同步結果，以及**這部片的所有匯出檔**全部刪除（Brian，2026-10-06）。別人建立的匯出檔，建立者會收到通知 |
-| 持有人 | 取消進行中或排隊中的下載 | 同上的邏輯：還有別人就只是退出，否則停止並刪除已下載的部分 |
-| 持有人 | 移除失敗的下載 | 刪除殘留 |
-| 建立者或管理員 | 刪除匯出檔 | 刪除那個 MKV |
-| 持有人 | 移除一條字幕 | 刪除字幕和同步結果。很小，不值得提空間 |
-| 持有人 | 移除一條候選字幕 | 刪除那條候選和它抓下來的檔案（主要是清掉失敗的上傳）。不用確認框 |
-| 管理員 | 強制刪除任何項目 | 不論誰持有。刪影片時連這部片的所有匯出檔一起刪。受影響的人會收到通知（`item.deleted`）：電影、預留、殘留、預覽檔通知每位持有人，匯出檔通知建立者，不通知按下刪除的管理員自己。這則通知是正式版新增的，原型沒有 |
-| 管理員 | 刪除預覽檔 | 預覽影片和聲音檔一起刪，正在轉的也會停下來。**不會自動重轉**：之後有人要同步這部片時，在工作台按「轉預覽檔」 |
-| 管理員 | 刪除孤兒資料夾 | 重新計算用量時發現的、資料庫裡沒有紀錄的資料夾。刪掉那個資料夾 |
-| 管理員 | 移除一個帳號 | **不刪他的任何檔案。** 他獨自持有的項目變成沒有持有人，留在儲存空間管理頁等管理員決定 |
+| 96 minutes, 480p | 0.56 GB | about 0.3 GB |
+| 120 minutes, 480p | 0.70 GB | about 0.4 GB |
+| 120 minutes, 720p | 1.47 GB | about 0.7 GB |
+| 120 minutes, auto-convert off (audio file only) | 0.11 GB | about 0.08 GB |
 
-### 確認的文字
+When an asset finishes, its actual size is recorded instead and the excess is released automatically; on failure the whole reservation is released.
 
-每一種刪除在按下去之前都有一段說明。片庫頁的兩段（最重要的）在 [11-pages.md](11-pages.md)；其餘的在這裡，照原型的寫法，數字換成實際的。
+The prototype shows smaller numbers ("480p, about 340 MB per 2 hours"); those are typical sizes. The real interface must say both: the settings page gives the typical size and notes "Some extra space is reserved before downloading and released once the file is made"; when blocked on the film page, use the reserved number. The settings page options follow the prototype ("480p (about 340 MB per 2 hours)", "720p (about 800 MB per 2 hours)", with a line below: "Preview files are only for syncing subtitles and count toward the storage limit."), plus a sentence explaining the reservation.
 
-儲存空間頁（所有人）的「我持有的項目」：
+Another difference from the prototype: with auto-convert off, the prototype reserves nothing at all; the real version still reserves the audio file's amount, because the audio file is made regardless (audio-only mode needs it).
 
-| 情況 | 文字 | 按鈕 |
+## Lowering the limit
+
+An administrator can set the limit below current usage (D22). Then:
+
+- **Nothing is deleted.**
+- Everyone's downloads and exports are blocked until usage falls below the limit.
+- Downloads in progress continue (they were counted long ago).
+- The usage indicator at the top of every page turns red; the Storage page shows: "Over the storage limit. Nobody can download or export until usage is back under the limit. No files are deleted automatically."
+
+### Validating the limit
+
+The interface takes a whole number in GB.
+
+| Input | Result | Explanation in the interface |
 | --- | --- | --- |
-| 還沒下載完 | 取消並刪除已下載的部分？ | 取消下載 |
-| 已完成，還有別人持有 | 從你的片庫移除？美玲 還持有，不會釋放空間。 | 移除 |
-| 已完成，自己是最後一位 | 刪除後釋放 2.3 GB，字幕和 1 個匯出的 MKV 也會一起刪掉。（沒有匯出檔時不提；大小含匯出檔） | 移除 |
-| 失敗下載的殘留 | 移除這筆紀錄並刪除殘留的 300 MB？ | 移除 |
-| 自己建立的匯出檔 | 刪除後釋放 1.9 GB。 | 刪除 |
+| Not a whole number of 1 or more | Rejected | The limit must be a whole number of 1 or more (GB). |
+| More than the disk can give | Rejected | More than the disk can provide. The limit can be at most 30 GB. |
+| Not changed yet | | The disk has 32 GB in total, with 2 GB kept for the system; the limit can be set up to 30 GB. |
+| Below current usage | **Allowed**; the button becomes "Save anyway" | Below the current usage of 22.3 GB. Saving won't delete any files, but nobody can download or export until usage drops below 12 GB. |
+| Anything else | Allowed | After saving, 3.7 GB more will fit. |
 
-展開確認框的那個按鈕，文字依情況是：「取消下載」（還沒下載完）、「從片庫移除」（還有別人持有）、「刪除」（自己是最後一位；匯出檔）、「移除」（失敗的殘留）。原型對失敗的殘留用的是「取消並刪除已下載的部分？」，和下載頁不一致；正式版統一用下載頁那一句。
+The most the disk can give:
 
-這一頁的每一列：種類、名稱（影片後面附「另有預覽檔 430 MB」）、大小、誰持有（只有自己時寫「只有你」）、動作。匯出檔那幾列另外有「下載」（原型的這一頁沒有下載按鈕）。刪除整部片時匯出檔會一起刪掉，要留的話先下載。
+```
+max limit = (used − not yet written) + available − system reserve
+```
 
-另外兩個確認在別的頁面：字幕分頁移除字幕是「移除這條字幕和它的同步結果？」；匯出分頁刪除匯出檔是「刪除這個匯出檔，釋放 1.9 GB？」。
+That is, "what this site already has on the disk" plus "what's still free on the disk", minus the reserve. If the disk is dedicated to this site, it's roughly the disk size minus the reserve.
 
-儲存空間管理頁（管理員）的強制刪除：
+The "not changed yet" sentence differs slightly from the prototype: the prototype says "…, so the limit can be at most 30 GB", which assumes the whole disk belongs to this site. When the disk is shared with other things, the max limit isn't the disk size minus the reserve, so the real version doesn't say "so". The three numbers come from `DiskInfo` (`totalBytes`, `reserveBytes`, `maxLimitBytes`).
 
-| 項目 | 文字 |
+Message after saving: "The limit is now 26 GB."; if usage is over the limit after the change, append "Currently over the limit; downloads and exports will be blocked."; pressing save without changing the number gives "The limit didn't change."
+
+The `STORAGE_LIMIT_GB` environment variable is written only once, on first startup, when the settings table has no limit yet. **With no limit set, nothing can start** (`storage_admit` returns not passed).
+
+## Deletion
+
+Every deletion is started by a person. Before the button is pressed, the interface must say clearly what will happen and how much is freed. The prototype has all the copy; use it.
+
+| Who | Action | Result |
+| --- | --- | --- |
+| Holder | Remove from Library while others still hold it | It's just no longer in their library. The files stay put and **no space is freed**. The confirmation must say so |
+| Holder | Delete the whole film from Library (they're the last one) | The video, preview files, this film's subtitles and sync results, and **all of this film's exports** are deleted (Brian, 2026-10-06). For exports made by others, their creators get a notification |
+| Holder | Cancel a running or queued download | Same logic as above: if others still hold it, just leave; otherwise stop and delete what was downloaded |
+| Holder | Remove a failed download | Delete the leftovers |
+| Creator or administrator | Delete an export | Delete that MKV |
+| Holder | Remove subtitles | Delete the subtitles and their sync. Very small, not worth mentioning space |
+| Holder | Remove a candidate | Delete that candidate and the files fetched for it (mainly to clear failed uploads). No confirmation dialog |
+| Administrator | Force delete any item | Regardless of who holds it. Deleting a film also deletes all of its exports. Affected people get a notification (`item.deleted`): for films, reservations, leftovers and preview files, every holder is notified; for exports, the creator; the administrator who pressed delete is not notified. This notification is new in the real version; the prototype doesn't have it |
+| Administrator | Delete a preview file | The preview video and audio file are deleted together, and one being converted is stopped. **It isn't reconverted automatically**: the next person who wants to sync this film presses "Make preview file" in the workbench |
+| Administrator | Delete an orphan folder | A folder found while recounting usage that has no record in the database. Delete that folder |
+| Administrator | Remove an account | **None of their files are deleted.** Items they held alone end up with no holder and stay on the Storage management page for an administrator to decide |
+
+### Confirmation wording
+
+Every kind of deletion has an explanation before it's pressed. The two on the Library page (the most important) are in [11-pages.md](11-pages.md); the rest are here, written as in the prototype, with the numbers replaced by real ones.
+
+"What I hold" on the Storage page (everyone):
+
+| Situation | Text | Button |
+| --- | --- | --- |
+| Not finished downloading | Cancel and delete what was downloaded? | Cancel download |
+| Finished, others still hold it | Remove from your library? Meiling still holds it, so no space will be freed. | Remove |
+| Finished, you're the last one | Deleting frees 2.3 GB; the subtitles and 1 exported MKV are deleted too. (Not mentioned when there are no exports; the size includes the exports) | Remove |
+| Leftovers from a failed download | Remove this entry and delete the 300 MB left over? | Remove |
+| An export you made | Deleting frees 1.9 GB. | Delete |
+
+The button that opens the confirmation dialog reads, depending on the situation: "Cancel download" (not finished downloading), "Remove from Library" (others still hold it), "Delete" (you're the last one; exports), "Remove" (failed leftovers). For failed leftovers the prototype used "Cancel and delete what was downloaded?", inconsistent with the Downloads page; the real version uses the Downloads page's sentence throughout.
+
+Each row on this page: kind, name (films are followed by "plus a 430 MB preview file"), size, holders ("Only you" when it's just you), action. Export rows also have "Download" (the prototype's version of this page has no download button). Deleting a whole film deletes its exports too; download them first to keep them.
+
+Two other confirmations are on other pages: removing subtitles on the Subtitles tab is "Remove these subtitles and their sync?"; deleting an export on the Export tab is "Delete this export and free 1.9 GB?".
+
+Force delete on the Storage management page (administrators):
+
+| Item | Text |
 | --- | --- |
-| 影片，有人持有 | 會從 2 位持有人的片庫移除，連同字幕、預覽檔和 1 個匯出的 MKV 一起刪掉，釋放 4.2 GB。 |
-| 影片，沒有人持有 | 目前沒有人持有。連同字幕、預覽檔和 1 個匯出的 MKV 一起刪掉，釋放 4.2 GB。 |
-| 下載中預留 | 取消 美玲 的下載並刪除已下載的部分。 |
-| 失敗下載的殘留 | 刪除殘留的 300 MB。 |
-| 預覽檔 | 刪除預覽檔。之後有人要同步這部片時，要在工作台再按一次「轉預覽檔」。 |
-| 匯出的 MKV | 刪除 美玲 的匯出檔，釋放 1.9 GB。 |
-| 孤兒資料夾 | 這個資料夾在資料庫裡沒有紀錄。刪除後釋放 1.2 GB。 |
+| Film, held by someone | Removes it from 2 holders' libraries and deletes it along with its subtitles, preview file and 1 exported MKV, freeing 4.2 GB. |
+| Film, held by nobody | Nobody holds it right now. Deletes it along with its subtitles, preview file and 1 exported MKV, freeing 4.2 GB. |
+| Reserved for downloads | Cancels Meiling's download and deletes what was downloaded. |
+| Leftovers from a failed download | Deletes the 300 MB left over. |
+| Preview file | Deletes the preview file. Whoever syncs this film next has to press "Make preview file" in the workbench again. |
+| Exported MKV | Deletes Meiling's export, freeing 1.9 GB. |
+| Orphan folder | This folder has no record in the database. Deleting it frees 1.2 GB. |
 
-預覽檔那一句和原型不同（原型寫「會重新轉檔」，正式版不會自動重轉）；孤兒資料夾那一句是新增的。沒有預覽檔的影片，句子裡的「和預覽檔」拿掉。
+The preview file sentence differs from the prototype (the prototype says "it will be converted again"; the real version doesn't reconvert automatically); the orphan folder sentence is new. For films without a preview file, drop "preview file" from the sentence.
 
-### 哪些清理不算「自動刪除」
+### Which clean-ups don't count as "automatic deletion"
 
-規則 1 保護的是使用者放進來或做出來的東西：影片、預覽檔、字幕、同步結果、匯出檔，以及失敗下載的殘留。下面這些是程式自己的草稿，不在保護範圍內，而且**只有這些**可以由程式自行移除：
+Rule 1 protects things users put in or made: films, preview files, subtitles, sync results, exports, and leftovers from failed downloads. The things below are the program's own scratch work, outside that protection, and **only these** may be removed by the program on its own:
 
-| 東西 | 什麼時候移除 |
+| Thing | When it's removed |
 | --- | --- |
-| `/data/tmp/` 裡的上傳暫存和工作目錄 | 用它的那個工作結束時；`media` 啟動時，也清掉已經沒有候選在等的上傳或下載暫存（那條候選被移除、處理完、或卡住超過 10 分鐘被標成失敗） |
-| `*.part`（寫到一半的預覽檔、聲音檔、匯出檔） | 那個工作失敗或被取消時；`media` 啟動時清掉 `/data/media` 和 `/data/exports` 底下上次殘留的。**不去 `/data/torrents` 底下找**：那裡是下載來的內容，就算有檔名叫 `.part` 的也不是我們的 |
-| 匯出時暫存的字幕軌檔（`tracks/`） | 封裝有了最後的結果（完成、兩次都失敗、被取消、來源的電影被移除）時。由封裝工作刪；電影被移除時 `torrent` 也替它標成失敗的那些匯出刪（[03-data-model.md](03-data-model.md)）；`api` 建立匯出時寫好了軌檔、那一列卻沒寫進去，也刪掉自己剛寫的 |
-| 一個工作（或 `api` 的「加入字幕」）剛寫出來的東西，而它最後那一筆帶條件的寫入沒有成功：電影在途中被移除、預覽資產被管理員刪掉、候選被移除、匯出被取消 | 它把自己剛寫出來的檔案刪掉，自己建立的資料夾空了也一併刪掉。這是那一次刪除或取消的一部分，不是另一次；沒有它，刪除之後會冒出沒有紀錄的資料夾（[03-data-model.md](03-data-model.md)） |
-| 佇列系統自己的工作紀錄 | 由 pg-boss 管理 |
-| 對外查詢的快取（`provider_cache`）、重新計算的發現（`storage_findings`） | 資料表裡的列，不是檔案。快取在下次查詢時覆寫；發現在下次重新計算時整批換新 |
+| Upload temp files and working directories in `/data/tmp/` | When the job using it ends; when `media` starts, it also clears upload or download temp files no candidate is waiting on anymore (that candidate was removed, processed, or stuck for over 10 minutes and marked failed) |
+| `*.part` (half-written preview files, audio files, exports) | When that job fails or is cancelled; when `media` starts, it clears ones left over from last time under `/data/media` and `/data/exports`. **It doesn't look under `/data/torrents`**: that's downloaded content, and even a file named `.part` there isn't ours |
+| Subtitle track files staged for export (`tracks/`) | When packing reaches a final result (done, failed twice, cancelled, the source film removed). Deleted by the packing job; when the film is removed, `torrent` also deletes them for the exports it marks failed ([03-data-model.md](03-data-model.md)); if `api` wrote the track files while creating an export but the row wasn't written, it also deletes what it just wrote |
+| What a job (or `api`'s "add subtitles") just wrote, when its final conditional write didn't succeed: the film was removed partway, the preview asset was deleted by an administrator, the candidate was removed, the export was cancelled | It deletes the files it just wrote, and any folder it created that is now empty. This is part of that deletion or cancellation, not a separate one; without it, folders with no record would appear after a deletion ([03-data-model.md](03-data-model.md)) |
+| The queue system's own job records | Managed by pg-boss |
+| The outbound lookup cache (`provider_cache`), recount findings (`storage_findings`) | Table rows, not files. The cache is overwritten on the next lookup; findings are replaced wholesale on the next recount |
 
-**為了讓這條規則守得住，程式裡只有一個模組可以刪除 `/data` 底下的東西**（例如 `apps/server/src/storage/remove.ts`）。它的每個函式對應「刪除」那張表（誰、動作、結果）或上面這張草稿清理表裡的一種情況，而且都要留下紀錄：使用者發起的寫進 `audit_log`，草稿清理寫進 log。其他地方不直接呼叫 `rm`、`unlink`、`rmdir`；WebTorrent 的 `client.remove(…, { destroyStore: true })` 也算刪除，同樣只能從這個模組呼叫。
+**To make this rule hold, only one module in the code may delete things under `/data`** (e.g. `apps/server/src/storage/remove.ts`). Each of its functions corresponds to one case in the "Deletion" table (who, action, result) or in the scratch clean-up table above, and each must leave a record: user-initiated ones go into `audit_log`, scratch clean-ups into the log. Nothing else calls `rm`, `unlink` or `rmdir` directly; WebTorrent's `client.remove(…, { destroyStore: true })` also counts as deletion and may likewise only be called from this module.
 
-加一個掃描原始碼的測試檢查這件事。它要確認的是兩點：
+Add a test that scans the source code for this. It must confirm two things:
 
-- 會刪檔的呼叫只出現在這個模組裡。
-- **沒有任何刪除是由「時間到了」或「東西舊了」決定的。** 程式裡當然有定時跑的迴圈（`torrent` 每 2 秒看一次有沒有 `want = 'remove'` 的列）；那不算，因為它執行的是某個人已經按下去的刪除。要擋的是「比較時間戳、超過多久就刪」這一類的判斷：刪除模組的函式不接受、也不計算任何「多久以前」的條件。
+- Calls that delete files appear only in this module.
+- **No deletion is decided by "time is up" or "it's old".** The code naturally has loops that run on a timer (`torrent` checks every 2 seconds for rows with `want = 'remove'`); that doesn't count, because what it executes is a deletion someone has already pressed. What's being blocked is the "compare timestamps, delete after so long" kind of decision: the deletion module's functions neither accept nor compute any "how long ago" condition.
 
-## 小檔案
+## Small files
 
-字幕、候選字幕、波形、人聲資料都很小（一部片加起來幾 MB）。它們照實計入 `movies`，但**加入時不做 admission**：為了幾百 KB 擋下「加入字幕」沒有意義。用量因此可能略微超過上限（幅度是 MB 等級），這是可以接受的；之後的下載和匯出仍然會被擋。
+Subtitles, candidate subtitles, waveforms and speech data are all small (a few MB per film in total). They're counted in `movies` as they are, but **no admission is done when adding them**: blocking "add subtitles" over a few hundred KB makes no sense. Usage may therefore go slightly over the limit (by MBs), which is acceptable; later downloads and exports are still blocked.
 
-海報更小，而且和電影一起刪除，所以不計入用量，資料庫裡也沒有它的大小。`/data/tmp` 底下的暫存同樣不計入。
+Posters are even smaller and are deleted along with the film, so they don't count toward usage, and the database doesn't store their size. Temp files under `/data/tmp` don't count either.
 
-候選字幕的檔案在使用者按「排名」或「加入」時才會抓。重新搜尋不會刪掉已經抓過的候選；它們和電影一起刪除，或由持有人一條一條移除。
+Candidate subtitle files are fetched only when the user presses "Rank" or "Add". Searching again doesn't delete candidates already fetched; they're deleted with the film, or removed one by one by a holder.
 
-## 重新計算用量
+## Recounting usage
 
-資料庫裡的數字是在各個時間點量的。管理員的「重新計算用量」實際走一遍磁碟。磁碟大的時候這要一點時間，所以它是背景工作（`storage.rescan`）：按鈕按下去立刻回來，頁面顯示「重新計算中」，做完時收到事件再更新。
+The numbers in the database were measured at various points in time. An administrator's "Recount usage" actually walks the disk. On a big disk this takes a while, so it's a background task (`storage.rescan`): the button returns immediately, the page shows "Recounting…", and it updates when the completion event arrives.
 
-1. 每個已完成或失敗的下載：量資料夾大小，和 `disk_bytes` 不同就更新。還在下載的不量（它們算的是預留，不是實際大小）。
-2. 預覽資產、分析資料、字幕、候選、匯出檔：同樣處理。
-3. 找出**孤兒**：下面五個地方底下，資料庫裡沒有對應紀錄的資料夾。
+1. Each finished or failed download: measure the folder size and update `disk_bytes` if it differs. Downloads still in progress aren't measured (they count the reservation, not the actual size).
+2. Preview assets, analysis data, subtitles, candidates, exports: handled the same way.
+3. Find **orphans**: folders under the five places below with no matching record in the database.
 
-   | 位置（`root`） | 資料夾名稱對應到 |
+   | Location (`root`) | Folder name maps to |
    | --- | --- |
    | `/data/torrents`(`torrents`) | `torrents.info_hash` |
    | `/data/media`(`media`) | `media_files.id` |
-   | `/data/subtitles`（`subtitles`） | `subtitles.id`。這一層的 `candidates` 資料夾跳過，它是下一列 |
+   | `/data/subtitles` (`subtitles`) | `subtitles.id`. The `candidates` folder at this level is skipped; it's the next row |
    | `/data/subtitles/candidates`(`candidates`) | `subtitle_candidates.id` |
    | `/data/exports`(`exports`) | `exports.id` |
 
-4. 找出**遺失**：資料庫有紀錄但檔案不見了（完成的下載沒有主影片檔、完成的匯出沒有 MKV、字幕沒有 `cues.json`）。
-5. 把第 3、4 步的結果寫進 `storage_findings`（先清空上一次的，再寫入這一次的），`NOTIFY`（`storage`）。
+4. Find **missing**: records in the database whose files are gone (a finished download without its main video file, a finished export without its MKV, subtitles without `cues.json`).
+5. Write the results of steps 3 and 4 into `storage_findings` (clear the previous run's first, then write this run's), then `NOTIFY` (`storage`).
 
-**這個工作只更新數字和回報，不刪任何東西。**
+**This job only updates numbers and reports; it deletes nothing.**
 
-孤兒和遺失出現在儲存空間管理頁的「重新計算時發現的」區塊，以及總覽頁的「需要處理」。孤兒由管理員決定刪不刪（`DELETE /api/admin/storage/items/orphan/<那一筆發現的 id>`；路徑由那一筆紀錄的 `root` 和 `name` 組出來，不是從請求來的）；刪除前再確認一次它仍然沒有對應的紀錄。遺失的只能看，處理方式是把那個項目移除。
+Orphans and missing items appear in the "Found while recounting" section of the Storage management page, and under "Needs attention" on the Overview page. Whether to delete an orphan is up to an administrator (`DELETE /api/admin/storage/items/orphan/<id of that finding>`; the path is built from that record's `root` and `name`, not taken from the request); before deleting, confirm once more that it still has no matching record. Missing items are view-only; to deal with one, remove that item.
 
-**孤兒不計入用量**：用量只算資料庫裡有紀錄的東西。但它們確實佔著磁碟，會讓「磁碟本身的空間」那一項檢查更早擋下來，所以要讓管理員看得到。正常運作不該產生孤兒；出現的話通常是程式在刪除途中被強制終止，或有人手動動過 `/data`。
+**Orphans don't count toward usage**: usage only counts things the database has records for. But they really do take up disk space and make the "Space on the disk itself" check block sooner, so administrators need to be able to see them. Normal operation shouldn't produce orphans; when they appear, it's usually because the program was killed in the middle of a deletion, or someone touched `/data` by hand.
 
-## 介面上的呈現
+## How it appears in the interface
 
-| 位置 | 內容 |
+| Where | What |
 | --- | --- |
-| 每一頁頂端 | 用量指示：一條細的進度條加「22.3 GB / 26 GB」。剩不到 2 GB 變黃；剩不到 0.5 GB 或已超過變紅。點了進儲存空間頁 |
-| 電影頁 | 「容量：已用 20.5 GB，上限 26 GB，還能放 5.6 GB。」加色條。放不下的版本按下載時，在那一列下方展開說明 |
-| 匯出分頁 | 「匯出檔約 1.9 GB，和原檔一樣大。目前剩 3.7 GB，匯出後剩 1.8 GB。」數字用 `Workspace.exportNeedBytes`（比原檔多 1% 左右，是檢查空間時實際用的量）。放不下時變成紅色的說明並停用「開始匯出」 |
-| 儲存空間頁（所有人） | 大數字、色條、圖例、四條規則、我持有的項目（`GET /api/storage`）和我建立的匯出檔（`GET /api/exports`；可以下載、刪除）。項目可以從這裡移除。超過上限時頂端是紅色的說明（句子在「把上限調低」）；剩不到 2 GB 時是黃色的：「空間快滿了。只剩 1.6 GB，大一點的版本已經放不下。」 |
-| 儲存空間管理頁（管理員） | 同樣的用量、上限的表單、所有項目由大到小、強制刪除、重新計算、重新計算時發現的孤兒與遺失 |
-| 總覽頁（管理員） | 超過上限或剩不到 2 GB 時出現在「需要處理」 |
+| Top of every page | Usage indicator: a thin progress bar plus "22.3 GB / 26 GB". Yellow when under 2 GB is left; red when under 0.5 GB is left or over the limit. Clicking it goes to the Storage page |
+| Film page | "Storage: 20.5 GB used, limit 26 GB, 5.6 GB more fits." plus the color bar. When download is pressed on a version that doesn't fit, an explanation expands below that row |
+| Export tab | "The export is about 1.9 GB, the same size as the original. 3.7 GB is left now; 1.8 GB will be left after exporting." The number uses `Workspace.exportNeedBytes` (about 1% more than the original, the amount actually used for the space check). When it doesn't fit, this becomes a red explanation and "Start export" is disabled |
+| Storage page (everyone) | Big number, color bar, legend, the four rules, What I hold (`GET /api/storage`) and Exports I made (`GET /api/exports`; can be downloaded and deleted). Items can be removed from here. When over the limit, there's a red explanation at the top (wording in "Lowering the limit"); when under 2 GB is left, a yellow one: "Space is almost full. Only 1.6 GB is left, so larger versions no longer fit." |
+| Storage management page (administrators) | The same usage, the limit form, all items from largest to smallest, force delete, recount, and the orphans and missing items found while recounting |
+| Overview page (administrators) | Shows up under "Needs attention" when over the limit or when under 2 GB is left |
 
-儲存空間頁上的四條規則（照原型）：
+The four rules on the Storage page (as in the prototype):
 
-- 系統不會自動刪除任何檔案。要釋放空間，只能由人手動刪除。
-- 用量加上新的影片會超過上限時，不能開始下載；匯出 MKV 也一樣要有空間。
-- 下載一開始就以完整大小佔位，不會下載到一半才發現放不下。
-- 多人共用的影片只佔一份空間，要所有人都移除才會真的刪檔。
+- The system never deletes files on its own. Space is freed only when someone deletes something.
+- A download can't start if it would go over the limit; exporting an MKV needs space too.
+- A download reserves its full size from the start, so it never runs out of space halfway.
+- A film shared by several people takes space once, and is only deleted when everyone removes it.
 
-用量變動時發 `usage` 事件給所有人，頂端的指示即時更新。
+When usage changes, a `usage` event goes to everyone, and the indicator at the top updates live.
 
-## 要測的情況
+## Cases to test
 
-`db/schema.test.mjs` 已經涵蓋資料庫這一面。應用程式層面至少要有下面這些。它們分屬三個階段，因為預覽檔和匯出要到後面的階段才存在（[14-plan.md](14-plan.md)）。
+`db/schema.test.mjs` already covers the database side. The application level needs at least the cases below. They fall into three phases, because preview files and exports don't exist until later phases ([14-plan.md](14-plan.md)).
 
-階段 3（下載）：
+Phase 3 (downloads):
 
-- 剩 5 GB 時，兩個 3 GB 的下載同時送出：恰好一個成功。
-- 需求剛好等於剩餘：成功。多 1 位元組：失敗，而且錯誤裡的差額是 1。
-- 加入別人已有的版本：用量不變，不論剩多少都成功。
-- 重試失敗的下載：需求扣掉殘留。
-- 把上限調到低於用量：成功；之後下載回 `STORAGE_LIMIT`；磁碟上的檔案數量不變。
-- 最後一位持有人移除：資料夾消失、用量下降。
-- 不是最後一位：資料夾還在、用量不變。
-- 最後一位移除的同時另一個人加入：要嘛加入成功而檔案留著，要嘛加入的人收到 `TORRENT_STATE`；不會出現「加入成功但檔案被刪了」。
-- 移除帳號：他的檔案都還在，出現在管理頁，持有人是空的。
-- 不能直接播的版本：接受下載時用量多了預覽預留；之後改掉預覽的設定，這個下載的預留和計畫不變。
-- 種子比 YTS 列的大超過 64 MB 而空間不夠：下載失敗，已下載的部分還在，用量算的是殘留。
-- 沒有設定上限：什麼都不能開始。
-- 磁碟本身的可用空間不夠（上限還沒到）：回 `DISK_FULL`。
-- 原始碼掃描：除了指定的模組，沒有其他地方刪除 `/data` 底下的檔案；沒有任何刪除是依時間或新舊決定的（見「哪些清理不算自動刪除」）。
+- With 5 GB left, two 3 GB downloads submitted at the same time: exactly one succeeds.
+- Need exactly equal to remaining: succeeds. One byte more: fails, and the shortfall in the error is 1.
+- Adding a version someone else already has: usage unchanged, succeeds no matter how much is left.
+- Retrying a failed download: the need minus the leftovers.
+- Lowering the limit below usage: succeeds; downloads afterwards return `STORAGE_LIMIT`; the number of files on disk is unchanged.
+- The last holder removes it: the folder disappears and usage drops.
+- Not the last one: the folder stays and usage is unchanged.
+- Someone joins while the last holder is removing: either the join succeeds and the files stay, or the joiner gets `TORRENT_STATE`; "join succeeded but the files were deleted" never happens.
+- Removing an account: all their files are still there, shown on the admin page with no holders.
+- A version that doesn't play directly: usage includes the preview reservation when the download is admitted; after changing the preview settings, this download's reservation and plan are unchanged.
+- Torrent more than 64 MB larger than YTS listed and not enough space: the download fails, what was downloaded stays, and usage counts the leftovers.
+- No limit set: nothing can start.
+- Not enough free space on the disk itself (limit not yet reached): returns `DISK_FULL`.
+- Source scan: nothing outside the designated module deletes files under `/data`; no deletion is decided by time or age (see "Which clean-ups don't count as "automatic deletion"").
 
-階段 4（預覽檔）：
+Phase 4 (preview files):
 
-- 預覽檔完成後，用量從預留值變成實際值。
-- 預覽檔失敗（兩次都失敗）：預留釋出；第一次失敗時預留還在。
-- 管理員刪除轉到一半的預覽檔：ffmpeg 停下來，沒有留下檔案，預留歸零。
-- 事後要求預覽檔而空間不夠：回 `STORAGE_LIMIT`，狀態不變。
-- 重新計算用量：手動放一個多餘的資料夾、手動刪掉一個檔案，兩者都出現在發現的清單裡；磁碟上沒有任何東西被刪。
+- After a preview file finishes, usage changes from the reserved value to the actual value.
+- Preview file fails (fails twice): the reservation is released; after the first failure the reservation is still there.
+- An administrator deletes a half-converted preview file: ffmpeg stops, no files are left, and the reservation goes to zero.
+- Requesting a preview file afterwards without enough space: returns `STORAGE_LIMIT`, state unchanged.
+- Recounting usage: put an extra folder in by hand and delete a file by hand; both show up in the findings list; nothing on disk is deleted.
 
-階段 7（匯出）：
+Phase 7 (exports):
 
-- 空間不夠時不能匯出；把上限調到低於用量之後也不能。
-- 最後一位持有人移除電影：匯出檔還在、還能下載。
-- 匯出失敗（兩次都失敗）：預留釋出、沒有留下 `.part` 和 `tracks/`。
+- Can't export when space is short; also can't after lowering the limit below usage.
+- The last holder removes the film: the exports are still there and can still be downloaded.
+- Export fails (fails twice): the reservation is released; no `.part` or `tracks/` is left behind.

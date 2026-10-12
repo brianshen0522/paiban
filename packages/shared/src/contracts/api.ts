@@ -287,7 +287,7 @@ export type Torrent = {
 
 /* ------------------------------------------------------------------ torrents added by hand */
 
-/** Why a magnet link or .torrent file cannot be used (docs/06-torrent-worker.md, "手動加入"). */
+/** Why a magnet link or .torrent file cannot be used (docs/06-torrent-worker.md, "Adding by hand"). */
 export type TorrentInvalidReason = 'BAD_MAGNET' | 'BAD_TORRENT' | 'NO_VIDEO_FILE' | 'UNSAFE_PATH' | 'NO_METADATA';
 
 /**
@@ -322,7 +322,7 @@ export type TorrentInspection = {
 export type ManualTorrentBody = { inspectionId: Id; tmdbId: number };
 
 /**
- * What one download is doing right now, for its detail page (docs/11-pages.md, "下載細節"). Only
+ * What one download is doing right now, for its detail page (docs/11-pages.md, "Download details"). Only
  * made while someone has that page open; refreshed every 2 seconds.
  */
 export type TorrentLivePeer = {
@@ -397,7 +397,7 @@ export type MediaStatus = {
    */
   errors: Partial<Record<'analysis' | 'audio' | 'proxy' | 'asr', MediaErrorCode>>;
   /**
-   * Speech recognition on a few windows of the film, for auto-align (docs/08, "語音辨識").
+   * Speech recognition on a few windows of the film, for auto-align (docs/08, "Speech recognition").
    * `language` is what was heard (ISO 639-1, as Whisper reports it). 'none' = switched off.
    */
   asr: { state: AssetState; language: string | null };
@@ -534,7 +534,7 @@ export type AlignResult = {
   /** Two independent engines put every line within 0.15 s of each other. */
   agree: boolean;
   /**
-   * What speech recognition contributed (docs/08, "語音辨識"); null when the film has none.
+   * What speech recognition contributed (docs/08, "Speech recognition"); null when the film has none.
    * `pairs`: recognised lines matched with subtitle lines, by text (`via: 'text'`, same language)
    * or by the language model (`'llm'`). `support`: how many of them the chosen alignment agrees
    * with. `via: 'none'` with `llmError` set: the model was asked and failed.
@@ -547,7 +547,7 @@ export type AlignResult = {
     llmError: LlmErrorCode | null;
   } | null;
   /**
-   * Aligned to another subtitle of the same film (docs/08, "依另一條字幕對齊"); null otherwise.
+   * Aligned to another subtitle of the same film (docs/08, "Align by other subtitles"); null otherwise.
    * `via`: lines paired by text (same language), by the language model, or none paired and the
    * timing of the reference's lines decided (`timing`).
    */
@@ -567,7 +567,7 @@ export type AlignResult = {
   extraLines: number[];
 };
 
-/** A tiny fixed pairing question sent to the configured model (docs/13-settings.md, "測試連線"). */
+/** A tiny fixed pairing question sent to the configured model (docs/13-settings.md, "Test connection"). */
 /* ------------------------------------------------------------------ language models (docs/18-llm.md) */
 
 /** `self-hosted`: any server speaking the OpenAI protocol (vLLM, LM Studio…); `ollama`: Ollama's own API. */
@@ -645,7 +645,7 @@ export type LlmCheck = { ok: boolean; code: 'OK' | 'WRONG_ANSWER' | LlmErrorCode
 
 export type LlmSettings = { profiles: LlmProfile[]; usage: LlmUsage[]; translatePerHour: number };
 
-/* ------------------------------------------------------------------ translation (docs/18-llm.md, "字幕翻譯") */
+/* ------------------------------------------------------------------ translation (docs/18-llm.md, "Subtitle translation") */
 
 export type TranslationMode = 'plain' | 'bilingual';
 
@@ -951,7 +951,7 @@ export type Settings = {
   };
   subtitles: { defaultLangs: Lang[] };
   /**
-   * Auto-align with recognised speech (docs/08, "語音辨識" and "語言模型"). `asr` switches
+   * Auto-align with recognised speech (docs/08, "Speech recognition" and "Language model"). `asr` switches
    * recognition for newly analysed films; the language model that pairs it with a subtitle in
    * another language comes from the LLM profiles (docs/18-llm.md).
    */
@@ -959,7 +959,7 @@ export type Settings = {
     asr: boolean;
   };
   llm: {
-    /** Translations one person may start in an hour (docs/18-llm.md, "誰可以翻"). */
+    /** Translations one person may start in an hour (docs/18-llm.md, "Who can translate"). */
     translatePerHour: number;
   };
 };

@@ -1,164 +1,164 @@
-# 13 設定
+# 13 Settings
 
-管理員在介面上調整的東西存在 `settings` 資料表（一項一列），金鑰存在 `secrets`。部署時決定的東西是環境變數，見 [02-architecture.md](02-architecture.md)。
+What administrators adjust in the interface is stored in the `settings` table (one row per item); keys are stored in `secrets`. Things decided at deployment are environment variables, see [02-architecture.md](02-architecture.md).
 
-API 的形狀是 `packages/shared/src/contracts/api.ts` 的 `Settings`、`SettingsInfo`。`PATCH /api/admin/settings` 只送要改的部分；任何一項不合法就整個拒絕，回 `SETTING_INVALID`，`details.fields` 指出是哪一項、什麼原因。每次成功的變更寫一筆 `admin.settings.change`（記改了哪些鍵，不記金鑰的內容）。
+The API shapes are `Settings` and `SettingsInfo` in `packages/shared/src/contracts/api.ts`. `PATCH /api/admin/settings` sends only the parts to change; if any item is invalid, the whole request is rejected with `SETTING_INVALID`, and `details.fields` says which item and why. Each successful change writes one `admin.settings.change` entry (recording which keys changed, not the content of keys).
 
-容量上限也存在 `settings` 資料表，但它不在 `Settings` 這個型別裡：它有自己的端點和驗證（`PUT /api/admin/storage/limit`），目前的值在 `Usage.limitBytes`。
+The storage limit is also stored in the `settings` table, but it isn't in the `Settings` type: it has its own endpoint and validation (`PUT /api/admin/storage/limit`), and the current value is in `Usage.limitBytes`.
 
-## 設定項目
+## Settings items
 
-| 鍵 | 型別 | 預設 | 規則 | 在哪一頁 |
+| Key | Type | Default | Rules | On which page |
 | --- | --- | --- | --- | --- |
-| `storage.limitBytes` | 整數 | 由 `STORAGE_LIMIT_GB` 寫入一次 | 見 [10-storage.md](10-storage.md)。走專用的端點 `PUT /api/admin/storage/limit` | 儲存空間管理 |
-| `downloads.maxActive` | 整數 | 2 | 1 到 5 | 下載設定 |
-| `downloads.maxPerUser` | 整數 | 2 | 1 到 5，不能大於 `maxActive` | 下載設定 |
-| `downloads.downloadLimitKB` | 整數 | 0 | 0 到 1,000,000。0 是不限。單位是每秒 KB（1024 位元組） | 下載設定 |
-| `downloads.uploadLimitKB` | 整數 | 512 | 同上 | 下載設定 |
-| `downloads.seedMode` | `stop` / `ratio` | `stop` | | 下載設定 |
-| `downloads.stallMinutes` | 整數 | 30 | 5 到 240 | 下載設定（D37） |
-| `downloads.trackers` | 字串陣列 | 見 [05-yts.md](05-yts.md) | 每一項是 `udp://`、`http://` 或 `https://` 開頭的網址；最多 20 項；可以是空的 | 下載設定（D37） |
-| `media.analyzeAuto` | 布林 | true | | 下載設定 |
-| `media.proxyAuto` | 布林 | true | | 下載設定 |
-| `media.proxyResolution` | `480p` / `720p` | `480p` | | 下載設定 |
-| `yts.baseUrl` | 字串 | 空 | `https://` 開頭，只有主機和可有可無的埠，沒有路徑；儲存時去掉結尾斜線；不能指向內部位址。開發和測試時（`ALLOW_LOCAL_SOURCES=1`）可以是 `http://` 和內部位址 | 來源設定 |
-| `providers.cacheHours` | 整數 | 24 | 1 到 168 | 來源設定 |
-| `providers.justsubtitles.enabled` | 布林 | true | | 來源設定 |
-| `providers.justsubtitles.mode` | `direct` / `subdl` | `direct` | 切到 `subdl` 而沒有 SubDL 金鑰是允許的，但要提醒「已切換，但還沒有 SubDL 金鑰，查詢會失敗。」 | 來源設定 |
-| `providers.yify.enabled` | 布林 | true | | 來源設定 |
-| `providers.yify.baseUrl` | 字串 | `https://yts-subs.com` | 同 `yts.baseUrl` 的規則 | 來源設定 |
-| `providers.assrt.enabled` | 布林 | true | | 來源設定 |
-| `providers.zimuku.enabled` | 布林 | true | | 來源設定 |
-| `providers.zimuku.searchUrl` | 字串 | 空 | 空的，或 `https://` 開頭而且含有 `{q}` | 來源設定（原型沒有這個欄位） |
-| `subtitles.defaultLangs` | 語言陣列 | `zh-Hant`、`en` | 至少一項 | 來源設定的「共用設定」。原型只顯示、不能改；正式版做成可以勾選 |
-| `align.asr` | 布林 | true | 之後分析的片子要不要做語音辨識（[08-media-pipeline.md](08-media-pipeline.md) 的「語音辨識」）。關掉不影響已經做好的 | 來源設定的「自動對齊」（新） |
-| `llm.translatePerHour` | 整數 | 5 | 0 到 100。每人每小時最多開始幾次字幕翻譯（[18-llm.md](18-llm.md)）；0 表示不能開始新的翻譯 | LLM 設定頁（新） |
+| `storage.limitBytes` | integer | Written once from `STORAGE_LIMIT_GB` | See [10-storage.md](10-storage.md). Uses the dedicated endpoint `PUT /api/admin/storage/limit` | Storage management |
+| `downloads.maxActive` | integer | 2 | 1 to 5 | Download settings |
+| `downloads.maxPerUser` | integer | 2 | 1 to 5, not greater than `maxActive` | Download settings |
+| `downloads.downloadLimitKB` | integer | 0 | 0 to 1,000,000. 0 means no limit. Unit is KB (1024 bytes) per second | Download settings |
+| `downloads.uploadLimitKB` | integer | 512 | Same as above | Download settings |
+| `downloads.seedMode` | `stop` / `ratio` | `stop` | | Download settings |
+| `downloads.stallMinutes` | integer | 30 | 5 to 240 | Download settings (D37) |
+| `downloads.trackers` | string array | See [05-yts.md](05-yts.md) | Each item is a URL starting with `udp://`, `http://` or `https://`; at most 20 items; may be empty | Download settings (D37) |
+| `media.analyzeAuto` | boolean | true | | Download settings |
+| `media.proxyAuto` | boolean | true | | Download settings |
+| `media.proxyResolution` | `480p` / `720p` | `480p` | | Download settings |
+| `yts.baseUrl` | string | empty | Starts with `https://`, only a host and an optional port, no path; trailing slash removed on save; can't point to an internal address. In development and testing (`ALLOW_LOCAL_SOURCES=1`) it may be `http://` and an internal address | Sources |
+| `providers.cacheHours` | integer | 24 | 1 to 168 | Sources |
+| `providers.justsubtitles.enabled` | boolean | true | | Sources |
+| `providers.justsubtitles.mode` | `direct` / `subdl` | `direct` | Switching to `subdl` without a SubDL key is allowed, but show the warning "Switched, but there is no SubDL key yet, so lookups will fail." | Sources |
+| `providers.yify.enabled` | boolean | true | | Sources |
+| `providers.yify.baseUrl` | string | `https://yts-subs.com` | Same rules as `yts.baseUrl` | Sources |
+| `providers.assrt.enabled` | boolean | true | | Sources |
+| `providers.zimuku.enabled` | boolean | true | | Sources |
+| `providers.zimuku.searchUrl` | string | empty | Empty, or starting with `https://` and containing `{q}` | Sources (the prototype has no such field) |
+| `subtitles.defaultLangs` | language array | `zh-Hant`, `en` | At least one | "Shared settings" on Sources. The prototype only displays it and can't change it; the real version makes it checkable |
+| `align.asr` | boolean | true | Whether films analyzed from now on get speech recognition ("Speech recognition" in [08-media-pipeline.md](08-media-pipeline.md)). Turning it off doesn't affect what's already done | "Auto-align" on Sources (new) |
+| `llm.translatePerHour` | integer | 5 | 0 to 100. The maximum number of subtitle translations each person can start per hour ([18-llm.md](18-llm.md)); 0 means no new translations can be started | LLM settings page (new) |
 
-### 介面上的錯誤訊息
+### Error messages in the interface
 
-| 情況 | 文字 |
+| Situation | Text |
 | --- | --- |
-| `maxActive`、`maxPerUser` 超出範圍 | 請填 1 到 5 之間的整數。 |
-| `maxPerUser` 大於 `maxActive` | 不能大於全站上限（2）。 |
-| 限速不是 0 以上的整數 | 請填 0 以上的整數，0 表示不限。 |
-| `stallMinutes` 超出範圍 | 請填 5 到 240 之間的整數。（新） |
-| tracker 格式不對 | 第 3 行不是有效的 tracker 網址。（新） |
-| 網址格式不對 | 請填完整的網址，以 https:// 開頭，例如 https://yts.example。（句尾的例子依欄位換：YIFY Subtitles 的欄位寫 https://yts-subs.com；字幕庫的欄位不舉例。`yts.example` 是保留給示範用的網域，只出現在這句說明裡，不會被當成預設值） |
-| 網址指向內部位址 | 這個網址指向內部網路，不能使用。（新） |
-| `cacheHours` 超出範圍 | 請填 1 到 168 之間的整數。 |
-| 字幕庫的網址沒有 `{q}` | 網址裡要有 {q}，搜尋時會換成片名。（新） |
-| 選了 OpenAI 相容卻沒填網址或模型（`REQUIRED`） | 選了 OpenAI 相容的服務時，這一欄必填。（新） |
-| 模型服務的網址格式不對 | 請填完整的網址，以 http:// 或 https:// 開頭，例如 https://dashscope.aliyuncs.com/compatible-mode/v1。（新） |
+| `maxActive` or `maxPerUser` out of range | Enter a whole number from 1 to 5. |
+| `maxPerUser` greater than `maxActive` | Can't be greater than the site-wide limit (2). |
+| Speed limit not a whole number of 0 or more | Enter a whole number of 0 or more; 0 means no limit. |
+| `stallMinutes` out of range | Enter a whole number from 5 to 240. (new) |
+| Invalid tracker format | Line 3 isn't a valid tracker address. (new) |
+| Invalid URL format | Enter a full address starting with https://, e.g. https://yts.example. (The example at the end changes per field: the YIFY Subtitles field uses https://yts-subs.com; the Zimuku field gives no example. `yts.example` is a domain reserved for illustration; it appears only in this help sentence and is never taken as a default) |
+| URL points to an internal address | This address points to an internal network and can't be used. (new) |
+| `cacheHours` out of range | Enter a whole number from 1 to 168. |
+| Zimuku URL has no `{q}` | The address must contain {q}, which becomes the film title when searching. (new) |
+| OpenAI-compatible chosen but no URL or model filled in (`REQUIRED`) | Required for OpenAI-compatible services. (new) |
+| Invalid model service URL format | Enter a full address starting with http:// or https://, e.g. https://dashscope.aliyuncs.com/compatible-mode/v1. (new) |
 
-標了「（新）」的是原型沒有的欄位或檢查，句子照同樣的語氣寫。
+Entries marked "(new)" are fields or checks the prototype doesn't have; write their sentences in the same tone.
 
-## 金鑰
+## Keys
 
-| 名稱 | 用途 | 沒有設定時 |
+| Name | Purpose | When not set |
 | --- | --- | --- |
-| `tmdbKey` | 搜尋和電影頁的中文片名、中文簡介、海報、評分（Brian，2026-10-06）；IMDb 編號換 TMDB 編號（JustSubtitles 需要）；射手網搜尋用的中文片名 | 片名、簡介是 YTS 的英文，海報是 YTS 的，評分是 YTS 給的 IMDb 評分（標「IMDb」）；JustSubtitles 改用片名比對（可能對不到）；射手網只用英文片名查 |
-| `subdlKey` | JustSubtitles 的備援模式 | 備援模式不能用 |
-| `assrtToken` | 射手網（偽） | 這個來源顯示「還沒設定」，其他來源不受影響 |
+| `tmdbKey` | Chinese titles, Chinese synopses, posters and ratings on Search and the film page (Brian, 2026-10-06); turning IMDb IDs into TMDB IDs (JustSubtitles needs this); the Chinese title used for Assrt searches | Titles and synopses are YTS's English ones, posters are YTS's, and the rating is the IMDb rating YTS provides (labeled "IMDb"); JustSubtitles falls back to title matching (may not find a match); Assrt searches by English title only |
+| `subdlKey` | JustSubtitles' fallback mode | Fallback mode can't be used |
+| `assrtToken` | Assrt (Shooter) | This source shows "Not set"; other sources are unaffected |
 
-語言模型的金鑰不在這裡：每個 LLM 設定檔有自己的金鑰，存在 `llm_profiles`（[18-llm.md](18-llm.md)）。原本的 `llmKey` 和 `align.llm.*` 在升級時搬成第一個設定檔後刪除。
+Language model keys are not here: each LLM profile has its own key, stored in `llm_profiles` ([18-llm.md](18-llm.md)). The former `llmKey` and `align.llm.*` were moved into the first profile during upgrade and then deleted.
 
-`PUT /api/admin/secrets/:name` 寫入，`DELETE` 清除。輸入框是密碼框；已經設定的顯示「已設定，留空表示不變」；儲存後提示「〈名稱〉已儲存。之後不會再顯示內容。」留空按儲存是「沒有輸入新的值，維持原設定。」
+`PUT /api/admin/secrets/:name` writes and `DELETE` clears. The input is a password field; when already set it shows "Set. Leave empty to keep it"; after saving it says "〈name〉 saved. Its content won't be shown again." Pressing save with the field empty gives "No new value entered. Kept the current setting."
 
-申請方式的說明文字：
+Help text on how to get each one:
 
-- TMDB：「在 TMDB 帳號設定裡免費申請。」
-- SubDL：「只有切到 SubDL 官方 API 時才會用到。」
-- 射手網：「在射手網（偽）註冊後，從使用者面板取得。」
-- 語言模型：「Claude 在 console.anthropic.com 申請；通義千問在阿里雲百鍊（DashScope）申請。只有字幕和片中語言不同時才會用到，每次自動對齊約十幾個請求。」
+- TMDB: "Get one for free in your TMDB account settings."
+- SubDL: "Only used when the official SubDL API is selected."
+- Assrt: "Sign up at Assrt (Shooter) and get it from your user panel."
+- Language model: "For Claude, apply at console.anthropic.com; for Qwen (通義千問), apply at Alibaba Cloud Model Studio (DashScope). Only used when the subtitles and the film's spoken language differ; each auto-align uses about a dozen or so requests."
 
-## 唯讀資訊（`SettingsInfo`）
+## Read-only information (`SettingsInfo`)
 
-| 項目 | 來源 | 顯示在 |
+| Item | Source | Shown in |
 | --- | --- | --- |
-| 哪些金鑰已設定 | `secrets` 有沒有那一列 | 來源設定 |
-| 連入埠 | 環境變數 `TORRENT_PORT`、`TORRENT_DHT_PORT` | 下載設定的「連線」（D31）。說明：「這兩個埠寫在部署設定裡。Docker 和路由器都要開：〈埠〉（TCP 和 UDP）、〈DHT 埠〉（UDP）。沒開仍然能下載，只是比較慢。」（新：原型這裡是可以改的欄位） |
-| 連入狀況 | `torrent` 的心跳 | 同上（D32）：「最近 24 小時內有外部連入」或「還沒觀察到外部連入」（新：原型這裡是一個測試按鈕） |
-| 磁碟 | `/data` 的可用空間、系統保留、上限最大值 | 儲存空間管理、系統狀態 |
+| Which keys are set | Whether `secrets` has that row | Sources |
+| Incoming ports | Environment variables `TORRENT_PORT`, `TORRENT_DHT_PORT` | "Connection" in Download settings (D31). Help text: "These two ports are set in the deployment configuration. Open them in both Docker and the router: 〈port〉 (TCP and UDP), 〈DHT port〉 (UDP). Downloads still work without them, just more slowly." (new: in the prototype this is an editable field) |
+| Incoming connections | The `torrent` heartbeat | Same as above (D32): "Incoming connections seen in the last 24 hours" or "No incoming connections seen yet" (new: in the prototype this is a test button) |
+| Disk | Free space on `/data`, system reserve, maximum limit | Storage management, System status |
 
-## 測試連線
+## Test connection
 
-`POST /api/admin/sources/:id/test`，`:id` 是 `yts`、`tmdb`、`justsubtitles`、`subdl`、`yify`、`assrt`。每個來源實際做什麼寫在 [05-yts.md](05-yts.md) 和 [07-subtitle-providers.md](07-subtitle-providers.md)。
+`POST /api/admin/sources/:id/test`, where `:id` is `yts`, `tmdb`, `justsubtitles`, `subdl`, `yify` or `assrt`. What each source actually does is in [05-yts.md](05-yts.md) and [07-subtitle-providers.md](07-subtitle-providers.md).
 
-這個端點一律回 200，內容是 `SourceCheck`：`{ok, code, data, ms}`。**它不回句子**；按鈕旁邊顯示的文字由前端依 `code` 和 `data` 寫。測試的結果同時更新那個來源的狀況（`SourceHealth`，總覽頁讀它）。按下去到結果回來之前，按鈕旁邊寫「測試中…」。
+This endpoint always returns 200, with a `SourceCheck` body: `{ok, code, data, ms}`. **It returns no sentences**; the text next to the button is written by the front end from `code` and `data`. The test result also updates that source's status (`SourceHealth`, which the Overview page reads). Between pressing the button and the result coming back, the text next to the button reads "Testing…".
 
-| `code` | 文字 | 用到的 `data` |
+| `code` | Text | `data` used |
 | --- | --- | --- |
-| `OK`（YTS） | 回應 200 · 0.4 秒 | `status`；秒數來自 `ms` |
-| `OK`（TMDB） | 金鑰有效 | |
-| `OK`（JustSubtitles、SubDL） | 英文回傳 30 筆 | `count` |
-| `OK`（YIFY Subtitles） | 網頁可以解析 | `rows` |
-| `OK`（射手網） | 配額正常 | `quota` |
-| `NOT_CONFIGURED` | 還沒設定網址。/ 還沒設定金鑰。 | |
-| `INVALID_KEY` | 金鑰無效。 | |
-| `UNREACHABLE` | 連不上。（原型模擬 YTS 連不上時寫的是「連線逾時」；正式版分不出逾時和其他連不上的原因，統一用這一句） | `status`（有的話） |
-| `BAD_RESPONSE` | 回應的格式不對，這個來源可能改版了，或網址已經不是它了。 | |
-| `REDIRECTED` | 這個網域把請求轉到 yts.example。確認那是真的之後，再把設定改過去。 | `host` |
-| `RATE_LIMITED` | 超過使用額度，請稍後再試。 | `retryAfterSeconds`（有的話） |
+| `OK` (YTS) | Responded 200 · 0.4 s | `status`; the seconds come from `ms` |
+| `OK` (TMDB) | Key is valid | |
+| `OK` (JustSubtitles, SubDL) | 30 results in English | `count` |
+| `OK` (YIFY Subtitles) | Pages can be parsed | `rows` |
+| `OK` (Assrt) | Quota OK | `quota` |
+| `NOT_CONFIGURED` | No address set yet. / No key set yet. | |
+| `INVALID_KEY` | The key is invalid. | |
+| `UNREACHABLE` | Can't connect. (When the prototype simulates YTS being unreachable it says "Connection timed out"; the real version can't tell a timeout from other reasons for being unreachable, so it uses this one sentence for all) | `status` (if any) |
+| `BAD_RESPONSE` | The reply is in the wrong format. The source may have changed, or the address no longer points to it. | |
+| `REDIRECTED` | This domain redirects requests to yts.example. Once you've confirmed that's the real one, change the setting to it. | `host` |
+| `RATE_LIMITED` | Usage limit reached. Try again later. | `retryAfterSeconds` (if any) |
 
-`OK` 的五句是原型的寫法；其餘是新的。
+The five `OK` sentences are the prototype's wording; the rest are new.
 
-## 設定什麼時候生效
+## When settings take effect
 
-| 設定 | 生效時機 |
+| Setting | Takes effect |
 | --- | --- |
-| 容量上限 | 立刻。下一次 admission 就用新的值 |
-| 同時下載數 | `torrent` 的下一輪（2 秒內）。**調低不會暫停已經在跑的**，只是在數量降下來之前不開始新的 |
-| 限速 | `torrent` 的下一輪 |
-| 做種方式 | 之後完成的下載。正在做種的在下一輪依新設定處理 |
-| 停滯逾時、tracker | 之後開始的下載 |
-| 自動分析 | 之後完成的下載。已經排入的分析照舊 |
-| 自動轉預覽檔、解析度 | 之後**接受**的下載（D40）。已經在下載、已經完成的都照它們被接受時的設定走；已經做好的預覽檔不動。事後在工作台按「轉預覽檔」時，用的是當下的解析度 |
-| YTS 網址、各來源的設定 | 立刻 |
-| 快取時間 | 之後寫入的快取 |
+| Storage limit | Immediately. The next admission uses the new value |
+| Simultaneous downloads | `torrent`'s next round (within 2 seconds). **Lowering it doesn't pause downloads already running**; it just doesn't start new ones until the count drops |
+| Speed limits | `torrent`'s next round |
+| Seeding mode | Downloads that finish afterwards. Ones currently seeding are handled per the new setting on the next round |
+| Stall timeout, trackers | Downloads started afterwards |
+| Automatic analysis | Downloads that finish afterwards. Analyses already queued proceed as before |
+| Automatic preview files, resolution | Downloads **admitted** afterwards (D40). Ones already downloading or finished follow the settings in force when they were admitted; existing preview files are left alone. Pressing "Make preview file" in the workbench later uses the resolution in effect at that moment |
+| YTS URL, per-source settings | Immediately |
+| Cache time | Cache entries written afterwards |
 
-`api` 讀設定時可以快取幾秒；`torrent` 每一輪重讀；`media` 每個工作開始時重讀。
+`api` may cache settings for a few seconds when reading them; `torrent` rereads them every round; `media` rereads them at the start of each job.
 
-## 個人偏好
+## Personal preferences
 
-存在 `users.prefs`，不是全站設定。原型的個人設定頁可以改這些偏好，但只有「簡體字幕自動轉成繁體」真的接上了行為；正式版四項都要照「說明」那一欄接上。
+Stored in `users.prefs`, not site-wide settings. The prototype's Profile page can change these preferences, but only "Convert Simplified Chinese subtitles to Traditional automatically" is actually wired to behavior; the real version wires up all four per the "Description" column.
 
-| 鍵 | 預設 | 說明 |
+| Key | Default | Description |
 | --- | --- | --- |
-| `langs` | 建立帳號當時的 `subtitles.defaultLangs` | 字幕分頁的語言切換鈕預設選這些。至少一種 |
-| `convertToTraditional` | true | 加入簡體字幕時自動轉成繁體（`POST /api/candidates/:id/add` 沒帶 `convertToTraditional` 時用它） |
-| `secondLine` | false | 同步頁預設開著「同時顯示」；有英文字幕時選英文，沒有就選另一條 |
-| `quality` | `1080p` | 電影頁的版本表裡，這個畫質的列做個標記。「只是在版本清單裡先標出來，不會自動下載。」 |
-| `posterRegion` | `null` | 電影海報用哪一國的版本：`TW`、`HK`、`CN`、`US`、`JP`、`KR`；`null` 跟隨介面語言（中文用台灣、英文用美國）（Brian，2026-10-10） |
-| `locale` | `null` | 介面語言：`'zh-TW'`、`'en'`，`null` 跟隨瀏覽器（Brian，2026-10-08）。也決定這個人做出來的 AI 翻譯字幕名稱和匯出的字幕軌標題用哪種語言 |
+| `langs` | `subtitles.defaultLangs` at the time the account was created | The language toggle buttons on the Subtitles tab select these by default. At least one |
+| `convertToTraditional` | true | Automatically convert Simplified subtitles to Traditional when adding (used when `POST /api/candidates/:id/add` doesn't include `convertToTraditional`) |
+| `secondLine` | false | The Sync tab has "Also show" on by default; English subtitles are chosen if there are any, otherwise another one |
+| `quality` | `1080p` | In the film page's version table, rows of this quality get a mark. "Only highlighted in the version list; nothing downloads automatically." |
+| `posterRegion` | `null` | Which country's version of film posters to use: `TW`, `HK`, `CN`, `US`, `JP`, `KR`; `null` follows the interface language (Taiwan for Chinese, US for English) (Brian, 2026-10-10) |
+| `locale` | `null` | Interface language: `'zh-TW'`, `'en'`; `null` follows the browser (Brian, 2026-10-08). Also decides which language is used for the names of AI translation subtitles this person makes and for the subtitle track titles in exports |
 
-## 不開放設定的常數
+## Constants that can't be configured
 
-放在 `packages/shared` 的一個檔案裡，集中管理、有註解，之後要開放再說。
+Kept in one file in `packages/shared`, managed in one place, with comments; opening them up can be decided later.
 
-| 常數 | 值 | 出處 |
+| Constant | Value | Source |
 | --- | --- | --- |
-| 站名 | 拍板 / Paiban | D9。**使用者看得到的站名只在這裡**；對外請求的 `User-Agent`（`Paiban/<版本>`）也從這個常數組出來 |
-| 搜尋每頁筆數 | 24 | [05-yts.md](05-yts.md) |
-| 檢查點數量 | 8 | [09-sync-workbench.md](09-sync-workbench.md) |
-| 自動對齊的搜尋範圍 | 60 秒 | [08-media-pipeline.md](08-media-pipeline.md) |
-| 分數的顏色門檻 | 全片 0.70 / 0.55；單句 0.50 / 0.25 | 同上，尚未校正 |
-| 上傳大小上限 | 20 MB | [07-subtitle-providers.md](07-subtitle-providers.md) |
-| 解壓縮限制 | 200 個項目、總共 50 MB、單檔 10 MB | 同上 |
-| 排名一次最多幾條 | 30 | 同上 |
-| 來源請求的間隔 | JustSubtitles（含 SubDL）、YIFY Subtitles 1 秒；射手網 3.4 秒 | 同上 |
-| 按「加入」時最多等抓檔多久 | 30 秒 | 同上 |
-| 自動對齊的逾時 | ffsubsync 每次 20 秒；端點最多等 60 秒 | [08-media-pipeline.md](08-media-pipeline.md) |
-| 背景工作失敗後自動再試 | 1 次（總共做 2 次） | 同上 |
-| 候選字幕停在「處理中」多久算失敗 | 10 分鐘 | 同上（「對帳」） |
-| 對帳的間隔 | 60 秒 | [02-architecture.md](02-architecture.md) |
-| 種子比 YTS 列的大，不另外檢查空間的範圍 | 64 MB | [06-torrent-worker.md](06-torrent-worker.md) |
-| 匯出檔名的長度上限 | 200 個字 | [11-pages.md](11-pages.md) |
-| 預覽預留的位元率 | 見 [10-storage.md](10-storage.md) | |
-| 匯出預留 | 原檔 × 1.01 + 1 MB | [10-storage.md](10-storage.md) |
-| 用量指示的門檻 | 剩 2 GB 變黃、0.5 GB 變紅 | 原型 |
-| 總覽的「磁碟快滿了」（`DISK_LOW`） | 磁碟可用空間少於系統保留的兩倍 | 2026-10-06 定（docs/changes.md） |
-| Session 有效期 | 30 天 | [12-auth.md](12-auth.md) |
-| 邀請連結有效期的選項 | 1、3、7 天 | 原型 |
-| 重設連結有效期 | 30 分鐘 | 原型 |
-| 自動儲存的延遲 | 1.5 秒 | [09-sync-workbench.md](09-sync-workbench.md) |
-| 復原步數 | 100 | 原型 |
+| Site name | 拍板 / Paiban | D9. **The user-visible site name lives only here**; the `User-Agent` of outbound requests (`Paiban/<version>`) is also built from this constant |
+| Search results per page | 24 | [05-yts.md](05-yts.md) |
+| Number of checkpoints | 8 | [09-sync-workbench.md](09-sync-workbench.md) |
+| Auto-align search range | 60 seconds | [08-media-pipeline.md](08-media-pipeline.md) |
+| Score color thresholds | Whole film 0.70 / 0.55; single line 0.50 / 0.25 | Same as above; not yet calibrated |
+| Upload size limit | 20 MB | [07-subtitle-providers.md](07-subtitle-providers.md) |
+| Extraction limits | 200 entries, 50 MB total, 10 MB per file | Same as above |
+| Maximum candidates per ranking | 30 | Same as above |
+| Interval between source requests | JustSubtitles (including SubDL), YIFY Subtitles 1 second; Assrt 3.4 seconds | Same as above |
+| Maximum wait for the fetch when "Add" is pressed | 30 seconds | Same as above |
+| Auto-align timeouts | ffsubsync 20 seconds per run; the endpoint waits at most 60 seconds | [08-media-pipeline.md](08-media-pipeline.md) |
+| Automatic retries after a background job fails | 1 (2 runs in total) | Same as above |
+| How long a candidate can stay "Processing" before it counts as failed | 10 minutes | Same as above ("Reconciliation") |
+| Reconciliation interval | 60 seconds | [02-architecture.md](02-architecture.md) |
+| How much larger than YTS's listed size a torrent may be without a separate space check | 64 MB | [06-torrent-worker.md](06-torrent-worker.md) |
+| Maximum export file name length | 200 characters | [11-pages.md](11-pages.md) |
+| Bitrate for the preview reservation | See [10-storage.md](10-storage.md) | |
+| Export reservation | Original file × 1.01 + 1 MB | [10-storage.md](10-storage.md) |
+| Usage indicator thresholds | Yellow at 2 GB left, red at 0.5 GB | Prototype |
+| Overview's "Disk almost full" (`DISK_LOW`) | Free disk space below twice the system reserve | Set on 2026-10-06 (docs/changes.md) |
+| Session lifetime | 30 days | [12-auth.md](12-auth.md) |
+| Invite link lifetime options | 1, 3, 7 days | Prototype |
+| Reset link lifetime | 30 minutes | Prototype |
+| Autosave delay | 1.5 seconds | [09-sync-workbench.md](09-sync-workbench.md) |
+| Undo steps | 100 | Prototype |

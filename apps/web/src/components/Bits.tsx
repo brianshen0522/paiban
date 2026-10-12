@@ -3,7 +3,7 @@ import { t } from '../copy';
 
 export type Tone = 'ok' | 'warn' | 'bad' | 'info' | '';
 
-/** Status chip: a dot plus words, never colour alone (docs/17-ui.md, "無障礙"). */
+/** Status chip: a dot plus words, never colour alone (docs/17-ui.md, "Accessibility"). */
 export function Chip({ tone = '', children }: { tone?: Tone; children: ReactNode }) {
   return <span className={`st${tone ? ` ${tone}` : ''}`}>{children}</span>;
 }
@@ -62,7 +62,7 @@ export function Progress({
 }
 
 /**
- * The confirmation before a destructive action (docs/11-pages.md, "確認框的樣式"): a modal dialog
+ * The confirmation before a destructive action (docs/11-pages.md, "Confirmation dialog style"): a modal dialog
  * over the page, so the list or card it came from keeps its size (Brian, 2026-10-06: a red box
  * opening inside a card made it grow). The consequences in words, a red button and "not now".
  * Focus starts on "not now", so Enter does not delete; Esc or a click outside cancels; focus goes

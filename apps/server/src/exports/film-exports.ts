@@ -6,7 +6,7 @@ import type { Deps } from '../http/context.js';
 import { removeExportFiles } from '../storage/remove.js';
 
 /**
- * Deleting a film deletes its exports too (Brian, 2026-10-06; docs/10-storage.md, "刪除"): the
+ * Deleting a film deletes its exports too (Brian, 2026-10-06; docs/10-storage.md, "Deletion"): the
  * last holder removing it, or an administrator forcing it. Runs inside the transaction that marks
  * the film `want = 'remove'`, the same way deleting one export does: waiting or finished ones go
  * at once, one being written is cancelled and the media service removes it once it stops.

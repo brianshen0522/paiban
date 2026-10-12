@@ -1,23 +1,23 @@
-# 階段報告
+# Phase reports
 
-每個階段結束時在這裡放一份 `phase-N.md`，繁體中文，給 Brian 看。寫完就停下來等他確認。
+At the end of each phase, put a `phase-N.md` here, in English (since 2026-10-12; the summary told to Brian in conversation is in Traditional Chinese), for Brian to read. Once it's written, stop and wait for his confirmation.
 
-每一份包含：
+Each one contains:
 
-1. **結論**（三句話以內）：這個階段完成了沒有；有沒有需要他馬上知道的事。
-2. **做了什麼**：依功能列，不用列檔案。
-3. **驗收**：`docs/14-plan.md` 那個階段的每一條，逐條寫通過或沒通過。沒通過的寫原因和打算。
-4. **測試**：跑了哪些、幾項、結果。沒有自動化的寫怎麼手動確認的。
-5. **和規格不同的地方**：指到 `docs/changes.md` 的哪幾則。
-6. **發現的問題與風險**：包含不在這個階段範圍內、但看到了的。
-7. **需要 Brian 決定或提供的**：每一項寫清楚選項和你的建議。
-8. **怎麼看成果**：從零開始的指令，以及打開哪個網址、可以試什麼。帳號和密碼不要寫出來：寫「帳密在 `deploy/.env` 的哪兩個變數」。
+1. **Conclusion** (three sentences at most): whether this phase is done; whether there's anything he needs to know right away.
+2. **What was done**: listed by feature, no need to list files.
+3. **Acceptance**: every item for that phase in `docs/14-plan.md`, each marked passed or not passed. For ones that didn't pass, give the reason and the plan.
+4. **Tests**: what was run, how many, the results. For things not automated, say how they were checked by hand.
+5. **Differences from the spec**: point to the relevant entries in `docs/changes.md`.
+6. **Problems and risks found**: including ones outside this phase's scope that you noticed.
+7. **What Brian needs to decide or provide**: for each item, state the options and your recommendation clearly.
+8. **How to see the results**: commands starting from scratch, plus which URL to open and what to try. Don't write out usernames and passwords: write "the credentials are in these two variables in `deploy/.env`".
 
-階段 0 的報告另外要有：
+The phase 0 report must also have:
 
-- `docs/14-plan.md` 階段 0 第 3 到 7 項各自的結論：確認、不符（附上實際情況和建議怎麼改規格）、或無法確認（附上原因和需要什麼）。
-- 會動搖架構的發現放在最前面。
-- `docs/16-risks.md` 最後「請 Brian 確認的事」那張表，原樣再列一次請他回覆。
-- `docs/agent-notes.md` 裡標了「需要 Brian 確認」的每一則。
+- A conclusion for each of items 3 to 7 of phase 0 in `docs/14-plan.md`: confirmed, does not match (with what actually happens and a suggested spec change), or could not be confirmed (with the reason and what's needed).
+- Findings that could shake the architecture go first.
+- The "Things for Brian to confirm" table at the end of `docs/16-risks.md`, listed again verbatim for him to answer.
+- Every entry in `docs/agent-notes.md` marked "needs Brian to confirm".
 
-沒做完的說沒做完，沒驗證的說沒驗證。報告裡不放任何金鑰、密碼或 token。
+If something isn't done, say it isn't done; if something isn't verified, say it isn't verified. No keys, passwords or tokens in reports.

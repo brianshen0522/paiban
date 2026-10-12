@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 /**
- * Environment of the three services (docs/02-architecture.md, "設定"). Read once at start-up;
+ * Environment of the three services (docs/02-architecture.md, "Configuration"). Read once at start-up;
  * anything an administrator changes at run time lives in the settings table instead.
  */
 const intString = (fallback: number) =>

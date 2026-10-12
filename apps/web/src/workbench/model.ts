@@ -1,5 +1,5 @@
 /**
- * The workbench's document operations (docs/09-sync-workbench.md, "功能"), as pure functions over
+ * The workbench's document operations (docs/09-sync-workbench.md, "Features"), as pure functions over
  * SyncDoc. Every function returns a new document and never mutates its input, so a snapshot kept in
  * the undo history stays as it was. The maths comes from SyncCore; the prototype's ui.js is only the
  * behavioural reference.
@@ -313,7 +313,7 @@ export function redo(h: History, current: SyncDoc): { history: History; doc: Syn
 
 const MINUS = '−';
 
-/** Offsets: sign always, U+2212 for minus, `digits` decimals (docs/17-ui.md, "數字怎麼寫"). */
+/** Offsets: sign always, U+2212 for minus, `digits` decimals (docs/17-ui.md, "How to write numbers"). */
 export function signed(v: number, digits = 2): string {
   // A value that rounds to zero is written as +0.00, never −0.00.
   const negative = Number(v.toFixed(digits)) < 0;

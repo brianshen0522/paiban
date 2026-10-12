@@ -14,7 +14,7 @@ import { useSearch } from '../lib/queries';
 
 const GENRES = Object.keys(t.genres);
 
-/** docs/11-pages.md, "搜尋". The URL holds the query and filters, so back/forward and links work. */
+/** docs/11-pages.md, "Search (02, 18, 32)". The URL holds the query and filters, so back/forward and links work. */
 export function SearchPage() {
   const me = useOutletContext<Me>();
   const [params, setParams] = useSearchParams();

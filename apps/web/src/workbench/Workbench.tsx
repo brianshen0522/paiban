@@ -173,7 +173,7 @@ function Bench({ ws, detail }: { ws: Workspace; detail: SubtitleDetail }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [playingCue, setPlayingCue] = useState(-1);
 
-  /* ---------------------------------------------------------------- saving (docs/09, "儲存") */
+  /* ---------------------------------------------------------------- saving (docs/09, "Saving") */
 
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const inFlight = useRef<Promise<boolean> | null>(null);
@@ -441,7 +441,7 @@ function Bench({ ws, detail }: { ws: Workspace; detail: SubtitleDetail }) {
     [secondCues, mapped, secondAt],
   );
 
-  /* ---------------------------------------------------------------- media element (docs/09, "播哪個檔") */
+  /* ---------------------------------------------------------------- media element (docs/09, "Which file to play") */
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const sources = media?.sources ?? [];
@@ -856,7 +856,7 @@ function Bench({ ws, detail }: { ws: Workspace; detail: SubtitleDetail }) {
     ]);
   }, [conflict, say, takeTheirs, keepMine]);
 
-  /* ---------------------------------------------------------------- keyboard (docs/09, "快捷鍵") */
+  /* ---------------------------------------------------------------- keyboard (docs/09, "Keyboard shortcuts") */
 
   const onKey = useLatest((e: KeyboardEvent) => {
     const a = keyAction({
@@ -1046,7 +1046,7 @@ function Bench({ ws, detail }: { ws: Workspace; detail: SubtitleDetail }) {
     };
   }, [setView, updateOverlay]);
 
-  /* ---------------------------------------------------------------- timeline pointer (docs/09, "時間軸") */
+  /* ---------------------------------------------------------------- timeline pointer (docs/09, "Timeline") */
 
   type Drag =
     | { kind: 'scrub' }

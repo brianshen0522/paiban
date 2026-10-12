@@ -8,7 +8,7 @@ import { get } from '../../lib/api';
 import { bytes } from '../../lib/format';
 import { langName } from '../workspace/SubtitlesTab';
 
-/** docs/11-pages.md, "操作紀錄": time, who (as named then), action and target, 50 per page. */
+/** docs/11-pages.md, "Activity log (21)": time, who (as named then), action and target, 50 per page. */
 export function AuditPage() {
   const [params, setParams] = useSearchParams();
   const userId = params.get('user') ?? '';

@@ -1,209 +1,209 @@
-# 階段 0 報告：確認假設
+# Phase 0 report: check the assumptions
 
-2026-10-05。環境是開發機：Debian 13（trixie）、x86-64、8 核心、32 GB 記憶體、125 GB 磁碟（可用 90 GB）、Docker 29.8.2、Compose 5.6.0、可以連外。部署的機器是不是這一台還不知道，所以下面網路和效能的結論都是**開發機的結果**。
+2026-10-05. The environment is the dev machine: Debian 13 (trixie), x86-64, 8 cores, 32 GB of memory, 125 GB of disk (90 GB free), Docker 29.8.2, Compose 5.6.0, with outbound access. Whether the deployment machine is this one isn't known yet, so the network and performance conclusions below are **results from the dev machine**.
 
-## 結論
+## Conclusion
 
-階段 0 做完了：骨架和五個容器起得來，參考測試在映像檔裡全部通過，真實的 BitTorrent 下載、字幕來源、壓縮檔、瀏覽器播放都確認過；YTS、TMDB、射手網、SubDL 因為沒有網址或金鑰，**還沒有確認**。
+Phase 0 is done: the skeleton and the five containers come up, the reference tests all pass in the image, and real BitTorrent downloads, subtitle sources, archives and browser playback have been checked; YTS, TMDB, Assrt and SubDL are **not yet confirmed** because there's no URL or key.
 
-**最需要你知道的：自動對齊在真實電影上的表現比規格預期差。** 在 *Tears of Steel* 上，ffsubsync 單一位移很準，但規格的「分段」做法會產生假的斷點，而且每次都被選中，結果是錯的；在配樂很重的 *Sintel* 上，人聲偵測根本抓不到對白。產品仍然成立（手動工具不依賴偵測），但階段 6 要調整自動對齊，下面有數字和建議。
+**The most important thing for you to know: auto-align performs worse on real films than the spec expected.** On *Tears of Steel*, ffsubsync's single offset is accurate, but the spec's "segment" approach produces false breakpoints that get chosen every time, so the result is wrong; on *Sintel*, which has a heavy score, speech detection doesn't pick up the dialogue at all. The product still holds up (the manual tools don't depend on detection), but phase 6 needs to adjust auto-align; numbers and suggestions are below.
 
-沒有會擋住階段 1 的問題。
+Nothing blocks phase 1.
 
-## 會動搖架構的發現
+## Findings that could shake the architecture
 
-沒有會改變架構的發現（WebTorrent 在 Docker 裡正常、映像檔建得起來、ffmpeg 7.1.5 和 6.1.1 結果相同）。最接近的是上面的自動對齊，它影響的是階段 6 的演算法和介面的說法，不是架構。
+No findings change the architecture (WebTorrent works in Docker, the image builds, ffmpeg 7.1.5 and 6.1.1 give identical results). The closest is the auto-align issue above, which affects the phase 6 algorithm and how the interface describes it, not the architecture.
 
-### 自動對齊在真實電影上（第 6 項）
+### Auto-align on real films (item 6)
 
-做法：把官方英文字幕當作正確答案，用和 `fixtures/` 相同的方式弄錯（原樣、晚 2.4 秒、晚 23.7 秒、影格率 25→23.976、中間少 12 秒），每一份跑完整的自動對齊（`reference/pipeline/align.ts`：ffsubsync 兩種模式 + 對齊核心 + 挑選），量每一句的開始時間和正確答案差多少。腳本：`scripts/phase0/real-film.sh`、`real-film-align.ts`。
+Method: take the official English subtitles as the correct answer, break them the same way as in `fixtures/` (as is, 2.4 seconds late, 23.7 seconds late, frame rate 25→23.976, 12 seconds missing in the middle), run the full auto-align on each (`reference/pipeline/align.ts`: ffsubsync in two modes + the sync core + selection), and measure how far each line's start time is from the correct answer. Scripts: `scripts/phase0/real-film.sh`, `real-film-align.ts`.
 
-**Tears of Steel**（12 分鐘、76 句、偵測到人聲 48%）：
+**Tears of Steel** (12 minutes, 76 lines, 48% speech detected):
 
-| 情境 | 最後選中 | 選中結果的誤差 | ffsubsync 單一位移 | 對齊核心 |
+| Scenario | Finally chosen | Error of the chosen result | ffsubsync single offset | Sync core |
 | --- | --- | --- | --- | --- |
-| 原樣 | 對齊核心（兩段） | 中位數 0.03 秒，但 **17 句錯 37.8 秒** | 全部 0.03 秒內 | 同左（錯） |
-| 晚 2.4 秒 | 對齊核心（兩段） | 同上 | 全部 0.03 秒內 | 同左（錯） |
-| 晚 23.7 秒 | 對齊核心（兩段） | 中位數 0.03 秒，21 句錯 79 秒 | 全部 0.03 秒內 | 同左（錯） |
-| 影格率不同 | 對齊核心（兩段） | 中位數 0.034 秒，17 句錯 37.8 秒 | 全部 0.034 秒內 | 同左（錯） |
-| 中間少 12 秒 | 對齊核心（兩段） | 一半的句子錯 12 秒以上 | 一半錯 11.9 秒（只找一段） | 斷點和位移都錯 |
+| As is | Sync core (two segments) | Median 0.03 s, but **17 lines off by 37.8 s** | All within 0.03 s | Same as left (wrong) |
+| 2.4 s late | Sync core (two segments) | Same as above | All within 0.03 s | Same as left (wrong) |
+| 23.7 s late | Sync core (two segments) | Median 0.03 s, 21 lines off by 79 s | All within 0.03 s | Same as left (wrong) |
+| Different frame rate | Sync core (two segments) | Median 0.034 s, 17 lines off by 37.8 s | All within 0.034 s | Same as left (wrong) |
+| 12 s missing in the middle | Sync core (two segments) | Half the lines off by 12 s or more | Half off by 11.9 s (only finds one segment) | Breakpoint and offset both wrong |
 
-- 對齊核心允許分段時，每次都把最後 17 句另外切成一段、往前搬 38 秒（那裡剛好有別的人聲）。這樣的分數比較高（71.7% 對 67.2%），每多一段扣 3 秒台詞的懲罰擋不住它，所以挑選邏輯每次都選它，而且 `agree` 是 false。
-- **關掉分段時**，兩種方法完全一致、位移 0.03 秒、`agree` 是 true。
-- 正確字幕的分數是 67%：在現在的門檻（70% 綠、55% 黃）下會顯示黃色；76 句裡 22 句低於 50%、5 句低於 25%。門檻偏高。
+- When the sync core is allowed to segment, it always splits off the last 17 lines as a separate segment and moves them 38 seconds earlier (where there happens to be other speech). That scores higher (71.7% vs. 67.2%), and the penalty of 3 seconds of dialogue per extra segment doesn't stop it, so the selection logic picks it every time, with `agree` false.
+- **With segmentation turned off**, the two methods agree exactly, the offset is 0.03 seconds, and `agree` is true.
+- The correct subtitles score 67%: under the current thresholds (70% green, 55% yellow) they'd show yellow; 22 of the 76 lines are below 50% and 5 below 25%. The thresholds are too high.
 
-**Sintel**（15 分鐘、26 句、配樂很重、對白輕）：webrtc 偵測到的「人聲」只佔 14%，而且大多不是對白：正確字幕的分數只有 20%。五種情境兩種方法全部對錯（誤差中位數 12 到 79 秒）。
+**Sintel** (15 minutes, 26 lines, heavy score, quiet dialogue): the "speech" webrtc detects covers only 14%, and most of it isn't dialogue: the correct subtitles score only 20%. Both methods got all five scenarios wrong (median error 12 to 79 seconds).
 
-**另一種人聲偵測（silero）**：ffsubsync 的 `--vad silero` 要另外裝 torch，環境 5.3 GB；跑得完，但輸出整份是 0。ffsubsync 0.5.1 和目前的 silero-vad 模型不相容，沒有得到有意義的結果。這個環境已經刪掉。
+**Another speech detector (silero)**: ffsubsync's `--vad silero` needs torch installed separately, a 5.3 GB environment; it runs to completion, but the whole output is 0. ffsubsync 0.5.1 is incompatible with the current silero-vad model, and no meaningful result was obtained. That environment has been deleted.
 
-**我的建議**（階段 6 處理，不影響階段 1 到 5）：
-1. 分段要更難成立：一段至少要有一定句數、要比單一位移明顯好，懲罰要依片長調整；兩種方法不一致時傾向段數少的。用這次的兩部片當回歸測試（只放人聲資料和字幕時間，影片不進 repo）。
-2. 介面在 `agree` 是 false 或分數很低時，明講「自動對齊不可靠，請放兩個對齊點」，而不是只顯示分數。
-3. 是否另外投入一種人聲偵測（修好 silero 的相容性，或用 whisper 轉錄），要你決定：會讓映像檔大好幾 GB、吃更多 CPU（見最後「需要你決定的」）。
+**My suggestions** (handled in phase 6, not affecting phases 1 to 5):
+1. Make segments harder to justify: a segment needs a minimum number of lines and must be clearly better than a single offset, and the penalty should scale with film length; when the two methods disagree, prefer fewer segments. Use these two films as regression tests (only the speech data and subtitle timings; the videos don't go into the repo).
+2. When `agree` is false or the score is very low, the interface should say plainly "Auto-align isn't reliable; please set two anchors", rather than only showing the score.
+3. Whether to invest in another speech detector (fix silero's compatibility, or transcribe with whisper) is your decision: it would make the image several GB larger and use more CPU (see "To decide" at the end).
 
-## 做了什麼
+## What was done
 
-- **讀規格。** README、AGENTS 和 docs/ 的 18 份文件。其中 00、01、02、05、06、07、08、10、12、14、15、16 是我逐字讀的；03、04、09、11、13、17 與合約、schema 的逐條交叉比對交給一個輔助的審閱流程做，我抽查了其中三條（都屬實）。結果記在 `docs/agent-notes.md`。
-- **看原型。** 兩個原型用 Playwright 內建的無頭 Chromium 實際操作過一遍（這台機器沒有 Chrome 和螢幕，MCP 的瀏覽器工具開不起來）：每一頁、工作台的自動對齊、檢查點、快捷鍵、400 px 和深色主題。原型自己的檢查：平台 72/72、工作台 40/40 通過。這一步也是由輔助流程操作、回報給我的，我沒有親手點。
-- **骨架。** pnpm monorepo：`apps/server`（`api`、`torrent`、`media` 三個進入點）、`apps/web`（一個寫著站名的頁面）、`packages/shared`（站名常數）。TypeScript 7.0.2 strict、Biome（lint 和格式）、Vitest。`api` 有 `GET /api/health`；`torrent`、`media` 每分鐘寫一行 log；三個程式在 `NODE_ENV=production` 時設了測試用的變數會拒絕啟動。
-- **部署檔。** 三個範例檔改成正式檔案並實際建置；改過的地方在 `docs/changes.md`。
-- **`deploy/.env`。** 從範例複製，資料庫密碼、`SECRET_KEY`、管理員密碼用亂數產生，管理員帳號填 `admin`。另外因為這台機器的 8080 已經被另一個專案（forward）用了，本機的 `HTTP_PORT` 改成 8088、`HTTPS_PORT` 8448、`PUBLIC_URL` 是 `http://localhost:8088`。
-- **階段 0 的腳本**，都在 `scripts/phase0/`，每支開頭有用法：參考測試在映像檔裡跑、真實來源的確認、真實的 BitTorrent 下載、真實電影的對齊、壓縮檔、瀏覽器播放測試頁。
-- **文件。** 和事實不同的地方都改了（tracker 清單、JustSubtitles 的兩處、Playwright 與 H.264、ffmpeg 版本、壓縮檔素材）；`docs/16-risks.md` 加了每一項風險在階段 0 之後的狀態；`AGENTS.md` 的「指令」填好了。
+- **Read the spec.** The README, AGENTS and the 18 documents in docs/. Of those, I read 00, 01, 02, 05, 06, 07, 08, 10, 12, 14, 15 and 16 word for word; the item-by-item cross-check of 03, 04, 09, 11, 13, 17 against the contract and schema was handed to an assisting review process, and I spot-checked three of its findings (all accurate). Results are recorded in `docs/agent-notes.md`.
+- **Looked at the prototypes.** Both prototypes were actually operated with Playwright's built-in headless Chromium (this machine has no Chrome and no display, and the MCP browser tools wouldn't start): every page, the workbench's auto-align, checkpoints, keyboard shortcuts, 400 px and the dark theme. The prototypes' own checks: platform 72/72, workbench 40/40 passed. This step was also done by the assisting process and reported back to me; I didn't click through it myself.
+- **Skeleton.** A pnpm monorepo: `apps/server` (three entry points: `api`, `torrent`, `media`), `apps/web` (one page showing the site name), `packages/shared` (the site name constant). TypeScript 7.0.2 strict, Biome (lint and formatting), Vitest. `api` has `GET /api/health`; `torrent` and `media` write a log line every minute; the three programs refuse to start under `NODE_ENV=production` if test variables are set.
+- **Deployment files.** The three example files became real files and were actually built; the changes are in `docs/changes.md`.
+- **`deploy/.env`.** Copied from the example, with the database password, `SECRET_KEY` and administrator password generated randomly and the administrator username set to `admin`. Also, because port 8080 on this machine is already used by another project (forward), the local `HTTP_PORT` was changed to 8088, `HTTPS_PORT` to 8448, and `PUBLIC_URL` is `http://localhost:8088`.
+- **Phase 0 scripts**, all in `scripts/phase0/`, each with usage at the top: reference tests in the image, checking real sources, a real BitTorrent download, alignment on real films, archives, and a browser playback test page.
+- **Documents.** Everywhere that differed from reality was fixed (the tracker list, two points about JustSubtitles, Playwright and H.264, the ffmpeg version, the archive fixtures); `docs/16-risks.md` now has each risk's status after phase 0; the "Commands" section in `AGENTS.md` is filled in.
 
-## 驗收
+## Acceptance
 
-| 條件 | 結果 |
+| Criterion | Result |
 | --- | --- |
-| `docker compose up --build` 一次成功，健康檢查通過 | **通過。** 五個容器都在、沒有重啟；`GET /api/health` 回 `{"ok":true}`；頁面顯示「拍板」（1280 px 淺色、400 px 深色都沒有橫向捲軸、沒有 console 錯誤）；Caddy 加上了安全標頭。第一次因為 `deploy/data` 被 Docker 用 root 建立，服務寫不進去，已修正並寫進 `.env.example` |
-| 第 2 項的每個測試在映像檔裡通過，數字和文件一致 | **通過。** 見下面第 2 項 |
-| 報告對第 3 到 7 項各有明確的結論 | 見下一節 |
-| 會動搖架構的發現寫在最前面 | 沒有會動搖架構的；自動對齊的問題寫在最前面 |
+| `docker compose up --build` succeeds in one go and health checks pass | **Passed.** All five containers are up with no restarts; `GET /api/health` returns `{"ok":true}`; the page shows "拍板" (Paiban, the site name; no horizontal scroll bar at 1280 px light or 400 px dark, no console errors); Caddy adds the security headers. The first attempt failed because Docker created `deploy/data` as root and the services couldn't write to it; this is fixed and noted in `.env.example` |
+| Every test in item 2 passes in the image, with numbers matching the docs | **Passed.** See item 2 below |
+| The report has a clear conclusion for each of items 3 to 7 | See the next section |
+| Findings that could shake the architecture are written first | There are none that shake the architecture; the auto-align issue is written first |
 
-### 第 1 項：骨架與映像檔
+### Item 1: skeleton and image
 
-映像檔裡的實際版本：Node 24.21.0、**ffmpeg 7.1.5**（Debian trixie；規格的數字是在 6.1.1 量的）、Python 3.13.5、ffsubsync 0.5.1、bsdtar 3.7.4（libarchive 3.7.4）。`api`、`torrent`、`media` 共用一個映像檔 `paiban-server`（1.23 GB），網頁是 `paiban-proxy`（93 MB）。
+Actual versions in the image: Node 24.21.0, **ffmpeg 7.1.5** (Debian trixie; the spec's numbers were measured on 6.1.1), Python 3.13.5, ffsubsync 0.5.1, bsdtar 3.7.4 (libarchive 3.7.4). `api`, `torrent` and `media` share one image, `paiban-server` (1.23 GB); the web front is `paiban-proxy` (93 MB).
 
-### 第 2 項：參考測試在映像檔裡
+### Item 2: reference tests in the image
 
-`scripts/phase0/reference-in-image.sh`（約 2 分鐘）：
+`scripts/phase0/reference-in-image.sh` (about 2 minutes):
 
-| 項目 | 結果 |
+| Item | Result |
 | --- | --- |
 | `reference/sync-core` | 17/17 |
 | `reference/subtitles` | 5/5 |
 | `db` | 11/11 |
 | `reference/torrent` | PASS |
-| `analyze.sh` 對 `clip.mp4` | `speech.json` 和 `data.json` **完全相同**（42 段、9,242 格，0 格不同）；`peaks.bin` 逐位元組相同。ffmpeg 7.1.5 和 6.1.1 沒有差異，不需要放寬比對 |
-| `align.ts` 三份字幕 | 晚：一段 ×1 −2.36；影格率：一段 ×1.04271 −0.791；剪輯：兩段 +1.25 / +13.24；三份 `agree` 都是 true。和 08 的表格一致 |
-| `preview.sh` 對 `clip.hevc10.mp4` | `audio.m4a`（AAC 立體聲）和 `proxy.mp4`（H.264 yuv420p 480×270 + AAC 立體聲）；2,214 格的時間戳和來源完全相同 |
-| `mux.sh` | 一條影像、一條聲音、兩條字幕；`chi`「繁體中文」是預設軌、`eng`「English」不是；影像和聲音的封包雜湊和來源完全相同 |
+| `analyze.sh` on `clip.mp4` | `speech.json` and `data.json` are **identical** (42 regions, 9,242 frames, 0 frames different); `peaks.bin` is byte-for-byte identical. No difference between ffmpeg 7.1.5 and 6.1.1; no need to loosen the comparison |
+| `align.ts` on three subtitle files | Late: one segment ×1 −2.36; frame rate: one segment ×1.04271 −0.791; cut: two segments +1.25 / +13.24; `agree` is true for all three. Matches the table in 08 |
+| `preview.sh` on `clip.hevc10.mp4` | `audio.m4a` (AAC stereo) and `proxy.mp4` (H.264 yuv420p 480×270 + AAC stereo); the timestamps of all 2,214 frames are identical to the source |
+| `mux.sh` | One video, one audio and two subtitle tracks; `chi` "繁體中文" is the default track, `eng` "English" is not; the video and audio packet hashes are identical to the source |
 
-一個小差異：ffsubsync 兩次加起來約 2 秒，交接時量的是 0.7 秒（不影響結論）。
+One small difference: the two ffsubsync runs together take about 2 seconds, while the handover measured 0.7 seconds (doesn't affect the conclusion).
 
-### 第 3 項：壓縮檔 — **確認**
+### Item 3: archives — **confirmed**
 
-在一個暫時的 Debian 容器裡用 RARLAB 的 `rar` 7 和 `7zip` 做了 RAR5 和 7z 版的 `archive.zip`，以及七種該被拒絕的壓縮檔，放在 `fixtures/archives/`（產生的工具不進產品的映像檔）。映像檔裡的 bsdtar 解 zip、7z、RAR5，內容都和 `archive.zip` 完全相同。
+In a temporary Debian container, RARLAB's `rar` 7 and `7zip` were used to make RAR5 and 7z versions of `archive.zip`, plus seven archives that should be rejected, placed in `fixtures/archives/` (the tools that generate them don't go into the product image). bsdtar in the image extracts zip, 7z and RAR5, all with contents identical to `archive.zip`.
 
-- **RAR4 沒有確認**：目前的 `rar` 7 已經不能寫 RAR4，沒有樣本。libarchive 支援 RAR4 的時間比 RAR5 久得多，風險低。
-- bsdtar 自己只會拒絕含 `..` 的項目（其他照解）和去掉開頭的 `/`；**符號連結照樣解出來、數量和大小不限制**。所以 07 和 12 要求的檢查必須由程式自己做（先列出再決定、解的時候再數實際寫出的位元組）。這和規格的要求一致，只是確認了不能依賴工具。
+- **RAR4 is not confirmed**: the current `rar` 7 can no longer write RAR4, so there's no sample. libarchive has supported RAR4 far longer than RAR5, so the risk is low.
+- bsdtar on its own only rejects entries containing `..` (it extracts everything else) and strips a leading `/`; **symlinks are extracted as is, and there's no limit on count or size**. So the checks required by 07 and 12 must be done by the program itself (list first and then decide, and count the bytes actually written while extracting). This matches what the spec requires; it just confirms the tool can't be relied on.
 
-### 第 4 項：真實的外部來源 — **部分確認**
+### Item 4: real external sources — **partly confirmed**
 
-`scripts/phase0/check-sources.mjs`，每個來源只發幾個請求，回應存在 `.scratch/`（不提交），金鑰在寫進檔案之前就換成 `PLACEHOLDER`。
+`scripts/phase0/check-sources.mjs` sends only a few requests per source; responses are stored in `.scratch/` (not committed), and keys are replaced with `PLACEHOLDER` before being written to any file.
 
-| 來源 | 結論 |
+| Source | Conclusion |
 | --- | --- |
-| JustSubtitles | **確認，有兩處不同。** 從伺服器端（`User-Agent: Paiban/…`，沒有偽裝）正常回應。欄位和文件相同；`EN` 30 筆、`ZH` 7 筆、`ZH_BG` 3 筆。**不存在的編號回 200**（文件寫 500）；片名搜尋的外層是 `{results: [...]}`（文件說沒記下來）。`ZH` 和 `ZH_BG` 的每一筆網址都帶別人的 `api_key`，去掉之後下載照樣成功。下載了一個壓縮檔：zip、一個 UTF-8 的繁體 `.srt`（在名義上是簡體的 `ZH` 分類裡） |
-| YIFY Subtitles | **確認。** 頁面結構、下載按鈕的 base64、下載主機都和文件相同，沒有驗證碼或挑戰頁。壓縮檔：zip、一個 UTF-8（有 BOM）的繁體 `.srt` |
-| YTS | **無法確認**：沒有網址 |
-| TMDB | **無法確認**：`TMDB_KEY` 空著 |
-| 射手網 | **無法確認**：`ASSRT_TOKEN` 空著 |
-| SubDL | **無法確認**：`SUBDL_KEY` 空著 |
+| JustSubtitles | **Confirmed, with two differences.** Responds normally to server-side requests (`User-Agent: Paiban/…`, no disguise). Fields match the docs; `EN` 30 items, `ZH` 7, `ZH_BG` 3. **A nonexistent ID returns 200** (the docs said 500); title search's outer shape is `{results: [...]}` (the docs said it wasn't recorded). Every URL in `ZH` and `ZH_BG` carries someone else's `api_key`, and downloads still succeed with it removed. One archive downloaded: a zip with one UTF-8 Traditional Chinese `.srt` (in the `ZH` category, which is nominally Simplified) |
+| YIFY Subtitles | **Confirmed.** The page structure, the base64 of the download button and the download host all match the docs; no CAPTCHA or challenge page. Archive: a zip with one UTF-8 (with BOM) Traditional Chinese `.srt` |
+| YTS | **Could not confirm**: no URL |
+| TMDB | **Could not confirm**: `TMDB_KEY` is empty |
+| Assrt | **Could not confirm**: `ASSRT_TOKEN` is empty |
+| SubDL | **Could not confirm**: `SUBDL_KEY` is empty |
 
-兩個壓縮檔看完就刪了。錄下來的 JustSubtitles 和 YIFY 回應已經放進 `reference/providers/` 取代手寫的範例（YIFY 頁面裡一個分析服務的 `token` 也換成了 `PLACEHOLDER`）。補上網址或金鑰後，跑 `node scripts/phase0/check-sources.mjs --only <yts|tmdb|assrt|subdl>`（YTS 用 `YTS_BASE_URL=https://… node …`）就能補做。
+Both archives were deleted after inspection. The recorded JustSubtitles and YIFY responses have been put into `reference/providers/`, replacing the hand-written samples (an analytics service's `token` in the YIFY page was also replaced with `PLACEHOLDER`). Once the URL or keys are provided, run `node scripts/phase0/check-sources.mjs --only <yts|tmdb|assrt|subdl>` (for YTS, `YTS_BASE_URL=https://… node …`) to complete the check.
 
-### 第 5 項：真實的 BitTorrent 下載 — **確認**（開發機、短時間）
+### Item 5: real BitTorrent download — **confirmed** (dev machine, short run)
 
-`scripts/phase0/real-swarm.mjs`，在 `paiban-server` 映像檔的容器裡、Docker bridge 網路、發布 51413（TCP/UDP）和 51414（UDP），和正式部署相同。種子取自 WebTorrent 官方文件（`webtorrent.io/docs` 和 `/free-torrents`）：*Sintel*（129 MB）和 *Tears of Steel*（571 MB），都是 Blender 基金會的開放電影。官方磁力連結裡的 HTTP webseed 刻意拿掉，資料只能來自 BitTorrent peers。
+`scripts/phase0/real-swarm.mjs`, run in a container from the `paiban-server` image, on a Docker bridge network, publishing 51413 (TCP/UDP) and 51414 (UDP), the same as the real deployment. The torrents come from WebTorrent's official docs (`webtorrent.io/docs` and `/free-torrents`): *Sintel* (129 MB) and *Tears of Steel* (571 MB), both Blender Foundation open movies. The HTTP webseeds in the official magnet links were deliberately removed, so data could only come from BitTorrent peers.
 
 | | Sintel | Tears of Steel |
 | --- | --- | --- |
-| 拿到種子資訊 | 8.1 秒 | 3.6 秒 |
-| 速度 | 最高約 4 MB/s，十幾個 peers | 最高約 5.8 MB/s |
-| 暫停（存 bitfield、destroy）再接續 | 3 秒就緒，301 個分塊一個不少 | 3.2 秒就緒，263 個分塊一個不少 |
-| 強制終止（SIGKILL）後重啟、不給 bitfield | 重新驗證 4.5 秒，接續到完成 | 重新驗證 5.1 秒，接續到完成 |
-| 全程 | 1.6 分鐘 | 2.9 分鐘 |
+| Got torrent info | 8.1 s | 3.6 s |
+| Speed | Up to about 4 MB/s, a dozen or so peers | Up to about 5.8 MB/s |
+| Pause (save bitfield, destroy) and resume | Ready in 3 s, all 301 pieces intact | Ready in 3.2 s, all 263 pieces intact |
+| Restart after a forced kill (SIGKILL), no bitfield given | Re-verified in 4.5 s, resumed to completion | Re-verified in 5.1 s, resumed to completion |
+| Total | 1.6 minutes | 2.9 minutes |
 
-- **DHT**：正常，幾秒內就有 15 到 60 個節點。**uTP**：正常，大部分連線是 uTP 連出。
-- **tracker**：`opentrackr`、`demonii` 有回應；`tracker.openbittorrent.com` 查不到網域、`p4p.arenabg.com` 逾時。05 的清單已改。
-- **連入**：Sintel 那次觀察到 1 個 `utpIncoming`、0 個 `tcpIncoming`。uTP 走 UDP，我們先連出去之後 NAT 會讓對方暫時連得回來，所以這一個不能證明埠有轉發。建議「連入狀況」只看 `tcpIncoming`（記在 agent-notes，階段 3 處理）。
-- 長時間（好幾天）、好幾 GB 的種子的記憶體用量，**還沒有確認**。
+- **DHT**: works, with 15 to 60 nodes within seconds. **uTP**: works; most connections are outgoing uTP.
+- **Trackers**: `opentrackr` and `demonii` respond; `tracker.openbittorrent.com` has no DNS record and `p4p.arenabg.com` times out. The list in 05 has been changed.
+- **Incoming**: the Sintel run saw 1 `utpIncoming` and 0 `tcpIncoming`. uTP runs over UDP, and after we connect out, NAT temporarily lets the other side connect back, so this one doesn't prove the port is forwarded. Suggestion: "incoming connections" should look only at `tcpIncoming` (recorded in agent-notes, to be handled in phase 3).
+- Memory usage over long periods (several days) with multi-GB torrents is **not yet confirmed**.
 
-### 第 6 項：真實電影的對齊 — **不符**
+### Item 6: alignment on a real film — **does not match**
 
-見最前面。分析本身的耗時：12 分鐘的片 13 秒、15 分鐘的片 18 秒（8 核心）。
+See the top of this report. Analysis time itself: 13 seconds for the 12-minute film, 18 seconds for the 15-minute film (8 cores).
 
-### 第 7 項：瀏覽器播放 — **部分確認**
+### Item 7: browser playback — **partly confirmed**
 
-用 ffmpeg 從 *Tears of Steel* 做了兩個類似 YTS 的檔案：H.264 High、yuv420p、AAC 立體聲，以及同樣的影像配 AAC 5.1；兩個的 `moov` 都在檔尾（`ftyp free mdat moov`）。`scripts/phase0/playback/serve.mjs` 是一個只會處理 Range 的最小端點（206、416），測試頁會自動載入、播放、拖到 10:00、拖回 0:30。
+ffmpeg was used to make two YTS-like files from *Tears of Steel*: H.264 High, yuv420p, AAC stereo, and the same video with AAC 5.1; both have `moov` at the end of the file (`ftyp free mdat moov`). `scripts/phase0/playback/serve.mjs` is a minimal endpoint that only handles Range (206, 416); the test page automatically loads, plays, seeks to 10:00, and seeks back to 0:30.
 
-| 瀏覽器 | 結果 |
+| Browser | Result |
 | --- | --- |
-| Playwright 內建的 Chromium 153（無頭） | **兩個檔案全部通過**：metadata 0.1 到 0.2 秒載入（`moov` 在檔尾不是問題）、能播、拖動約 2.3 秒、聲音有解碼。畫面確實有解碼。這和規格「內建 Chromium 不能解 H.264」不同，文件已改 |
-| Chrome、Firefox、Safari | **無法確認**：這台機器沒有桌面瀏覽器。Playwright 的 WebKit 缺系統函式庫（要 sudo 安裝），而且它也不等於 Safari |
+| Playwright's built-in Chromium 153 (headless) | **Both files fully pass**: metadata loads in 0.1 to 0.2 seconds (`moov` at the end isn't a problem), plays, seeks in about 2.3 seconds, audio is decoded. The frames are actually decoded. This differs from the spec's "built-in Chromium can't decode H.264"; the docs have been changed |
+| Chrome, Firefox, Safari | **Could not confirm**: this machine has no desktop browser. Playwright's WebKit is missing system libraries (installing them needs sudo), and it isn't the same as Safari anyway |
 
-請你用 Chrome、Firefox、Safari（Mac 或 iPhone）各打開一次測試頁，按「開始」，把最下面灰色框裡的文字貼給我（步驟在最後一節）。
+Please open the test page once each in Chrome, Firefox and Safari (Mac or iPhone), press "Start", and paste me the text in the gray box at the bottom (steps in the last section).
 
-## 測試
+## Tests
 
-| 跑了什麼 | 結果 |
+| What was run | Result |
 | --- | --- |
-| `pnpm typecheck` / `pnpm lint` / `pnpm test` | 通過。測試 6 項（站名常數 1、健康檢查 1、測試用變數的啟動檢查 3、頁面顯示站名 1） |
-| 四組參考測試（主機上） | 17、5、11、PASS |
-| `scripts/phase0/reference-in-image.sh`（映像檔裡） | 四組測試同上 + pipeline 12/12 |
-| 壓縮檔、來源、BitTorrent、真實電影、播放 | 手動執行，結果在上面各項 |
+| `pnpm typecheck` / `pnpm lint` / `pnpm test` | Passed. 6 tests (site name constant 1, health check 1, startup check for test variables 3, page shows the site name 1) |
+| The four reference test suites (on the host) | 17, 5, 11, PASS |
+| `scripts/phase0/reference-in-image.sh` (in the image) | The four suites as above + pipeline 12/12 |
+| Archives, sources, BitTorrent, real films, playback | Run by hand; results in each item above |
 
-## 和規格不同的地方
+## Differences from the spec
 
-`docs/changes.md` 的五則（2026-10-05）：Playwright 與 H.264、預設的 tracker 清單、JustSubtitles 的兩處、壓縮檔的測試素材、deploy 檔案的修正。
+Five entries in `docs/changes.md` (2026-10-05): Playwright and H.264, the default tracker list, the two points about JustSubtitles, the archive test fixtures, and the fixes to the deploy files.
 
-## 發現的問題與風險
+## Problems and risks found
 
-- **自動對齊**（最前面）。
-- **交叉比對時發現的規格矛盾**：完整清單在 `docs/agent-notes.md` 最後一則。照字面做不出來的有四條：`media_files.error` 只有一格會互相蓋掉（階段 4）、廣播事件裡有依收件人而不同的欄位（階段 1、3）、暫停／繼續／下載的回應看不出要不要排隊（階段 3）、來源錯誤碼缺 `INVALID_KEY`（階段 5）。都可以依 AGENTS.md 的順序由我判斷，做到那個階段時改文件和合約。
-- **D34（交接）碰到 D6（指定）**：第一版會拿掉 ASS 的樣式和位置。射手網的中文字幕很多是有樣式的雙語 ASS，匯出後樣式會消失。D6 說「功能要完整」，所以列在下面請你確認。
-- **JustSubtitles 實際上很依賴 TMDB 金鑰**：沒有金鑰時用片名搜尋對編號，*Inception* 就有兩筆片名完全相同（靠年份才分得開）；要切到 SubDL 備援模式又需要 SubDL 金鑰。D5 說它最重要，所以兩把金鑰實際上幾乎是必要的。
-- **`deploy/data` 的擁有者**：Docker 自動建立的資料夾是 root 的，服務寫不進去。已寫進 `.env.example` 和 AGENTS 的指令。建議（規格沒有要求）：服務啟動時檢查 `/data` 可寫，否則報錯說明。
-- **webtorrent 的安全通報**：現況不變（3.0.21，`ip` 2.0.1 沒有修正版）。階段 9 要寫結論。
-- **ARM**：沒有 ARM 的機器，沒有確認。
+- **Auto-align** (at the top).
+- **Spec contradictions found during cross-checking**: the full list is in the last entry of `docs/agent-notes.md`. Four can't be implemented as literally written: `media_files.error` has only one slot, so errors overwrite each other (phase 4); broadcast events contain fields that differ per recipient (phases 1, 3); the responses for pause / resume / download don't show whether the item will be queued (phase 3); the source error codes are missing `INVALID_KEY` (phase 5). I can decide all of these following the order in AGENTS.md, and will change the docs and contract when I reach those phases.
+- **D34 (Handover) runs into D6 (Specified)**: the first version drops ASS styles and positioning. Many of Assrt's Chinese subtitles are styled bilingual ASS, and the styling disappears after export. D6 says "features must be complete", so it's listed below for you to confirm.
+- **JustSubtitles actually depends heavily on the TMDB key**: without a key, IDs are matched by title search, and *Inception* already has two results with identical titles (only the year tells them apart); switching to the SubDL fallback mode in turn needs a SubDL key. D5 says it's the most important source, so both keys are effectively almost required.
+- **Ownership of `deploy/data`**: folders Docker creates automatically belong to root, and the services can't write to them. This is now noted in `.env.example` and the AGENTS commands. Suggestion (not required by the spec): have the services check at startup that `/data` is writable, and otherwise report an explanatory error.
+- **webtorrent security advisory**: unchanged (3.0.21; `ip` 2.0.1 has no fixed version). Phase 9 needs to write a conclusion.
+- **ARM**: no ARM machine, not confirmed.
 
-## 需要 Brian 決定或提供的
+## What Brian needs to decide or provide
 
-### 要提供的
+### To provide
 
-| 項目 | 用在哪裡 | 沒有的話 |
+| Item | Used for | Without it |
 | --- | --- | --- |
-| 目前能用的 YTS 網址 | 補做第 4 項的 YTS；階段 2 | 用假的 YTS 開發，真的那一段延後 |
-| `deploy/.env` 的 `TMDB_KEY`、`ASSRT_TOKEN`、`SUBDL_KEY` | 補做第 4 項 | 那三個來源依文件和假資料開發 |
-| 部署的機器：是不是這一台？CPU、記憶體、磁碟、x86 還是 ARM | 第 5、6 項的結論、階段 9 | 先假設是這一台 |
-| 路由器有沒有轉發 51413（TCP/UDP）、51414（UDP） | 連入狀況 | 照常能下載，只是比較慢 |
-| 用 Chrome、Firefox、Safari 開一次播放測試頁 | 第 7 項 | 只有 Chromium 的結論 |
+| A currently working YTS URL | Completing the YTS part of item 4; phase 2 | Develop against the fake YTS and postpone the real part |
+| `TMDB_KEY`, `ASSRT_TOKEN`, `SUBDL_KEY` in `deploy/.env` | Completing item 4 | Develop those three sources from the docs and fake data |
+| The deployment machine: is it this one? CPU, memory, disk, x86 or ARM | Conclusions for items 5 and 6, phase 9 | Assume it's this one for now |
+| Whether the router forwards 51413 (TCP/UDP) and 51414 (UDP) | Incoming connections | Downloads still work, just slower |
+| Open the playback test page once in Chrome, Firefox and Safari | Item 7 | Only the Chromium conclusion |
 
-### 要決定的
+### To decide
 
-1. **人聲偵測要不要另外投入**（第 6 項）。
-   - 選項 A（**建議**）：階段 6 先修分段和挑選的邏輯、改介面說法，webrtc 照用；配樂重的片就靠手動對齊點。映像檔不變。
-   - 選項 B：階段 6 另外試 whisper 轉錄或修好 silero，量過再決定要不要放進映像檔（多好幾 GB、吃 CPU）。
-2. **D34 vs D6**：第一版匯出時拿掉 ASS 的樣式，可以嗎？
-   - 選項 A（**建議**）：可以，照規格；「保留 ASS 樣式」維持在以後再說。
-   - 選項 B：第一版就保留，階段 6、7 的工作量會明顯增加。
+1. **Whether to invest in another speech detector** (item 6).
+   - Option A (**recommended**): in phase 6, first fix the segmentation and selection logic and change the interface wording, keeping webrtc; films with heavy scores rely on manual anchors. The image doesn't change.
+   - Option B: in phase 6, also try whisper transcription or fixing silero, and decide after measuring whether to put it in the image (several GB more, uses CPU).
+2. **D34 vs. D6**: is it OK for the first version to drop ASS styling on export?
+   - Option A (**recommended**): yes, per the spec; "keep ASS styling" stays as a later item.
+   - Option B: keep it in the first version; the workload of phases 6 and 7 would grow noticeably.
 
-### `docs/16-risks.md`「請 Brian 確認的事」（原樣）
+### `docs/16-risks.md` "Things for Brian to confirm" (verbatim)
 
-| 項目 | 目前的預設 | 另一種選擇 |
+| Item | Current default | Alternative |
 | --- | --- | --- |
-| 來源是「交接」的決定：D18、D25、D30 到 D41 | 見 [00-decisions.md](../00-decisions.md) | |
-| 管理員要處理別人的片（對字幕、暫停下載） | 先把那個版本加入自己的片庫，之後和其他持有人一樣；要停掉別人的下載用強制刪除。和原型一致 | 管理員可以直接操作任何人的片 |
-| 「下載完成」的通知什麼時候發 | 下載完成的那一刻（這時已經可以找字幕） | 等聲音分析完再發（原型的做法，大約晚一分鐘） |
-| 背景工作失敗 | 自動再試一次，還是失敗才顯示失敗 | 不自動重試 |
-| 用中文片名搜尋 | 不做（YTS 只認英文片名） | 以後用 TMDB 做中文片名對照 |
-| 簡體轉繁體的方式 | 字和用語都換成台灣的說法（软件 → 軟體） | 只換字，不換用語 |
-| 做種 | 下載完成就停止 | 做種到分享率 1.0 |
-| 上傳限速 | 512 KB/s | |
-| 同時下載 | 全站 2 部、每人 2 部 | |
-| 成員看得到其他成員的名字（在共用的影片上） | 看得到 | 匿名成「其他人」 |
-| 成員能不能刪除別人加入的字幕 | 能（字幕是這部片共用的） | 只有加入的人和管理員能刪 |
-| 預覽檔預設解析度 | 480p | 720p |
-| 介面文案的標點 | 全形的逗號、冒號、分號、括號，見 [17-ui.md](../17-ui.md) | 照原型用半形 |
+| Decisions whose source is "Handover": D18, D25, D30 to D41 | See [00-decisions.md](../00-decisions.md) | |
+| An administrator needs to work on someone else's film (sync subtitles, pause a download) | First add that version to their own library, then act like any other holder; to stop someone else's download, use force delete. Matches the prototype | Administrators can act on anyone's film directly |
+| When the "download finished" notification is sent | The moment the download finishes (subtitles can already be searched for at that point) | Send it after audio analysis finishes (the prototype's approach, about a minute later) |
+| A background job fails | Retry once automatically, and show it as failed only if it fails again | No automatic retry |
+| Searching by Chinese title | Not done (YTS only knows English titles) | Later, use TMDB to map Chinese titles |
+| How Simplified is converted to Traditional | Both characters and terms are changed to Taiwanese usage (软件 → 軟體, "software") | Characters only, not terms |
+| Seeding | Stop when the download finishes | Seed to a ratio of 1.0 |
+| Upload speed limit | 512 KB/s | |
+| Concurrent downloads | 2 site-wide, 2 per person | |
+| Members can see other members' names (on shared films) | They can | Anonymized as "someone else" |
+| Whether members can delete subtitles added by others | They can (subtitles are shared by the film) | Only the person who added them and administrators can |
+| Default preview file resolution | 480p | 720p |
+| Punctuation in interface copy | Full-width commas, colons, semicolons and parentheses; see [17-ui.md](../17-ui.md) | Half-width, as in the prototype |
 
-### `docs/agent-notes.md` 裡標了「需要 Brian 確認」的
+### Items in `docs/agent-notes.md` marked "needs Brian to confirm"
 
-- **配樂很重的片，webrtc 人聲偵測抓不到對白**：就是上面「要決定的」第 1 項。
+- **On films with heavy scores, webrtc speech detection doesn't pick up the dialogue**: this is item 1 of "To decide" above.
 
-## 怎麼看成果
+## How to see the results
 
-從零開始（需要 Node 24、pnpm 12、Docker）：
+From scratch (needs Node 24, pnpm 12, Docker):
 
 ```bash
 pnpm install && pnpm typecheck && pnpm lint && pnpm test
@@ -211,10 +211,10 @@ mkdir -p deploy/data
 docker compose -f deploy/docker-compose.yml up -d --build
 ```
 
-打開 `http://localhost:8088/`（本機的 `deploy/.env` 把埠改成 8088，因為 8080 被別的專案用了），會看到寫著「拍板」的頁面；`http://localhost:8088/api/health` 回 `{"ok":true}`。這個階段還不能登入。第一個管理員的帳號和密碼在 `deploy/.env` 的 `BOOTSTRAP_ADMIN_USERNAME` 和 `BOOTSTRAP_ADMIN_PASSWORD`，階段 1 做出登入之後就能用。
+Open `http://localhost:8088/` (the local `deploy/.env` changes the port to 8088 because 8080 is used by another project), and you'll see a page saying "拍板" (Paiban); `http://localhost:8088/api/health` returns `{"ok":true}`. You can't sign in yet at this phase. The first administrator's username and password are in `BOOTSTRAP_ADMIN_USERNAME` and `BOOTSTRAP_ADMIN_PASSWORD` in `deploy/.env`, and become usable once sign-in is built in phase 1.
 
-參考測試在映像檔裡：`scripts/phase0/reference-in-image.sh`。
+Reference tests in the image: `scripts/phase0/reference-in-image.sh`.
 
-播放測試頁：伺服器現在還開著（`node scripts/phase0/playback/serve.mjs 8090`，聽在所有網路介面上；它只會回測試頁和那兩個檔案，沒有登入）。這台機器的位址看起來不是私有網段，如果它直接面對網際網路，這個埠外面也連得到。從你的電腦或手機打開 `http://<這台機器的位址>:8090/`，按「開始」，把灰色框裡的文字貼給我；請順便用耳朵確認 5.1 那個檔案有沒有聲音。測試檔是 *Tears of Steel* 轉出來的（CC BY），在 `.scratch/playback/`，不提交。看完請跟我說，我會把伺服器關掉；要重新產生檔案用 `scripts/phase0/playback/make-files.sh`。
+Playback test page: the server is still running (`node scripts/phase0/playback/serve.mjs 8090`, listening on all network interfaces; it only serves the test page and the two files, with no sign-in). This machine's address doesn't look like a private range, so if it faces the internet directly, this port is reachable from outside too. Open `http://<this machine's address>:8090/` from your computer or phone, press "Start", and paste me the text in the gray box; please also check by ear whether the 5.1 file has sound. The test files are converted from *Tears of Steel* (CC BY), in `.scratch/playback/`, not committed. Let me know when you're done and I'll shut the server down; to regenerate the files, use `scripts/phase0/playback/make-files.sh`.
 
-`.scratch/` 裡還留著兩部開放電影（約 1 GB）、它們的分析結果和錄下來的原始回應，給補做和階段 6 用；都不提交，不需要時可以整個刪掉。
+`.scratch/` still holds two open movies (about 1 GB), their analysis results and the recorded raw responses, for completing checks and for phase 6; none of it is committed, and the whole folder can be deleted when no longer needed.

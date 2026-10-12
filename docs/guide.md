@@ -1,61 +1,61 @@
-# 使用說明：五分鐘走完一次
+# User guide: one run-through in five minutes
 
-從找一部電影，到拿到一個帶著對好字幕的 MKV 檔。
+From finding a film to getting an MKV file with synced subtitles in it.
 
-## 1. 找電影、下載
+## 1. Find a film and download it
 
-1. 登入後是**搜尋**頁。打片名（中英文都可以），或用類型、年份、評分篩選。
-2. 點一部電影進**電影頁**，下面列出可以下載的版本（解析度、片源、檔案大小）。
-   - 標「瀏覽器能直接播」的版本，之後對字幕時不用另外轉檔，最省空間。
-   - 已經有人下載過的版本會標出來；按「加入我的片庫」就好，不會再下載一次。
-3. 按「下載」。到**下載**頁看進度：排隊中、下載中、完成。可以暫停、繼續。
+1. After signing in you are on the **Search** page. Type a title (Chinese or English both work), or filter by genre, year or rating.
+2. Click a film to open its **film page**, which lists the versions you can download (resolution, source, file size).
+   - Versions marked "Plays in the browser" won't need converting later when you sync subtitles, and save the most space.
+   - Versions someone has already downloaded are marked; just press "Add to my library" and it won't be downloaded again.
+3. Press "Download". Watch the progress on the **Downloads** page: Queued, Downloading, Done. You can pause and resume.
 
-容量不夠時會告訴你還差多少，並帶你去**儲存空間**頁看哪些東西可以刪。系統不會自己刪任何檔案。
+When there isn't enough space, it tells you how much is missing and takes you to the **Storage** page to see what can be deleted. The system never deletes any files on its own.
 
-## 2. 等它準備好
+## 2. Wait for it to be ready
 
-下載完成後，系統會自動：
+When the download finishes, the system automatically:
 
-- 分析聲音：畫出波形、找出有人在講話的地方（約一分鐘內）。
-- 語音辨識：聽片中的幾段，記下講了什麼，之後自動對齊用（每部片約 1 到 3 分鐘）。
-- 瀏覽器不能直接播的版本，另外轉一份小的預覽檔。
+- Analyzes the audio: draws the waveform and finds where people are talking (within about a minute).
+- Runs speech recognition: listens to a few parts of the film and notes what was said, for auto-align later (about 1 to 3 minutes per film).
+- For versions the browser can't play directly, makes a separate small preview file.
 
-這些都在片子的工作區看得到進度，不用等它們全部做完才開始找字幕。
+You can see the progress of all of these in the film's workspace, and you don't have to wait for them to finish before looking for subtitles.
 
-## 3. 找字幕
+## 3. Find subtitles
 
-到**片庫**，點片子的「字幕」。
+Go to **Library** and click the film's "Subtitles".
 
-1. 選語言（繁體中文、簡體中文、英文），按「搜尋」。各個字幕來源的結果會一起列出，標「版本相符」的是和你下載的版本同一個發行來源，通常最好對。
-2. 不知道選哪個？按「全部自動對齊並排名」，每一條都會自動對一次並打分數，最好的標「建議」。
-3. 按「加入」。簡體字幕會自動轉成繁體。
-4. 手上已經有字幕檔，按「上傳」（SRT、ASS、VTT，或裝著它們的 ZIP、7z、RAR）。
+1. Choose languages (Traditional Chinese, Simplified Chinese, English) and press "Search all sources". Results from every subtitle source are listed together; ones marked "Matches the YTS release" come from the same release as the version you downloaded and usually sync best.
+2. Not sure which to pick? Press "Auto-align and rank all": each one is auto-aligned once and scored, and the best is marked "Recommended".
+3. Press "Add". Simplified Chinese subtitles are converted to Traditional automatically.
+4. If you already have a subtitle file, upload it under "Upload your own" (SRT, ASS, VTT, or a ZIP, 7z or RAR containing them).
 
-## 4. 對準字幕
+## 4. Line up the subtitles
 
-在加入的字幕旁按「同步」，進**同步工作台**。
+Press "Sync" next to the added subtitles to open the **sync workbench**.
 
-1. 先按「**自動對齊**」（快捷鍵 A）。系統會比對片中講的話和字幕的每一句，找出整體的位移、速度差（不同影格率），以及剪輯版本不同造成的斷點。幾秒鐘後套用，訊息列會說移了多少、分數從多少變多少。
-2. 按「檢查點」逐個聽幾句：對的按「對」，不對就用下面的工具修。
-   - 「吸附到人聲」：在目前位置前後 1.5 秒內微調。
-   - 位移和速率：整段一起移。
-   - 對齊點：拖一句字幕到它真正開始的地方，釘兩個以上的點，速度也會跟著算出來。
-   - 某一句單獨不對，可以直接改那一句的時間或文字。
-3. 每一步都能「復原」。滿意了按「**確認**」，這條字幕就可以拿去匯出。
+1. First press "**Auto-align**" (shortcut A). The system compares what is said in the film with each line of the subtitles, and finds the overall offset, speed difference (different frame rates), and breakpoints caused by different cuts. After a few seconds it is applied, and the message bar says how far things moved and how the score changed.
+2. Press "Checkpoints" and listen to a few lines one by one: if it's right press "This one is right"; if not, fix it with the tools below.
+   - "Snap to speech": fine-tunes within 1.5 seconds before and after the current position.
+   - Offset and rate: move a whole segment together.
+   - Anchors: drag a line to where it really starts; pin two or more and the speed is worked out too.
+   - If a single line is off on its own, you can edit that line's time or text directly.
+3. Every step can be undone with "Undo". When you're happy, press "**Confirm sync**", and these subtitles are ready for export.
 
-分數是「字幕和人聲重疊的比例」，只是輔助；最後以耳朵為準。
+The score is "the share of subtitle time that overlaps speech", and is only a hint; in the end, your ears decide.
 
-## 5. 匯出 MKV
+## 5. Export MKV
 
-片子的「匯出」：
+The film's "Export":
 
-1. 勾要放進去的字幕（可以好幾條，例如中文加英文），選一條當預設。
-2. 檔名可以改。按「匯出」。
-3. 做好之後按「下載」。影片和聲音不會重新壓縮，只是把字幕軌放進去，所以很快，畫質也不變。
+1. Tick the subtitles to put in (several are fine, e.g. Chinese plus English), and choose one as the default.
+2. You can change the file name. Press "Start export".
+3. When it's done, press "Download". The video and audio aren't re-encoded; the subtitle tracks are just added, so it's fast and the quality is unchanged.
 
-## 其他
+## Other
 
-- **個人設定**：改顯示名稱、密碼、外觀（淺色、深色、跟隨系統）、預設要找的字幕語言，看自己登入過的裝置並登出。
-- **通知**（右上角的鈴鐺）：下載完成或失敗、匯出完成、別人把你們共用的片子的字幕對好了。
-- 同一部片可以好幾個人一起用。對字幕時如果別人也剛好在改，儲存時會告訴你，讓你選要用誰的版本。
-- 不要的片子在片庫或儲存空間頁移除。還有別人持有的話，只是從你的片庫拿掉，檔案留給他們。
+- **Profile**: change your display name, password, appearance (Light, Dark, System) and the subtitle languages to search by default, and see the devices you've signed in on and sign them out.
+- **Notifications** (the bell in the top-right corner): a download finished or failed, an export finished, someone else synced the subtitles of a film you share.
+- Several people can use the same film together. If someone else happens to be editing while you sync subtitles, you're told when you save and can choose whose version to keep.
+- Remove films you don't want from Library or the Storage page. If others still hold it, it's only taken out of your library, and the files stay for them.

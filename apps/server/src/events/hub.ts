@@ -1,7 +1,7 @@
 import type { ServerEvent } from '@paiban/shared';
 
 /**
- * The open Server-Sent Events connections (docs/04-api.md, "即時更新"). Callers decide who may see
+ * The open Server-Sent Events connections (docs/04-api.md, "Live updates"). Callers decide who may see
  * an event; the hub only delivers. Events are reminders: a page that reconnects refetches.
  */
 type Client = { userId: string; admin: boolean; write: (chunk: string) => void };

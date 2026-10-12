@@ -90,7 +90,7 @@ run('media', tsx, ['src/media.ts'], 'apps/server');
 run('web', 'pnpm', ['exec', 'vite', '--host', '127.0.0.1'], 'apps/web');
 
 console.log('\nOpen http://localhost:5173 and sign in as admin / paiban-dev-not-real.');
-console.log('Then set the YTS address to http://127.0.0.1:8090 under 來源設定.\n');
+console.log('Then set the YTS address to http://127.0.0.1:8090 under Sources (來源設定).\n');
 
 const stop = () => {
   for (const c of children) c.kill('SIGTERM');

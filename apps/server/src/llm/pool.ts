@@ -5,7 +5,7 @@ import { openSecret, sealSecret } from '../settings/secrets.js';
 import { askJson, type Connection, type JsonRequest, LlmError } from './providers.js';
 
 /**
- * Which profile answers a request (docs/18-llm.md, "分配：負載平衡與備援"): the enabled profiles
+ * Which profile answers a request (docs/18-llm.md, "Distribution: load balancing and fallback"): the enabled profiles
  * in layers by priority; within the first layer that has one free, a weighted random pick among
  * those not cooling down and not at their concurrency limit. A failure cools the profile down
  * (60 s, or 10 min for a refused key) and the request moves to another one; at most four tries.

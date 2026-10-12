@@ -1,5 +1,5 @@
 /**
- * Constants that are not settings (docs/13-settings.md, "不開放設定的常數"). Kept in one place so
+ * Constants that are not settings (docs/13-settings.md, "Constants that can't be configured"). Kept in one place so
  * that opening one up later is a small change.
  */
 
@@ -35,7 +35,7 @@ export const PREVIEW_BYTES_PER_SECOND = {
 export const FALLBACK_RUNTIME_MIN = 120;
 
 /**
- * What admission asks for when an export starts (docs/10-storage.md, "接受與拒絕"): the film file
+ * What admission asks for when an export starts (docs/10-storage.md, "Admission and refusal (admission)"): the film file
  * × 1.01 + 1 MB, for the Matroska overhead and the subtitle tracks. `Workspace.exportNeedBytes`.
  */
 export function exportNeedBytes(mediaBytes: number): number {

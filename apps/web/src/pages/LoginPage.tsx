@@ -8,7 +8,7 @@ import { t } from '../copy';
 import { ApiFailure, post } from '../lib/api';
 import { keys } from '../lib/queries';
 
-/** docs/11-pages.md, "登入". One error line between the password and the button. */
+/** docs/11-pages.md, "Sign in (01)". One error line between the password and the button. */
 export function LoginPage() {
   const qc = useQueryClient();
   const navigate = useNavigate();

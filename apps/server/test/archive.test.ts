@@ -13,7 +13,7 @@ import {
 } from '../src/subtitles/archive.js';
 
 /**
- * docs/07-subtitle-providers.md step 3 and docs/12-auth.md "上傳與壓縮檔", on fixtures/archives.
+ * docs/07-subtitle-providers.md step 3 and docs/12-auth.md "Uploads and archives", on fixtures/archives.
  * The extraction tests need bsdtar: it is in the image (`pnpm test:image`); without it they are
  * skipped, loudly. The rule checks run everywhere.
  */

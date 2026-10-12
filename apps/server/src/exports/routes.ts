@@ -26,7 +26,7 @@ const CreateBody = z.object({
 const ListQuery = z.object({ scope: z.enum(['mine', 'all']).default('mine') });
 
 /**
- * The file name rules of db/schema.sql and docs/11-pages.md ("檔名"), with a reason code the page
+ * The file name rules of db/schema.sql and docs/11-pages.md ("file name"), with a reason code the page
  * turns into one of its two sentences. Control characters are refused too: the name goes into a
  * header and onto someone's disk.
  */
@@ -47,7 +47,7 @@ async function readCues(dataDir: string, subtitleId: string): Promise<Cue[]> {
   return list as Cue[];
 }
 
-/** The final SRT of a confirmed subtitle: applyDoc, then toSrt (docs/08-media-pipeline.md, "建立匯出時"). */
+/** The final SRT of a confirmed subtitle: applyDoc, then toSrt (docs/08-media-pipeline.md, "When an export is created (`api`)"). */
 export function finalSrt(cues: Cue[], doc: SyncDoc): string {
   return SyncCore.toSrt(SyncCore.applyDoc(cues, doc));
 }
@@ -70,7 +70,7 @@ async function visibleExport(deps: Deps, user: AuthedUser, id: string): Promise<
 export function exportRoutes(app: FastifyInstance, deps: Deps): void {
   const { pool, config } = deps;
 
-  /** Start an export (docs/04-api.md, "匯出"; docs/08-media-pipeline.md, "建立匯出時"). */
+  /** Start an export (docs/04-api.md, "Export"; docs/08-media-pipeline.md, "When an export is created (`api`)"). */
   app.post('/api/torrents/:id/exports', async (req, reply): Promise<Export> => {
     const user = requireUser(req);
     const { id } = parse(IdParams, req.params);

@@ -6,8 +6,8 @@ import { deflateSync } from 'node:zlib';
 import { TMDB_ONLY, tmdbCatalogue } from './films.ts';
 
 /**
- * The fake subtitle sources (docs/15-testing.md, "假的字幕來源"): one HTTP server that answers for
- * JustSubtitles (and its title search), SubDL, TMDB, YIFY Subtitles and 射手網, with the responses
+ * The fake subtitle sources (docs/15-testing.md, "Fake subtitle source"): one HTTP server that answers for
+ * JustSubtitles (and its title search), SubDL, TMDB, YIFY Subtitles and Assrt, with the responses
  * recorded in phase 0 (reference/providers) and fixtures/archive.zip as every download. The app
  * reaches it through SOURCE_OVERRIDES; `overrides(url)` gives that map.
  *

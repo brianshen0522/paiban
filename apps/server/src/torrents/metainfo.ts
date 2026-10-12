@@ -146,7 +146,7 @@ export async function decodeMetainfo(metainfo: Buffer): Promise<Metainfo> {
   };
 }
 
-/** The file that gets downloaded: the largest video (docs/06-torrent-worker.md, "手動加入"). */
+/** The file that gets downloaded: the largest video (docs/06-torrent-worker.md, "Adding by hand"). */
 export const chosenFile = (meta: Pick<Metainfo, 'files'>): TorrentFileEntry | null => mainVideo(meta.files);
 
 /** What a release name says about the version, for the downloads list (by hand nothing else says it). */

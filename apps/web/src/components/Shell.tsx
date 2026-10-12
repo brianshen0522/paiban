@@ -14,7 +14,7 @@ import { ThemeToggle } from './ThemeToggle';
 import { useToast } from './Toasts';
 import { meterLevel } from './Usage';
 
-/** Where a notification leads (docs/11-pages.md, "通知"). */
+/** Where a notification leads (docs/11-pages.md, "Notifications"). */
 export function notificationTarget(n: Notification): string {
   if (!n.link) return n.kind.startsWith('export.') ? '/storage' : '/library';
   if (n.link.page === 'downloads') return '/downloads';
@@ -42,7 +42,7 @@ export function notificationText(n: Notification): string {
   }
 }
 
-/** Closes a popup on outside click and Esc (docs/17-ui.md, "彈出選單"). */
+/** Closes a popup on outside click and Esc (docs/17-ui.md, "pop-up menu"). */
 function usePopup(): [boolean, (v: boolean) => void, React.RefObject<HTMLDivElement | null>] {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -77,7 +77,7 @@ export function Shell({ me }: { me: Me }) {
 
   const onNotification = useCallback(
     (n: Notification) => {
-      // Finished downloads and exports also pop up while the person has the site open (docs/11, "通知").
+      // Finished downloads and exports also pop up while the person has the site open (docs/11, "Notifications").
       if (n.kind === 'download.completed' || n.kind === 'export.completed')
         toast(notificationText(n), { label: t.common.open, run: () => navigate(notificationTarget(n)) });
     },

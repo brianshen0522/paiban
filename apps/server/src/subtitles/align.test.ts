@@ -5,7 +5,7 @@ import { computeAlignment, ffsubsyncCandidates, probeSrt, startsFromOutput } fro
 import { normalizeCues, parseSrt } from './text.js';
 
 /**
- * The last column of the table in docs/08-media-pipeline.md ("在測試素材上的結果"), from the recorded
+ * The last column of the table in docs/08-media-pipeline.md ("Results on the test fixtures"), from the recorded
  * ffsubsync outputs in fixtures/ffsubsync, so it runs without ffsubsync. The image test runs the
  * real tool end to end (test/subtitles-align.test.ts).
  */

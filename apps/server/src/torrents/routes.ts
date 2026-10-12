@@ -37,7 +37,7 @@ export function torrentRoutes(app: FastifyInstance, deps: Deps): void {
   const { pool, config, disk } = deps;
 
   /**
-   * Accept a download (docs/04-api.md, "接受下載"). Size, quality and codec come from YTS through the
+   * Accept a download (docs/04-api.md, "Admitting a download"). Size, quality and codec come from YTS through the
    * server, never from the request, and the hash must be one YTS lists for that film (D26).
    */
   app.post('/api/torrents', async (req, reply) => {
@@ -123,7 +123,7 @@ export function torrentRoutes(app: FastifyInstance, deps: Deps): void {
       result = await tx(pool, (c) => attempt(c)());
     } catch (err) {
       // Two people adding the same new version at once: the second insert hits the unique hash.
-      // Run again; this time it finds the row and joins (docs/03-data-model.md, "交易的邊界").
+      // Run again; this time it finds the row and joins (docs/03-data-model.md, "Transaction boundaries").
       if (pgCode(err) !== UNIQUE_VIOLATION) throw err;
       result = await tx(pool, (c) => attempt(c)());
     }
@@ -164,7 +164,7 @@ export function torrentRoutes(app: FastifyInstance, deps: Deps): void {
   });
 
   /**
-   * The detail page's live view (docs/11-pages.md, "下載細節"). Each call keeps the snapshot wanted
+   * The detail page's live view (docs/11-pages.md, "Download details"). Each call keeps the snapshot wanted
    * for ten more seconds; the torrent service writes one on its next pass (every 2 s). A snapshot
    * older than six seconds is not given out: the download has stopped running.
    */

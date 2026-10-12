@@ -12,7 +12,7 @@ import { dateTime, relative } from '../../lib/format';
 const USERS = ['admin', 'users'] as const;
 const INVITES = ['admin', 'invites'] as const;
 
-/** docs/11-pages.md, "使用者與邀請". */
+/** docs/11-pages.md, "Users & invites (15)". */
 export function UsersPage() {
   const me = useOutletContext<Me>();
   const users = useQuery({ queryKey: USERS, queryFn: () => get<AdminUser[]>('/api/admin/users') });

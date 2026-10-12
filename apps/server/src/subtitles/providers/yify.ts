@@ -146,7 +146,7 @@ export class Yify implements SubtitleProvider {
     });
     if (res.status !== 200) throw new DownloadFailure(`subtitle page answered ${res.status}`);
     const url = parseYifyDownloadLink(res.body.toString('utf8'));
-    // No button or no address: the page changed. Do not guess an address (docs/07, "下載").
+    // No button or no address: the page changed. Do not guess an address (docs/07, "Download").
     if (!url) throw new DownloadFailure('no download link on the subtitle page', true);
     if (!this.allow(new URL(url).hostname)) throw new DownloadFailure('download host not on the list');
     return [{ url, fileName: `${found.ref}.zip` }];

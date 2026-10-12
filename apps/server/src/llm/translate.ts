@@ -2,7 +2,7 @@ import { z } from 'zod';
 import type { JsonRequest } from './providers.js';
 
 /**
- * Translating a subtitle with a language model (docs/18-llm.md, "字幕翻譯"): the film's
+ * Translating a subtitle with a language model (docs/18-llm.md, "Subtitle translation"): the film's
  * background, then 50 lines at a time with up to 10 earlier lines (and their translations) and 10
  * later lines as context the model is told not to translate. Chunks go in order, so names and
  * wording carry from one to the next. This file builds the questions and checks the answers;

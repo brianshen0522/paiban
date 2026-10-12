@@ -1,4 +1,4 @@
-/* Workspace and sync workbench (docs/11-pages.md, "工作區"; docs/09-sync-workbench.md). Tokens from app.css. */
+/* Workspace and sync workbench (docs/11-pages.md, "Workspace"; docs/09-sync-workbench.md). Tokens from app.css. */
 
 /* A link styled as the row's main action, and links that read as links. */
 a.btn.strong {
@@ -18,7 +18,7 @@ a.link {
   text-decoration: underline;
 }
 
-/* Toggle buttons (docs/17-ui.md, "切換鈕"). */
+/* Toggle buttons (docs/17-ui.md, "toggle button"). */
 button[aria-pressed="true"] {
   background: var(--ink);
   border-color: var(--ink);

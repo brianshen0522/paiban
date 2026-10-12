@@ -9,7 +9,7 @@ import { film, fixture } from './export-helpers.js';
 import { createUser, type TestApp, testApp, testDb } from './helpers.js';
 
 /**
- * Subtitles a download carries (Brian, 2026-10-09; docs/08-media-pipeline.md, "種子內附的字幕"):
+ * Subtitles a download carries (Brian, 2026-10-09; docs/08-media-pipeline.md, "Subtitles from the torrent"):
  * files beside the film and text tracks inside it become the film's subtitles.
  */
 const FFMPEG = spawnSync('ffmpeg', ['-version'], { stdio: 'ignore' }).status === 0;

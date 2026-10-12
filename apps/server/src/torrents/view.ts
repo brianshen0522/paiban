@@ -96,7 +96,7 @@ export const filmPosterUrl = (r: Pick<TorrentRow, 'yts_id' | 'movie_id'>) =>
   r.yts_id !== null ? posterUrl(r.yts_id) : `/api/movies/${r.movie_id}/poster`;
 
 /**
- * MediaStatus (docs/09-sync-workbench.md, "播哪個檔"): sources in the order the sync page should try
+ * MediaStatus (docs/09-sync-workbench.md, "Which file to play"): sources in the order the sync page should try
  * them, and what asking for the missing preview assets would reserve now.
  */
 export function mediaStatus(r: TorrentRow, proxyResolution: '480p' | '720p' = '480p'): MediaStatus | null {

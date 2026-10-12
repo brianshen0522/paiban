@@ -12,7 +12,7 @@ import { fieldMessage } from './fieldMessages';
 
 const c = () => t.admin.sources;
 
-/** docs/11-pages.md, "來源設定": three tabs (Brian, 2026-10-06: one long page was too long). */
+/** docs/11-pages.md, "Sources (17)": three tabs (Brian, 2026-10-06: one long page was too long). */
 export function SourcesPage() {
   const s = useAdminSettings();
   return (
@@ -162,7 +162,7 @@ function Cards({ data }: { data: AdminSettings }) {
 
 /* ------------------------------------------------------------------ building blocks */
 
-/** Saves a partial update; answers with a sentence per invalid key (docs/13, "介面上的錯誤訊息"). */
+/** Saves a partial update; answers with a sentence per invalid key (docs/13, "Error messages in the interface"). */
 function useSave() {
   const qc = useQueryClient();
   const toast = useToast();
@@ -216,7 +216,7 @@ function SourceCard({
   );
 }
 
-/** The sentence beside a source's test button (docs/13-settings.md, "測試連線"). */
+/** The sentence beside a source's test button (docs/13-settings.md, "Test connection"). */
 export function checkText(id: SourceId, r: SourceCheck): string {
   switch (r.code) {
     case 'OK':
@@ -267,7 +267,7 @@ function TestButton({ id, label, disabled }: { id: SourceId; label?: string; dis
   );
 }
 
-/** A write-only key: a password box, saved with PUT, cleared with DELETE (docs/13-settings.md, "金鑰"). */
+/** A write-only key: a password box, saved with PUT, cleared with DELETE (docs/13-settings.md, "Keys"). */
 function SecretField({
   name,
   label,

@@ -12,7 +12,7 @@ import { film, fixture, idleEngine, subtitle } from './export-helpers.js';
 import { call, createUser, GB, login, setLimit, type TestApp, testApp, testDb } from './helpers.js';
 
 /**
- * The mux job against the fixtures (docs/08-media-pipeline.md, "封裝"; docs/10-storage.md, phase 7).
+ * The mux job against the fixtures (docs/08-media-pipeline.md, "Packing (`export.mux`)"; docs/10-storage.md, phase 7).
  * Needs ffmpeg and ffprobe: they are in the image, so `pnpm test:image test/exports-mux.test.ts`
  * runs this file for real; on a machine without them it is skipped, loudly.
  */
@@ -216,7 +216,7 @@ describe.skipIf(!TOOLS)('the mux job', { timeout: 120_000 }, () => {
     expect(packetHashes(out, '0:v:0')).toEqual(packetHashes(src, '0:v:0'));
     expect(packetHashes(out, '0:a:0')).toEqual(packetHashes(src, '0:a:0'));
 
-    // Subtitle times are applyDoc's, moved only by the container's common offset (docs/08, "時間").
+    // Subtitle times are applyDoc's, moved only by the container's common offset (docs/08, "Time").
     for (const [k, s] of [zh, en].entries()) {
       const want = SyncCore.applyDoc(s.cues, s.doc).filter((c) => !c.deleted);
       const got = cueTimes(out, subs[k]?.index ?? -1);

@@ -66,7 +66,7 @@ const TASK_TONE: Record<Task['state'], Tone> = {
   cancelled: '',
 };
 
-/** docs/11-pages.md, "系統狀態": services, background tasks, the disk. Polls every 10 seconds. */
+/** docs/11-pages.md, "System status (20)": services, background tasks, the disk. Polls every 10 seconds. */
 export function SystemPage() {
   const q = useAdminSystem();
   const storage = useStorage();

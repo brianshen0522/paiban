@@ -4,7 +4,7 @@ import { POSTER_REGIONS } from '@paiban/shared';
 import { z } from 'zod';
 
 /**
- * Poster copies kept under /data/posters (docs/05-yts.md, "海報"), one per country someone asked
+ * Poster copies kept under /data/posters (docs/05-yts.md, "Posters"), one per country someone asked
  * for (Brian, 2026-10-10): `<stem>-<region>.<ext>`, beside the copy kept when the film was added
  * (`<stem>.jpg`, Taiwan's). `<stem>` is the YTS id, or `tmdb-<id>` for a film added by hand.
  * Not counted toward the limit; removed with the film (storage/remove.ts, removePoster).

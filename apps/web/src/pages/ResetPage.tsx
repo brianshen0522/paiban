@@ -8,7 +8,7 @@ import { useToast } from '../components/Toasts';
 import { t } from '../copy';
 import { ApiFailure, get, post } from '../lib/api';
 
-/** docs/11-pages.md, "重設密碼": the account name read-only, a new password twice. */
+/** docs/11-pages.md, "Reset password": the account name read-only, a new password twice. */
 export function ResetPage() {
   const { token = '' } = useParams();
   const navigate = useNavigate();

@@ -28,7 +28,7 @@ import {
 import { selectTorrents, toTorrent, versionLabel } from './view.js';
 
 /**
- * Torrents added by hand (Brian, 2026-10-09; D26 changed; docs/06-torrent-worker.md, "手動加入"):
+ * Torrents added by hand (Brian, 2026-10-09; D26 changed; docs/06-torrent-worker.md, "Adding by hand"):
  * a magnet link or a .torrent file, inspected first so the person sees what will be downloaded,
  * then added with the film picked on TMDB. Only the largest video file is downloaded.
  */
@@ -241,7 +241,7 @@ export function manualTorrentRoutes(app: FastifyInstance, deps: Deps): void {
     return view(deps, user, await ownInspection(deps, user, id));
   });
 
-  /** Adds the inspected torrent as the film picked on TMDB (docs/04-api.md, "手動加入"). */
+  /** Adds the inspected torrent as the film picked on TMDB (docs/04-api.md, "Adding by hand"). */
   app.post('/api/torrents/manual', async (req, reply): Promise<{ torrent: Torrent; joined: boolean }> => {
     const user = requireUser(req);
     const body = parse(ManualBody, req.body);

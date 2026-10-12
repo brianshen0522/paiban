@@ -284,7 +284,7 @@ export function llmRoutes(app: FastifyInstance, deps: Deps): void {
 }
 
 /**
- * Before the LLM settings page, one model was set under 自動對齊 (`align.llm.*` and the `llmKey`
+ * Before the LLM settings page, one model was set under Sources → Auto-align (`align.llm.*` and the `llmKey`
  * secret). On start the api moves it into the first profile, the key sealed again for that row,
  * and removes the old rows. Only data moves; nothing is asked of the model (docs/18-llm.md).
  */
@@ -350,7 +350,7 @@ async function moveInto(
   });
 }
 
-/* ------------------------------------------------------------------ translation (docs/18-llm.md, "字幕翻譯") */
+/* ------------------------------------------------------------------ translation (docs/18-llm.md, "Subtitle translation") */
 
 declare module 'fastify' {
   interface FastifyInstance {
