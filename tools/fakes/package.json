@@ -2,6 +2,7 @@
   "name": "@paiban/fakes",
   "version": "0.0.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "description": "Stand-ins for development and tests (docs/15-testing.md): a fake YTS, fake subtitle sources and a local seeder. Never in the production image.",
   "exports": {

@@ -97,3 +97,7 @@ Please fill keys in yourself, into the local `deploy/.env` (used for checking so
 ## Legal note
 
 Not legal advice. Most content on YTS isn't authorized by the rights holders, and BitTorrent uploads while it downloads; in most regions this kind of use carries legal risk, borne by whoever hosts and uses it. Development and testing use only the synthetic fixtures included here and freely distributable videos throughout.
+
+## License
+
+[MIT](LICENSE). The license covers this code only; it grants nothing about any film, subtitle or other content the software downloads.
