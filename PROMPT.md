@@ -16,7 +16,7 @@ In this folder you are implementing a self-hosted website called Paiban (拍板)
 Please do these in order:
 
 1. If this folder isn't a git repo yet, run git init first and make the current contents, as they are, the first commit.
-2. Read README.md and AGENTS.md, then read all 18 documents in docs/ in the order README lists. While reading, record questions, contradictions and gaps in docs/agent-notes.md.
+2. Read docs/handover.md and AGENTS.md, then read all 18 documents in docs/ in the order docs/handover.md lists. While reading, record questions, contradictions and gaps in docs/agent-notes.md.
 3. Look at the prototypes: prototype/platform/index.html and prototype/workbench/index.html. If you can, operate them in a browser (prototype/README.md explains how); if not, read the source and screenshots under prototype/.
 4. Run the four sets of reference tests listed in the "Commands" section of AGENTS.md and confirm they all pass in your environment (needs Node.js 22.18 or later and the npm registry; if you can't run them, explain why).
 5. Tell me in a few paragraphs: what you understand this system is meant to do, how you plan to go about phase 0, and, having read everything, what problems you see in the spec or what needs my decision. Unless a problem blocks phase 0, you don't need to wait for my reply.

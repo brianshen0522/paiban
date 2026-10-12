@@ -2,7 +2,7 @@
 
 In this folder you are implementing Paiban (拍板): a self-hosted website for searching films, downloading them, finding subtitles, lining the subtitles up in the browser, and finally producing an MKV with subtitles.
 
-The spec, prototypes, reference code and test fixtures are already in this folder. **Read [README.md](README.md) first. It tells you where everything is and in what order to read it.**
+The spec, prototypes, reference code and test fixtures are already in this folder. **Read [docs/handover.md](docs/handover.md) first. It tells you where everything is and in what order to read it.**
 
 The client is Brian. He reads and writes Traditional Chinese.
 
