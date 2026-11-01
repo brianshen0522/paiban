@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { call, createUser, login, PUBLIC_URL, type TestApp, testApp, testDb } from './helpers.js';
 
 let db: Awaited<ReturnType<typeof testDb>>;
@@ -121,6 +121,20 @@ describe('invites and registration (D15)', () => {
 });
 
 describe('password reset links (D17)', () => {
+  it('keeps a live reset link out of the error log', async () => {
+    const id = await createUser(db.pool, 'logged_person');
+    const link = (await call(t.app, 'POST', `/api/admin/users/${id}/reset-link`, { cookie: boss })).json();
+    const token = link.url.split('/').pop() as string;
+    const logged = vi.spyOn(t.deps.log, 'error');
+    // A request with no body fails in the handler, after the token has been read.
+    expect((await call(t.app, 'POST', `/api/auth/reset/${token}`)).statusCode).toBe(500);
+    expect(logged).toHaveBeenCalled();
+    expect(
+      JSON.stringify(logged.mock.calls.map(([entry]) => ({ ...(entry as object), err: undefined }))),
+    ).not.toContain(token);
+    logged.mockRestore();
+  });
+
   it('work once, for thirty minutes, and sign the person out everywhere', async () => {
     const id = await createUser(db.pool, 'forgetful');
     const old = await login(t.app, 'forgetful');

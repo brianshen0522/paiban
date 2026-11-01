@@ -124,7 +124,9 @@ export function buildApp(deps: Deps): FastifyInstance {
       );
       return reply.status(api.status).send(api.body());
     }
-    deps.log.error({ err, method: req.method, url: req.url.split('?')[0] }, 'unexpected error');
+    // The route as written, not the URL: reset links and invite codes are in the path.
+    const url = req.routeOptions.url ?? req.url.split('?')[0];
+    deps.log.error({ err, method: req.method, url }, 'unexpected error');
     const api = new ApiError('INTERNAL', 'unexpected error');
     return reply.status(api.status).send(api.body());
   });
