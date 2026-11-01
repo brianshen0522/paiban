@@ -12,8 +12,8 @@
 		Referrer-Policy no-referrer
 		X-Frame-Options DENY
 		Permissions-Policy "camera=(), microphone=(), geolocation=()"
-		# The web app loads nothing from other origins. 'wasm-unsafe-eval' is for the ASS renderer.
-		Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; worker-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+		# The web app loads nothing from other origins.
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; worker-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
 		-Server
 	}
 
