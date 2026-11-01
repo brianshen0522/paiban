@@ -403,25 +403,29 @@ export function translationRoutes(app: FastifyInstance, deps: Deps): void {
     );
     if (earlier) return resume(user, earlier.id, req.ip);
     const limit = (await readSettings(pool)).llm.translatePerHour;
-    const recent = await many<{ created_at: Date }>(
-      pool,
-      `select created_at from translations where created_by = $1 and created_at > now() - interval '1 hour' order by created_at`,
-      [user.id],
-    );
-    if (recent.length >= limit) {
-      const oldest = recent[recent.length - limit]?.created_at ?? new Date();
-      throw new ApiError('RATE_LIMITED', 'too many translations this hour', {
-        retryAfterSeconds: Math.max(1, Math.ceil((oldest.getTime() + 3_600_000 - Date.now()) / 1000)),
-      });
-    }
     let created: { id: string } | null;
     try {
-      created = await one<{ id: string }>(
-        pool,
-        `insert into translations (torrent_id, source_id, target_language, mode, total_chunks, created_by)
-         select $1, $2, $3, $4, $5, $6 from torrents where id = $1 and want <> 'remove' returning id`,
-        [s.torrent_id, id, body.targetLanguage, body.mode, Math.max(1, Math.ceil(s.cue_count / CHUNK)), user.id],
-      );
+      created = await tx(pool, async (c) => {
+        // One at a time per person, so requests arriving together cannot all read the same count.
+        await c.query('select pg_advisory_xact_lock(727003, hashtext($1))', [user.id]);
+        const recent = await many<{ created_at: Date }>(
+          c,
+          `select created_at from translations where created_by = $1 and created_at > now() - interval '1 hour' order by created_at`,
+          [user.id],
+        );
+        if (recent.length >= limit) {
+          const oldest = recent[recent.length - limit]?.created_at ?? new Date();
+          throw new ApiError('RATE_LIMITED', 'too many translations this hour', {
+            retryAfterSeconds: Math.max(1, Math.ceil((oldest.getTime() + 3_600_000 - Date.now()) / 1000)),
+          });
+        }
+        return one<{ id: string }>(
+          c,
+          `insert into translations (torrent_id, source_id, target_language, mode, total_chunks, created_by)
+           select $1, $2, $3, $4, $5, $6 from torrents where id = $1 and want <> 'remove' returning id`,
+          [s.torrent_id, id, body.targetLanguage, body.mode, Math.max(1, Math.ceil(s.cue_count / CHUNK)), user.id],
+        );
+      });
     } catch (err) {
       if (pgCode(err) === UNIQUE_VIOLATION) throw new ApiError('TRANSLATION_RUNNING', 'already being translated');
       throw err;

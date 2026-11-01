@@ -653,6 +653,20 @@ describe('translating a subtitle', () => {
     expect(res.json().error.details.retryAfterSeconds).toBeGreaterThan(3000);
     expect((await translate(s.sid, { targetLanguage: 'x y', mode: 'plain' })).statusCode).toBe(422);
   });
+
+  it('keeps to the hourly limit when requests arrive together', async () => {
+    await create({ baseUrl: a.url });
+    expect(
+      (await call(t.app, 'PUT', '/api/admin/llm/settings', { cookie: boss, body: { translatePerHour: 2 } })).statusCode,
+    ).toBe(204);
+    const s = await source();
+    const answers = await Promise.all(
+      ['ja', 'ko', 'fr', 'de', 'es', 'it'].map((targetLanguage) => translate(s.sid, { targetLanguage, mode: 'plain' })),
+    );
+    await t.app.translationWorker.idle();
+    expect(answers.filter((r) => r.statusCode === 200)).toHaveLength(2);
+    expect(answers.filter((r) => r.statusCode === 429)).toHaveLength(4);
+  });
 });
 
 void sealKey;
