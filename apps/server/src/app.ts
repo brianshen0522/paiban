@@ -74,7 +74,8 @@ export function buildApp(deps: Deps): FastifyInstance {
   const origin = new URL(deps.config.publicUrl).origin;
   app.addHook('onRequest', async (req) => {
     // Cross-site request protection (docs/12-auth.md, "Cross-site request protection").
-    if (MUTATING.has(req.method) && req.url.startsWith('/api/')) {
+    // The route as matched, not the raw URL: the router decodes the path, so /%61pi/... reaches /api/...
+    if (MUTATING.has(req.method) && (req.routeOptions.url ?? req.url).startsWith('/api/')) {
       if (req.headers['x-requested-with'] !== 'paiban') throw new ApiError('FORBIDDEN', 'missing X-Requested-With');
       // Same-origin: the configured address, or the very host the request was sent to. A cross-site
       // form or script always carries its own origin, which matches neither.

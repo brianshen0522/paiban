@@ -87,6 +87,20 @@ describe('sign-in', () => {
     expect(res.json().error.details.retryAfterSeconds).toBeGreaterThan(0);
   });
 
+  it('counts guesses sent at the same moment toward the same limit', async () => {
+    await createUser(db.pool, 'burst', 'member');
+    // Its own app: the guesses also count against this address, which the other tests share.
+    const own = await testApp(db.pool);
+    const answers = await Promise.all(
+      Array.from({ length: 12 }, (_, i) =>
+        call(own.app, 'POST', '/api/auth/login', { body: { username: 'burst', password: `wrong-${i}-x` } }),
+      ),
+    );
+    await own.app.close();
+    expect(answers.filter((a) => a.statusCode === 401)).toHaveLength(5);
+    expect(answers.filter((a) => a.statusCode === 429)).toHaveLength(7);
+  });
+
   it('logs out and the cookie stops working', async () => {
     const cookie = await login(t.app, 'mei');
     expect((await call(t.app, 'GET', '/api/auth/me', { cookie })).statusCode).toBe(200);
@@ -128,6 +142,17 @@ describe('cross-site protection', () => {
       headers: { origin: 'https://evil.example' },
     });
     expect(otherOrigin.statusCode).toBe(403);
+  });
+
+  it('applies to the route reached, however its path is spelled', async () => {
+    await createUser(db.pool, 'spelled', 'member');
+    const own = await testApp(db.pool);
+    const cookie = await login(own.app, 'spelled');
+    const res = await own.app.inject({ method: 'POST', url: '/%61pi/auth/logout', headers: { cookie } });
+    const me = await call(own.app, 'GET', '/api/auth/me', { cookie });
+    await own.app.close();
+    expect(res.statusCode).toBe(403);
+    expect(me.statusCode).toBe(200);
   });
 });
 

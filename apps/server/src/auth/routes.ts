@@ -26,6 +26,8 @@ export function authRoutes(app: FastifyInstance, deps: Deps): void {
     const wait = Math.max(perUser.retryAfter(username), perIp.retryAfter(ip));
     if (wait > 0) throw new ApiError('RATE_LIMITED', 'too many sign-in attempts', { retryAfterSeconds: wait });
     perIp.record(ip);
+    // Counted before the slow check, so guesses sent at the same moment cannot all get through.
+    perUser.record(username);
 
     const row = await one<{
       id: string;
@@ -39,13 +41,10 @@ export function authRoutes(app: FastifyInstance, deps: Deps): void {
       username,
     ]);
     const ok = await verifyPassword(row?.password_hash ?? null, body.password);
-    if (!row || !ok) {
-      perUser.record(username);
-      throw new ApiError('INVALID_CREDENTIALS', 'wrong username or password');
-    }
+    if (!row || !ok) throw new ApiError('INVALID_CREDENTIALS', 'wrong username or password');
+    perUser.clear(username);
     // Only now, with the right password, may the answer say the account exists but is disabled.
     if (row.disabled) throw new ApiError('ACCOUNT_DISABLED', 'account disabled');
-    perUser.clear(username);
 
     const ua = req.headers['user-agent'] ?? '';
     const token = await createSession(pool, row.id, ua, ip);
