@@ -75,6 +75,11 @@ describe('text comparison', () => {
     expect(tokens('<i>Hello</i>, WORLD! {\\an8}')).toEqual(['hello', 'world']);
     expect(tokens('你好，世界')).toEqual(['你', '好', '世', '界']);
     expect(tokens('ＡＢＣ　def')).toEqual(['abc', 'def']);
+    expect(tokens('a < b <i>c</i> {d} e > f')).toEqual(['a', 'c', 'e', 'f']);
+    expect(tokens('left < open { too')).toEqual(['left', 'open', 'too']);
+    const started = performance.now();
+    tokens(`${'<'.repeat(200_000)}${'{'.repeat(200_000)}`);
+    expect(performance.now() - started).toBeLessThan(2000);
   });
 
   it('measures shared words against the shorter line, and refuses lines of very different length', () => {

@@ -173,3 +173,35 @@ describe('normalization', () => {
     expect(parseSubtitleFile('readme.txt', Buffer.from('just some notes'))).toBeNull();
   });
 });
+
+describe('hostile subtitle files', () => {
+  const quick = (run: () => unknown) => {
+    const started = performance.now();
+    run();
+    return performance.now() - started;
+  };
+  const events = (format: string, line: string) => `[Events]\n${format}\n${line}\n`;
+  const FORMAT = 'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text';
+  const DIALOGUE = 'Dialogue: 0,0:00:01.00,0:00:02.00,Default,,0,0,0,,';
+
+  it('reads a line of unclosed override blocks in linear time', () => {
+    expect(quick(() => assToCues(events(FORMAT, DIALOGUE + '{'.repeat(200_000))))).toBeLessThan(2000);
+  });
+
+  it('reads a very wide Format line in linear time', () => {
+    const wide = `Format: ${Array.from({ length: 100_000 }, (_, i) => `c${i}`).join(',')},Start,End,Text`;
+    const lines = Array.from({ length: 5000 }, () => 'Dialogue: 0:00:01.00,0:00:02.00,x').join('\n');
+    expect(quick(() => assToCues(`[Events]\n${wide}\n${lines}\n`))).toBeLessThan(2000);
+  });
+
+  it('keeps what the tag handling did for ordinary lines', () => {
+    const one = (text: string) => assToCues(events(FORMAT, DIALOGUE + text)).map((c) => c.text);
+    expect(one('{\\i1}Hello{\\i0} there')).toEqual(['Hello there']);
+    expect(one('{unclosed}a{b{c}d')).toEqual(['ad']);
+    expect(one('left { open')).toEqual(['left { open']);
+    expect(one('{\\p1}m 0 0 l 1 1{\\p0}')).toEqual([]);
+    expect(one('{\\an8\\p2\\c}m 0 0')).toEqual([]);
+    expect(one('{ no closing \\p1')).toEqual([]);
+    expect(one('{a}\\p1 is text')).toEqual(['\\p1 is text']);
+  });
+});

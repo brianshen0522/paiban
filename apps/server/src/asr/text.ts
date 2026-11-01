@@ -1,4 +1,5 @@
 import { SyncCore } from '@paiban/shared';
+import { dropSpans } from '../subtitles/markup.js';
 import type { Pair } from './fit.js';
 
 type Cue = SyncCore.Cue;
@@ -44,9 +45,7 @@ const CJK = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hang
  * spaces between words.
  */
 export function tokens(text: string): string[] {
-  const plain = text
-    .normalize('NFKC')
-    .replace(/<[^>]*>|\{[^}]*\}/g, ' ')
+  const plain = dropSpans(text.normalize('NFKC'), { '<': '>', '{': '}' }, ' ')
     .toLowerCase()
     .replace(/[\p{P}\p{S}]+/gu, ' ');
   const out: string[] = [];

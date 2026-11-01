@@ -1,6 +1,7 @@
 import type { Cue, DetectedLang } from '@paiban/shared';
 import iconv from 'iconv-lite';
 import * as OpenCC from 'opencc-js';
+import { dropSpans } from './markup.js';
 
 /**
  * Turning the bytes of a subtitle file into UTF-8 cues (docs/07-subtitle-providers.md, "Download and processing (`subtitle.resolve` downloads; `subtitle.fetch` / `subtitle.ingest` process)",
@@ -105,6 +106,17 @@ export function cuesToTraditional(cues: readonly Cue[]): Cue[] {
   return cues.map((c) => ({ ...c, text: toTwp(c.text) }));
 }
 
+/** Whether an override block turns on vector drawing (`{…\p1…`, closed or not). */
+function drawsVector(body: string): boolean {
+  for (let open = body.indexOf('{'); open >= 0; ) {
+    const close = body.indexOf('}', open);
+    if (/\\p[1-9]/.test(close < 0 ? body.slice(open) : body.slice(open, close))) return true;
+    if (close < 0) return false;
+    open = body.indexOf('{', close);
+  }
+  return false;
+}
+
 /**
  * ASS/SSA → plain cues. Dialogue events only; drawings and override tags dropped; \N and \n
  * become line breaks (D34).
@@ -114,7 +126,7 @@ export function assToCues(text: string): RawCue[] {
     const m = s.trim().match(/^(\d+):(\d\d):(\d\d)[.:](\d\d)$/);
     return m ? Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]) + Number(m[4]) / 100 : Number.NaN;
   };
-  let format: string[] | null = null;
+  let columns: { count: number; start: number; end: number; text: number } | null = null;
   const cues: RawCue[] = [];
   let inEvents = false;
   for (const raw of text.replace(/^﻿/, '').split(/\r?\n/)) {
@@ -125,30 +137,33 @@ export function assToCues(text: string): RawCue[] {
     }
     if (!inEvents) continue;
     if (/^Format:/i.test(line)) {
-      format = line
+      const format = line
         .slice(7)
         .split(',')
         .map((f) => f.trim().toLowerCase());
+      columns = {
+        count: format.length,
+        start: format.indexOf('start'),
+        end: format.indexOf('end'),
+        text: format.indexOf('text'),
+      };
       continue;
     }
-    if (!/^Dialogue:/i.test(line) || !format) continue;
+    if (!/^Dialogue:/i.test(line) || !columns) continue;
     // The text field is last and may itself contain commas.
     const parts = line.slice(9).split(',');
-    const fields = parts.slice(0, format.length - 1).concat(parts.slice(format.length - 1).join(','));
-    const f = format;
-    const get = (name: string) => fields[f.indexOf(name)] ?? '';
-    const body = get('text');
-    if (/\{[^}]*\\p[1-9]/.test(body)) continue; // vector drawing, not dialogue
-    const plain = body
-      .replace(/\{[^}]*\}/g, '')
+    const fields = parts.slice(0, columns.count - 1).concat(parts.slice(columns.count - 1).join(','));
+    const body = fields[columns.text] ?? '';
+    if (drawsVector(body)) continue; // vector drawing, not dialogue
+    const plain = dropSpans(body, { '{': '}' })
       .replace(/\\[Nn]/g, '\n')
       .replace(/\\h/g, ' ')
       .split('\n')
       .map((l) => l.trim())
       .filter(Boolean)
       .join('\n');
-    const start = time(get('start'));
-    const end = time(get('end'));
+    const start = time(fields[columns.start] ?? '');
+    const end = time(fields[columns.end] ?? '');
     if (!plain || !Number.isFinite(start) || !Number.isFinite(end)) continue;
     cues.push({ start, end, text: plain });
   }
