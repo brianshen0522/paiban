@@ -57,6 +57,12 @@ services:
       dockerfile: deploy/Dockerfile
       target: proxy
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
     environment:
       SITE_ADDRESS: ${SITE_ADDRESS:-:80}
     ports:
@@ -109,6 +115,8 @@ services:
   postgres:
     image: postgres:17
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     environment:
       POSTGRES_USER: paiban
       POSTGRES_DB: paiban
