@@ -22,7 +22,7 @@
     "@paiban/shared": "workspace:*",
     "bencode": "4.0.1",
     "cheerio": "1.2.0",
-    "fastify": "5.12.5",
+    "fastify": "5.12.6",
     "iconv-lite": "0.7.3",
     "memory-chunk-store": "1.3.5",
     "opencc-js": "1.4.2",
@@ -30,7 +30,7 @@
     "pg": "8.23.1",
     "pino": "10.4.0",
     "webtorrent": "3.0.21",
-    "zod": "4.6.5"
+    "zod": "4.6.6"
   },
   "devDependencies": {
     "@paiban/fakes": "workspace:*",
