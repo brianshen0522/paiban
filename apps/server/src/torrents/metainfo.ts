@@ -3,6 +3,7 @@ import { isIP } from 'node:net';
 import bencode from 'bencode';
 import parseTorrent from 'parse-torrent';
 import { z } from 'zod';
+import { isInternalAddress } from '../net/address.js';
 import { mainVideo } from '../torrent/schedule.js';
 
 /**
@@ -44,31 +45,19 @@ const Parsed = z.object({
   info: z.unknown().optional(),
 });
 
-/** Private, loopback and link-local hosts: a tracker there would make WebTorrent reach inside the network. */
+/**
+ * Hosts a tracker must not be on: it would make WebTorrent reach inside the network. udp:// is not a
+ * scheme URL parsing normalizes, so `127.1` or `0177.0.0.1` arrive as written and the system resolver
+ * would still read them as addresses: a host ending in a number is refused unless it is a public IP.
+ */
 function privateHost(host: string): boolean {
-  const h = host.replace(/^\[|\]$/g, '').toLowerCase();
+  const h = host
+    .replace(/^\[|\]$/g, '')
+    .replace(/\.+$/, '')
+    .toLowerCase();
   if (h === 'localhost' || h.endsWith('.localhost') || h.endsWith('.local') || h.endsWith('.internal')) return true;
-  if (isIP(h) === 4) {
-    const [a = 0, b = 0] = h.split('.').map(Number);
-    return (
-      a === 10 ||
-      a === 127 ||
-      a === 0 ||
-      (a === 169 && b === 254) ||
-      (a === 172 && b >= 16 && b <= 31) ||
-      (a === 192 && b === 168) ||
-      (a === 100 && b >= 64 && b <= 127)
-    );
-  }
-  if (isIP(h) === 6)
-    return (
-      h === '::1' ||
-      h === '::' ||
-      h.startsWith('fc') ||
-      h.startsWith('fd') ||
-      h.startsWith('fe80') ||
-      h.startsWith('::ffff:')
-    );
+  if (isIP(h)) return h.startsWith('::ffff:') || isInternalAddress(h);
+  if (h.includes('%') || /(?:^|\.)(?:\d+|0x[0-9a-f]*)$/.test(h)) return true;
   return !h.includes('.');
 }
 

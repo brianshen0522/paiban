@@ -88,6 +88,38 @@ describe('reading what someone gives by hand', () => {
     ).toEqual(['udp://a.example.org:6969', 'wss://c.example.org/a']);
   });
 
+  it('drops every spelling of an internal address', () => {
+    expect(
+      safeTrackers([
+        'udp://127.1:6969',
+        'udp://10.1:6969',
+        'udp://0177.0.0.1:6969',
+        'udp://0x7f.0.0.1:6969',
+        'udp://2130706433:6969',
+        'udp://127.0.0%2E1:6969',
+        'udp://localhost.:6969',
+        'http://localhost./a',
+        'http://198.18.0.1/a',
+        'http://192.0.0.1/a',
+        'http://224.0.0.1/a',
+        'http://240.0.0.1/a',
+        'http://[fe90::1]/a',
+        'http://[64:ff9b::7f00:1]/a',
+        'http://[::ffff:8.8.8.8]/a',
+      ]),
+    ).toEqual([]);
+  });
+
+  it('keeps public names and addresses, a trailing dot included', () => {
+    const kept = [
+      'udp://tracker.example.org.:6969',
+      'http://8.8.8.8/a',
+      'udp://1.1.1.1:6969',
+      'http://[2606:4700::1]/a',
+    ];
+    expect(safeTrackers(kept)).toEqual(kept);
+  });
+
   it('guesses the version from the release name', () => {
     expect(guessVersion('Movie.2019.2160p.UHD.BluRay.x265.10bit-GRP')).toEqual({
       quality: '2160p',
